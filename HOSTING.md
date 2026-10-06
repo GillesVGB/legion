@@ -4,6 +4,10 @@ Gebruik **Legion-FPS-ms.zip** voor FPS.ms of een vergelijkbare Linux x64-host. H
 
 ## Bot-Hosting.net via GitHub
 
+Voor de huidige Legion-deployment staat het vaste HTTPS-adres `https://wlll36f6gd.apps.bot-hosting.cloud` in `hosting.json`. Zodra de hosting `SERVER_PORT=25237` meegeeft, start het dashboard rechtstreeks op `0.0.0.0:25237`. Er wordt dan geen cloudflared gestart. Je hoeft hiervoor geen nieuwe `.env` te maken of token te veranderen.
+
+Bij een andere deployment zet je `DASHBOARD_PUBLIC_URL` op het nieuwe HTTPS-basisadres uit Domains. De bot gebruikt de toegewezen `SERVER_PORT`, ook als `.env` nog `TRANSCRIPT_PORT=8793` bevat. De hosting verzorgt TLS; alle private dashboardacties behouden hun beveiligde cookie, leidingcontrole en CSRF-controle. De vaste hosting-URL wordt ook gebruikt voor nieuwe en bestaande transcriptknoppen.
+
 1. Gebruik repository `https://github.com/GillesVGB/legion`, branch **main**, en zet **Git auto-pull** aan voor updates bij een herstart.
 2. Kies runtime **Node.js 24** en **Entry File / STARTUP_FILE: index.js**.
 3. Laat de standaard startopdracht dependencies installeren. Als je zelf een startopdracht instelt, gebruik `npm ci --omit=dev && exec node index.js` vanuit de hoofdmap van de deployment.
@@ -56,6 +60,10 @@ De host moet uitgaande HTTPS- en Cloudflare Tunnel-verbindingen toestaan en chil
 Bewaar `data/` op een **persistente schijf/volume** en maak regelmatig backups. Het dashboard kan je host niet herstellen als de hostingserver zelf uit staat. Het gratis FPS.ms-plan moet iedere 24 uur worden verlengd: [FPS.ms-informatie](https://fps.ms/free-discord-bot-hosting/).
 
 ## Als starten mislukt
+
+De opstartregel toont de botversie en of het dashboard via **hostingadres** of **tunnel** draait. Bij directe hosting hoort `Legion dashboard luistert op hostingpoort 25237` te verschijnen en daarna `Legion dashboard bereikbaar`. Een ontbrekend antwoord op de poort wijst op een fout port/bind-adres; controleer de Domains-pagina en SERVER_PORT.
+
+Als je een tunnel gebruikt: de bot probeert standaard IPv4 met protocol `auto` (QUIC, met fallback naar HTTP/2). Hij toont aparte DNS-, netwerk- en certificaatfouten, controleert de bereikbaarheid ook nadat hij online is en herstelt na een storing. Cloudflare vereist uitgaand UDP of TCP op poort 7844. Als de hosting beide blokkeert, gebruik het vaste HTTPS-adres via `DASHBOARD_PUBLIC_URL`. [Cloudflare-verbindingsproblemen](https://developers.cloudflare.com/tunnel/troubleshooting/).
 
 - `Cannot find module /home/container/index.js`: het pakket is niet in de hoofdmap uitgepakt of Main file klopt niet.
 - Discord `401` of `TokenInvalid`: vervang alleen het private bot-token in `.env` en herstart.

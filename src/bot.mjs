@@ -1,5 +1,6 @@
 import { Client, Events, GatewayIntentBits, MessageFlags, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { randomInt } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { loadConfig } from './config.mjs';
 import { Store } from './store.mjs';
 import { Locks } from './locks.mjs';
@@ -18,6 +19,7 @@ import { quiet, isStaff, requireStaff, requireAdmin, requireTickets, configureGu
   createCase, requestCaseDecision, decideCase, startInterview, cleanupInterviews, cleanupClosedCases, warningMessage, staffLogChannel, warnLogChannel, writeWarnLog, reconcileCases } from './service.mjs';
 
 const base = loadConfig();
+console.log(`Legion versie ${JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version}: dashboard ${base.dashboardPublicURL ? 'via hostingadres' : 'via tunnel'}.`);
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent], allowedMentions: quiet });
 const locks = new Locks();
 const contexts = new Map();

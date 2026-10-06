@@ -21,11 +21,18 @@ export function loadConfig(env = process.env, requireDiscord = true) {
   if (requireDiscord && (!token || token.includes('VUL_HIER'))) errors.push('DISCORD_TOKEN: vul je eigen bot-token in je lokale .env in.');
   const color = env.EMBED_COLOR || '#B91C1C';
   if (!/^#[\da-f]{6}$/i.test(color)) errors.push('EMBED_COLOR: gebruik bijvoorbeeld #B91C1C.');
+  const hostingPath = resolve(ROOT, 'hosting.json');
+  const hosting = existsSync(hostingPath) ? JSON.parse(readFileSync(hostingPath, 'utf8')) : {};
+  const hostedURL = String(env.SERVER_PORT || '') === String(hosting.port) ? hosting.dashboardURL : '';
+  const publicURL = (env.DASHBOARD_PUBLIC_URL ?? hostedURL ?? '').trim();
   const config = {
     token, clientId: (env.CLIENT_ID ?? '').trim(),
     transcriptViewerMode: (env.TRANSCRIPT_VIEWER_MODE || 'local').trim(),
-    transcriptPort: integer('TRANSCRIPT_PORT', 8793, 1024, 65535),
+    dashboardPublicURL: publicURL,
+    transcriptPort: integer(publicURL && env.SERVER_PORT ? 'SERVER_PORT' : 'TRANSCRIPT_PORT', 8793, 1024, 65535),
     cloudflaredPath: cloudflaredExecutable(env),
+    cloudflaredProtocol: (env.CLOUDFLARED_PROTOCOL || 'auto').trim(),
+    cloudflaredIPVersion: (env.CLOUDFLARED_EDGE_IP_VERSION || '4').trim(),
     transcriptSiteURL: (env.TRANSCRIPT_SITE_URL ?? '').trim(),
     transcriptSiteToken: (env.TRANSCRIPT_SITE_TOKEN ?? '').trim(),
     transcriptUploadSecret: (env.TRANSCRIPT_UPLOAD_SECRET ?? '').trim(),
@@ -41,6 +48,15 @@ export function loadConfig(env = process.env, requireDiscord = true) {
     content: JSON.parse(readFileSync(resolve(ROOT, 'content.json'), 'utf8'))
   };
   if (!['files', 'local', 'remote'].includes(config.transcriptViewerMode)) errors.push('TRANSCRIPT_VIEWER_MODE: kies files, local of remote.');
+  if (!['auto', 'http2', 'quic'].includes(config.cloudflaredProtocol)) errors.push('CLOUDFLARED_PROTOCOL: kies auto, http2 of quic.');
+  if (!['auto', '4', '6'].includes(config.cloudflaredIPVersion)) errors.push('CLOUDFLARED_EDGE_IP_VERSION: kies auto, 4 of 6.');
+  if (config.dashboardPublicURL) {
+    try {
+      const url = new URL(config.dashboardPublicURL);
+      if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || url.pathname !== '/') throw new Error();
+      config.dashboardPublicURL = url.origin;
+    } catch { errors.push('DASHBOARD_PUBLIC_URL: vul alleen het HTTPS-basisadres uit het hostingpaneel in.'); }
+  }
   if (env.GAMES_MEMBERS_ONLY && !['true', 'false'].includes(env.GAMES_MEMBERS_ONLY)) errors.push('GAMES_MEMBERS_ONLY: gebruik true of false.');
   if (requireDiscord && !snowflake.test(config.clientId)) errors.push('CLIENT_ID: vul een geldig Application-ID in.');
   if (!Array.isArray(config.guilds) || !config.guilds.length) errors.push('guilds.json: voeg minimaal een guild toe.');
