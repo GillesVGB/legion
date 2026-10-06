@@ -1,0 +1,20 @@
+{
+  "name": "legion-future-rp-bot",
+  "version": "1.4.0",
+  "private": true,
+  "description": "Nederlandstalige Discord-bot voor Legion in Future RP",
+  "type": "module",
+  "main": "index.js",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env index.js",
+    "deploy": "node --env-file-if-exists=.env scripts/deploy.mjs",
+    "check": "node --env-file-if-exists=.env scripts/check.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "discord.js": "14.25.1"
+  }
+}

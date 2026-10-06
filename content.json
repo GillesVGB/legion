@@ -1,0 +1,17 @@
+{
+  "gangName": "Legion",
+  "serverName": "Future RP",
+  "tagline": "Loyaliteit. Respect. Samen sterk.",
+  "information": "Welkom bij Legion in Future RP. Gebruik /solliciteren om je aan te melden en /ticket openen om contact op te nemen met de leiding. Bij /help vind je alle functies.",
+  "rules": [
+    "Volg de actuele regels van Future RP. De leiding vult hier de officiele regels of een link in.",
+    "Behandel leden met respect en houd OOC-conflicten buiten het roleplayverhaal.",
+    "Deel interne ganginformatie alleen met bevoegde leden.",
+    "Volg afspraken met de leiding en meld afwezigheid op tijd."
+  ],
+  "ranks": ["Chef", "Sous-Chef", "Conseiller", "Capitane", "Head Killer", "Killer", "Spécialiste", "Membre", "Recruter", "Hangaround"],
+  "applicationIntro": "Leuk dat je interesse hebt in Legion! Klik op Solliciteren om direct een prive ticket te openen. Daar staat de volledige sollicitatietemplate. Plaats je antwoorden gewoon in het kanaal; de leiding bespreekt je sollicitatie met je.",
+  "ticketIntro": "Hulp nodig of iets bespreken met de leiding? Open een prive ticket. Alleen jij, de leiding en Discord-administrators kunnen dit kanaal zien.",
+  "eightBallAnswers": ["Zeker weten.", "De leiding ziet kansen.", "Vraag het later nog eens.", "Dat klinkt als een slecht plan.", "De kaarten staan gunstig.", "Eerst even overleggen met Legion."],
+  "coinName": "Legion-coins"
+}

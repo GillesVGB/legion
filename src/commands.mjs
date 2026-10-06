@@ -1,0 +1,51 @@
+import { SlashCommandBuilder, PermissionFlagsBits, ChannelType } from 'discord.js';
+
+const cmd = (name, description) => new SlashCommandBuilder().setName(name).setDescription(description).setDMPermission(false);
+const userOption = option => option.setName('lid').setDescription('Het Legion-lid').setRequired(true);
+const reasonOption = option => option.setName('reden').setDescription('Reden, maximaal 500 tekens').setRequired(true).setMaxLength(500);
+const betOption = (maxBet, required = true) => option => option.setName('inzet').setDescription('Aantal fictieve Legion-coins (blackjack: even aantal)').setMinValue(2).setMaxValue(maxBet).setRequired(required);
+
+export function commands(maxBet, ticketsEnabled = true) {
+  const result = [
+    cmd('help', 'Bekijk alle Legion-commands'),
+    cmd('info', 'Informatie over Legion en Future RP'),
+    cmd('regels', 'Lees de door Legion ingestelde regels'),
+    cmd('rangen', 'Bekijk de rangvolgorde van Legion'),
+    cmd('dashboard', 'Open het privé Legion-dashboard (alleen leiding)'),
+    cmd('uitnodiging', 'Bekijk je persoonlijke uitnodiging na een aangenomen sollicitatie'),
+    cmd('inrichten', 'Maak privecategorieen en een logkanaal voor deze guild')
+      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+      .addRoleOption(o => o.setName('leiding').setDescription('Rol die warns, tickets en sollicitaties beheert').setRequired(true))
+      .addRoleOption(o => o.setName('leden').setDescription('Optionele ledenrol voor aangenomen sollicitanten')),
+    cmd('setup', 'Plaats of ververs een Legion-paneel in deze guild')
+      .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
+      .addStringOption(o => o.setName('paneel').setDescription('Kies een paneel').setRequired(true).addChoices(
+        { name: ticketsEnabled ? 'Tickets en solliciteren samen' : 'Solliciteren en informatie', value: 'alles' },
+        ...(ticketsEnabled ? [{ name: 'Tickets', value: 'tickets' }] : []),
+        { name: 'Solliciteren', value: 'sollicitaties' }, { name: 'Informatie', value: 'info' }))
+      .addChannelOption(o => o.setName('kanaal').setDescription('Anders: ingesteld paneelkanaal, of huidig kanaal').addChannelTypes(ChannelType.GuildText)),
+    cmd('gangwarn', 'Gangwarns beheren (alleen leiding)')
+      .addSubcommand(s => s.setName('geven').setDescription('Geef een lid een gangwarn').addUserOption(userOption).addStringOption(reasonOption))
+      .addSubcommand(s => s.setName('bekijken').setDescription('Bekijk de gangwarns van een lid').addUserOption(userOption))
+      .addSubcommand(s => s.setName('intrekken').setDescription('Trek een gangwarn in; historie blijft bewaard')
+        .addStringOption(o => o.setName('id').setDescription('Warn-ID uit /gangwarn bekijken').setRequired(true).setMaxLength(12))
+        .addStringOption(reasonOption)),
+    cmd('mijnwarns', 'Bekijk alleen je eigen gangwarns'),
+    cmd('solliciteren', 'Open direct een prive sollicitatieticket met de Legion-template'),
+    cmd('ticket', 'Open of sluit je prive ticket')
+      .addSubcommand(s => s.setName('openen').setDescription('Open direct een prive ticket'))
+      .addSubcommand(s => s.setName('sluiten').setDescription('Sluit het ticket in dit kanaal met bevestiging')),
+    cmd('saldo', 'Bekijk je fictieve Legion-coins'),
+    cmd('daily', 'Claim elke 24 uur gratis Legion-coins'),
+    cmd('fish', 'Ga vissen: een mooie vangst of een kreeft die je bijt?'),
+    cmd('leaderboard', 'De tien rijkste spelers in deze guild'),
+    cmd('blackjack', 'Speel blackjack, of hervat zonder inzet').addIntegerOption(betOption(maxBet, false)),
+    cmd('coinflip', 'Raad kop of munt met fictieve coins').addIntegerOption(betOption(maxBet))
+      .addStringOption(o => o.setName('keuze').setDescription('Kop of munt?').setRequired(true).addChoices({ name: 'Kop', value: 'kop' }, { name: 'Munt', value: 'munt' })),
+    cmd('dobbel', 'Gooi maximaal zes dobbelstenen').addIntegerOption(o => o.setName('aantal').setDescription('Aantal dobbelstenen').setMinValue(1).setMaxValue(6)),
+    cmd('8ball', 'Vraag de magische Legion-bal om advies').addStringOption(o => o.setName('vraag').setDescription('Wat wil je weten?').setRequired(true).setMaxLength(200)),
+    cmd('steenpapier', 'Steen, papier, schaar tegen de bot').addStringOption(o => o.setName('keuze').setDescription('Jouw keuze').setRequired(true)
+      .addChoices({ name: 'Steen', value: 'steen' }, { name: 'Papier', value: 'papier' }, { name: 'Schaar', value: 'schaar' }))
+  ];
+  return result.filter(command => ticketsEnabled || command.name !== 'ticket').map(command => command.toJSON());
+}

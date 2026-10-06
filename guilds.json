@@ -1,0 +1,41 @@
+[
+  {
+    "guildId": "1555685630640652338",
+    "admission": { "targetGuildId": "1555685630640652338", "inviteChannelId": "1555685632704249927", "targetRoleId": "1555685630640652347", "inviteMaxAgeSeconds": 86400 },
+    "ticketsEnabled": false,
+    "panelChannelId": "",
+    "staffRoleIds": [
+      "1555685630707769382"
+    ],
+    "memberRoleId": "1555685630640652347",
+    "ticketCategoryId": "",
+    "applicationCategoryId": "1556775923683033168",
+    "logChannelId": "1556775924865957938",
+    "gameChannelId": "",
+    "warnLogChannelId": "1556778849407213698",
+    "applicationTranscriptChannelId": "",
+    "ticketTranscriptChannelId": "",
+    "roster": {
+      "channelId": "1555685633266163795",
+      "roleIds": ["1555685630770413640", "1555685630770413639", "1555685630770413638", "1555685630707769383", "1555685630707769380", "1555685630707769379", "1555685630707769378", "1555685630707769377", "1555685630707769376", "1555685630707769374"]
+    }
+  },
+  {
+    "guildId": "1555726440933363753",
+    "admission": { "targetGuildId": "1555685630640652338", "inviteChannelId": "1555685632704249927", "targetRoleId": "1555685630640652347", "inviteMaxAgeSeconds": 86400 },
+    "ticketsEnabled": true,
+    "panelChannelId": "1555726441759375398",
+    "staffRoleIds": [
+      "1555726440933363761"
+    ],
+    "memberRoleId": "1555726440933363759",
+    "ticketCategoryId": "1555749806616608788",
+    "applicationCategoryId": "1555743692260642867",
+    "logChannelId": "1556781560320102432",
+    "gameChannelId": "",
+    "warnLogChannelId": "",
+    "applicationTranscriptChannelId": "1555746237582409789",
+    "ticketTranscriptChannelId": "1555747964461260861",
+    "recruitment": { "capacity": 25, "limitedAt": 20, "minimumAge": 16 }
+  }
+]
