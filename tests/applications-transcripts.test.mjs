@@ -104,6 +104,7 @@ test('transcripts bevatten antwoorden, bijlagen en veilige HTML zonder uitvoerba
 });
 
 test('mislukte transcriptuploads hervatten zonder reeds verstuurde bestanden te dupliceren', async t => {
+  const config = { ...base, ...base.guilds[1], transcriptViewerMode: 'files' };
   const store = memory(); t.after(() => store.close());
   const dossier = store.reserveCase('ticket', 'member', { subject: 'Vraag' });
   store.bindCase(dossier.id, 'source'); store.openCase(dossier.id, 'intro'); store.closeCase(dossier.id, 'closed', 'staff');

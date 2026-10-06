@@ -18,11 +18,11 @@ test('een sollicitatie sluiten is alleen voor leiding en bevestigt transcript pl
   const store = new Store(config, ':memory:'); t.after(() => store.close());
   const dossier = store.reserveCase('application', 'member', { template: true });
   store.bindCase(dossier.id, 'source'); store.openCase(dossier.id, 'intro');
-  const interaction = { channelId: 'source', user: { id: 'member' }, member: { roles: { cache: new Map() } }, reply: async () => {} };
+  const interaction = { channelId: 'source', user: { id: 'member' }, member: { roles: { cache: new Map() } }, deferReply: async () => {}, editReply: async () => {} };
   await assert.rejects(requestCaseDecision({ config, store }, interaction, dossier.id, 'close'), /leiding/);
   interaction.member.roles.cache.set(config.staffRoleIds[0], {});
   let message;
-  interaction.reply = async payload => { message = payload; };
+  interaction.editReply = async payload => { message = payload; };
   await requestCaseDecision({ config, store }, interaction, dossier.id, 'close');
   assert.match(message.content, /transcript.*verwijdert/); assert.ok(!message.content.includes('archief'));
 });

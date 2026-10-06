@@ -28,6 +28,8 @@ Rollen, kanaalinstellingen, warns, coins, spellen en dossiers zijn **per guild g
    npm start
    ```
 
+   `node index.js` werkt pas nadat `npm ci` de dependencies heeft geïnstalleerd. Laat maar één botinstantie tegelijk draaien. Gebruik op Windows een Windows-cloudflared-client in `bin/cloudflared.exe`; de Linux-client is bedoeld voor de hosting.
+
 6. Gebruik als administrator **in elke guild**:
 
    ```text

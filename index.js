@@ -10,8 +10,15 @@ if (existsSync(envFile)) loadEnvFile(envFile);
 if (process.platform === 'linux' && process.env.NODE_OPTIONS && !process.env.LEGION_ENV_APPLIED && typeof process.execve === 'function') {
   process.execve(process.execPath, [process.execPath, ...process.execArgv, ...process.argv.slice(1)], { ...process.env, LEGION_ENV_APPLIED: '1' });
 }
-if (process.platform !== 'win32' && process.env.TRANSCRIPT_VIEWER_MODE === 'local') {
-  const executable = process.env.CLOUDFLARED_PATH;
+if (process.platform !== 'win32') {
+  const { cloudflaredExecutable } = await import('./src/config.mjs');
+  const executable = cloudflaredExecutable();
   if (executable && existsSync(executable)) chmodSync(executable, 0o755);
+}
+try { await import('discord.js'); }
+catch (error) {
+  if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error;
+  console.error('Dependencies ontbreken. Voer in deze botmap eerst "npm ci" uit en start daarna met "npm start".');
+  process.exit(1);
 }
 await import('./src/bot.mjs');

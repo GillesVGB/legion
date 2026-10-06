@@ -1,6 +1,16 @@
-# Legion op Discord-bot-hosting
+# Legion op Bot-Hosting.net
 
 Gebruik **Legion-FPS-ms.zip** voor FPS.ms of een vergelijkbare Linux x64-host. Het dashboard, de bot en de transcriptviewer starten samen. Het pakket bevat de officiële Cloudflare-client voor neutrale HTTPS-adressen; er staat geen bot-token of privé database in het codepakket.
+
+## Bot-Hosting.net via GitHub
+
+1. Gebruik repository `https://github.com/GillesVGB/legion`, branch **main**, en zet **Git auto-pull** aan voor updates bij een herstart.
+2. Kies runtime **Node.js 24** en **Entry File / STARTUP_FILE: index.js**.
+3. Laat de standaard startopdracht dependencies installeren. Als je zelf een startopdracht instelt, gebruik `npm ci --omit=dev && exec node index.js` vanuit de hoofdmap van de deployment.
+4. Stel je actuele `DISCORD_TOKEN` en `CLIENT_ID=1556774794358169652` in via het paneel of een private `.env`. Het dashboard gebruikt automatisch `bin/cloudflared`; `TRANSCRIPT_VIEWER_MODE=local` geeft ook webtranscripts. Zet geen tokens of databases in GitHub.
+5. Behoud de hele bestaande `data/`-map en stop de lokale bot voordat je de hosting start. Herstart de hosting om de laatste commit op te halen. Wacht op **beide guilds gereed** en **Legion dashboard bereikbaar**; gebruik daarna `/dashboard`.
+
+De standaard Node.js-startup leest `package.json` voor dependencies. Zie de officiële [installatiehandleiding](https://bot-hosting.net/docs/guides/set-up-a-deployment), [Git auto-pull](https://bot-hosting.net/changelog) en [startopdracht-documentatie](https://bot-hosting.net/api).
 
 ## Installeren
 
@@ -17,9 +27,15 @@ De bot moet **Server Members Intent** en **Message Content Intent** hebben. De l
 
 ## Dashboard
 
+Het dashboard start ook als `TRANSCRIPT_VIEWER_MODE=files` of `remote` staat. Die instelling bepaalt alleen hoe transcripts worden bewaard. Zonder expliciet `CLOUDFLARED_PATH` zoekt de bot automatisch de meegeleverde client in `bin/` en daarna in PATH. Op Linux maakt `index.js` de client uitvoerbaar.
+
 Gebruik **/dashboard** in Discord met een leidingrol of als administrator. De bot geeft een privé inlogknop die twee minuten geldig is en één keer werkt. Het dashboard controleert bij ieder verzoek of je nog leiding bent in de geselecteerde guild. Je sessie duurt dertig minuten.
 
 De pagina’s zijn Overzicht, Tickets, Sollicitaties, Transcripts, Gangwarns, Leden & rangen, Games & coins, Informatie, Instellingen en Activiteit. Sluiten, aannemen en afwijzen vereisen bevestiging. De volledige sollicitatietemplate blijft in het Discord-kanaal; er worden geen intakeformulieren toegevoegd.
+
+De ledenlijst gebruikt dezelfde opgeslagen Discord-berichten bij iedere update en herstart. Als die bericht-ID’s ontbreken, zoekt de bot zijn bestaande ledenlijst terug. Eigen dubbele ledenlijsten worden samengevoegd; andere berichten blijven staan.
+
+Als een bestaande sollicitatie na een verhuizing geen dossier in de database heeft, kan de bot het open dossier terugvinden via zijn oorspronkelijke privé kanaal, eigenaar en eigen knoppen. Een afgehandeld dossier wordt nooit heropend. Coins, warns en oude transcripts vereisen nog steeds de bestaande `data/`-map.
 
 Ticket- en sollicitatie-embeds volgen de ledenstand: **groen** bij 0–19, **oranje** bij 20–24 en **rood** vanaf 25. Een aangenomen dossier en de aanname-DM zijn groen; afgewezen of gesloten dossiers zijn rood.
 
@@ -44,7 +60,9 @@ Bewaar `data/` op een **persistente schijf/volume** en maak regelmatig backups. 
 - `Cannot find module /home/container/index.js`: het pakket is niet in de hoofdmap uitgepakt of Main file klopt niet.
 - Discord `401` of `TokenInvalid`: vervang alleen het private bot-token in `.env` en herstart.
 - `cloudflared ENOENT`: controleer `CLOUDFLARED_PATH=./bin/cloudflared` en of de binary aanwezig is. De bootstrap maakt hem op Linux uitvoerbaar.
-- Geen dashboardlink: wacht op het consolebericht dat de transcriptviewer bereikbaar is. De bot probeert een verbroken tunnel automatisch opnieuw.
+- Geen dashboardlink: controleer het consolebericht `Legion dashboard bereikbaar`. `/dashboard` geeft bij ontbrekende of ongeschikte cloudflared een concrete fout. De bot probeert een verbroken tunnel automatisch opnieuw.
+- `Cannot find package discord.js`: voer in de map met `package.json` eerst `npm ci` uit en start daarna met `npm start`.
+- Fouten `10062` of `40060`, of wisselende reacties: controleer of maar één botinstantie met dit token draait. Stop de lokale bot als je de hosting gebruikt.
 - Een FPS.ms Error Event zonder Node.js-stacktrace: controleer eerst de hostingserver; dit is een fout van het paneel/hostingsysteem.
 
 De meegeleverde binary is voor **Linux x64**. Voor Windows of ARM kies je de bijpassende officiële [cloudflared-download](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/downloads/) en stel je het executable-pad in `.env` in.

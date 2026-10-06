@@ -178,8 +178,9 @@ async function handleCommand(ctx, interaction) {
   if (['info', 'regels', 'rangen'].includes(name)) return info(ctx, interaction, name);
   if (name === 'dashboard') {
     requireStaff(interaction, config);
+    await interaction.deferReply(privateReply);
     const url = dashboard.issueLogin(interaction.user.id, interaction.guildId);
-    return interaction.reply({ ...privateReply, content: 'Open je privé Legion-dashboard. De inloglink is twee minuten geldig en werkt één keer.',
+    return interaction.editReply({ allowedMentions: quiet, content: 'Open je privé Legion-dashboard. De inloglink is twee minuten geldig en werkt één keer.',
       components: [row(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Dashboard openen').setURL(url))] });
   }
   if (name === 'uitnodiging') {
@@ -325,7 +326,7 @@ client.on(Events.InteractionCreate, async interaction => {
     const content = error instanceof UserError ? error.message : 'De actie kon niet worden afgerond. Controleer de botrechten of vraag de leiding. Een bestaand blackjackspel kun je hervatten met /blackjack zonder inzet.';
     if (!(error instanceof UserError)) console.error(`Guild ${interaction.guildId}: interactie mislukt (${error.code ?? error.name}).`);
     const payload = { content, flags: MessageFlags.Ephemeral, allowedMentions: quiet };
-    if (interaction.deferred && !interaction.isButton()) await interaction.editReply({ content, allowedMentions: quiet }).catch(() => {});
+    if (interaction.deferred && !interaction.replied) await interaction.editReply({ content, allowedMentions: quiet }).catch(() => {});
     else if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => {});
     else await interaction.reply(payload).catch(() => {});
   }
@@ -473,9 +474,10 @@ async function shutdown() {
 process.once('SIGINT', () => shutdown().catch(() => {}));
 process.once('SIGTERM', () => shutdown().catch(() => {}));
 try {
-  if (base.transcriptViewerMode === 'local') {
-    try { stopViewer = await startTranscriptViewer(base, contexts, drainTranscripts, dashboard); }
-    catch (error) { console.error(`Transcriptviewer kon niet starten (${error.code ?? error.name}); exports blijven in de wachtrij.`); }
+  try { stopViewer = await startTranscriptViewer(base, contexts, drainTranscripts, dashboard); }
+  catch (error) {
+    dashboard.setConnection('', `Het dashboard kan niet starten (${error.code ?? error.name}). Controleer TRANSCRIPT_PORT en de hostingconsole.`);
+    console.error(`Dashboard/viewer kon niet starten (${error.code ?? error.name}); exports blijven in de wachtrij.`);
   }
   await client.login(base.token);
 }

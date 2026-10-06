@@ -2,6 +2,20 @@ import { ChannelType, PermissionFlagsBits as P } from 'discord.js';
 import { assertUser } from './errors.mjs';
 import { embed, safeText } from './ui.mjs';
 import { refreshMembers } from './members.mjs';
+const writes = new WeakMap();
+const isRoster = (message, botId) => message?.author.id === botId && message.embeds?.length &&
+  message.embeds.every(card => /^Legion — Ledenlijst(?: \(vervolg\))?$/.test(card.title));
+
+async function findRosterMessages(channel, botId) {
+  const found = []; let before;
+  for (let page = 0; page < 100; page++) {
+    const messages = await channel.messages.fetch({ limit: 100, ...(before ? { before } : {}) });
+    found.push(...[...messages.values()].filter(message => isRoster(message, botId)));
+    if (messages.size < 100) return found.sort((a, b) => BigInt(a.id) < BigInt(b.id) ? -1 : 1);
+    before = messages.last().id;
+  }
+  throw new Error('Ledenlijstkanaal bevat te veel berichten om bestaande lijsten veilig te vinden.');
+}
 
 export function rosterGroups(config, members) {
   const ranks = config.roster.roleIds;
@@ -46,6 +60,13 @@ export function rosterCards(config, guild) {
 }
 
 export async function publishRoster(ctx, guild, fetchMembers = false) {
+  const previous = writes.get(ctx) ?? Promise.resolve();
+  const task = previous.catch(() => {}).then(() => updateRoster(ctx, guild, fetchMembers));
+  writes.set(ctx, task);
+  try { return await task; } finally { if (writes.get(ctx) === task) writes.delete(ctx); }
+}
+
+async function updateRoster(ctx, guild, fetchMembers) {
   const { config, store } = ctx;
   if (!config.roster) return;
   const channel = await guild.channels.fetch(config.roster.channelId);
@@ -53,17 +74,24 @@ export async function publishRoster(ctx, guild, fetchMembers = false) {
   assertUser(channel.permissionsFor(guild.members.me)?.has([P.ViewChannel, P.SendMessages, P.EmbedLinks, P.ReadMessageHistory]), 'De bot mist rechten voor de ledenlijst.');
   if (fetchMembers) await refreshMembers(guild);
   const payloads = rosterCards(config, guild);
-  const oldIds = JSON.parse(store.setting('roster:messages') ?? '[]');
+  let oldIds = JSON.parse(store.setting('roster:messages') ?? '[]');
+  if (!ctx.rosterRecovered) {
+    const found = await findRosterMessages(channel, guild.members.me.id);
+    const foundIds = new Set(found.map(message => message.id));
+    oldIds = [...new Set([...oldIds.filter(id => foundIds.has(id)), ...foundIds])];
+    store.setSetting('roster:messages', JSON.stringify(oldIds));
+  }
   const ids = [];
   for (let part = 0; part < payloads.length; part++) {
     const old = oldIds[part] ? await channel.messages.fetch(oldIds[part]).catch(error => { if (error.code === 10008) return null; throw error; }) : null;
-    const message = old?.author.id === guild.members.me.id ? await old.edit(payloads[part]) : await channel.send(payloads[part]);
+    const message = isRoster(old, guild.members.me.id) ? await old.edit(payloads[part]) : await channel.send(payloads[part]);
     ids.push(message.id);
     store.setSetting('roster:messages', JSON.stringify([...ids, ...oldIds.slice(part + 1)]));
   }
   for (const id of oldIds.slice(payloads.length)) {
     const old = await channel.messages.fetch(id).catch(error => { if (error.code === 10008) return null; throw error; });
-    if (old?.author.id === guild.members.me.id) await old.delete();
+    if (isRoster(old, guild.members.me.id)) await old.delete();
   }
   store.setSetting('roster:messages', JSON.stringify(ids));
+  ctx.rosterRecovered = true;
 }

@@ -361,6 +361,18 @@ export class Store {
   }
   decodeCase(row) { return row ? { ...row, payload: JSON.parse(row.payload) } : null; }
   caseById(id) { return this.decodeCase(this.db.prepare('SELECT * FROM cases WHERE id=?').get(id)); }
+  restoreCase(row, actor) {
+    return this.transaction(() => {
+      const existing = this.caseById(row.id);
+      if (existing) return existing;
+      const conflict = this.db.prepare("SELECT id FROM cases WHERE channel_id=? OR (kind=? AND owner_id=? AND status IN ('creating','open'))").get(row.channel_id, row.kind, row.owner_id);
+      assertUser(!conflict, 'Er bestaat al een dossier voor dit kanaal of dit lid. Herstel gestopt.');
+      this.db.prepare("INSERT INTO cases(id,kind,owner_id,channel_id,message_id,status,payload,created_at) VALUES(?,?,?,?,?,'open',?,?)")
+        .run(row.id, row.kind, row.owner_id, row.channel_id, row.message_id, JSON.stringify(row.payload), row.created_at);
+      this.audit(`${row.kind}.recovered`, actor, { id: row.id, channel: row.channel_id, owner: row.owner_id });
+      return this.caseById(row.id);
+    });
+  }
   caseByChannel(channel) { return this.decodeCase(this.db.prepare('SELECT * FROM cases WHERE channel_id=?').get(channel)); }
   activeCases() { return this.db.prepare("SELECT * FROM cases WHERE status IN ('creating','open')").all().map(x => this.decodeCase(x)); }
   bindCase(id, channel) { this.db.prepare('UPDATE cases SET channel_id=? WHERE id=?').run(channel, id); }

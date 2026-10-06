@@ -47,23 +47,25 @@ export class Dashboard {
     this.logins = new Map(); this.sessions = new Map();
   }
   currentOrigin() {
-    const value = this.origin();
-    assertUser(value, 'Het dashboard start nog op. Probeer over een paar seconden opnieuw.');
+    const value = this.connection ? this.connection.origin : this.origin();
+    assertUser(value, this.connection?.error || 'Het dashboard maakt verbinding. Gebruik /dashboard opnieuw zodra de console "dashboard bereikbaar" toont.');
     const url = new URL(value);
     assertUser(url.protocol === 'https:' || (this.allowLocalPreview && url.protocol === 'http:' && ['localhost','127.0.0.1'].includes(url.hostname)), 'Het dashboard moet HTTPS gebruiken.');
     return url.origin;
   }
+  setConnection(origin, error = '') { this.connection = { origin, error }; }
   prune(now = Date.now()) {
     for (const [key, entry] of this.logins) if (entry.expires <= now) this.logins.delete(key);
     for (const [key, entry] of this.sessions) if (entry.expires <= now) this.sessions.delete(key);
   }
   issueLogin(userId, guildId) {
     assertUser(/^\d{17,20}$/.test(userId) && this.contexts.has(guildId), 'Ongeldige dashboardtoegang.');
+    const origin = this.currentOrigin();
     this.prune();
     const code = secret();
     for (const [key, item] of this.logins) if (item.userId === userId) this.logins.delete(key);
     this.logins.set(digest(code), { userId, guildId, expires: Date.now() + 120000 });
-    return `${this.currentOrigin()}/dashboard#login=${code}`;
+    return `${origin}/dashboard#login=${code}`;
   }
   cookieName() { return this.allowLocalPreview ? 'legion-preview-session' : '__Host-legion-session'; }
   cookie(value, maxAge) { return `${this.cookieName()}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${this.allowLocalPreview ? '' : '; Secure'}`; }

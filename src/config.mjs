@@ -1,9 +1,14 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const snowflake = /^\d{17,20}$/;
+export function cloudflaredExecutable(env = process.env) {
+  if (env.CLOUDFLARED_PATH?.trim()) return env.CLOUDFLARED_PATH.trim();
+  const bundled = resolve(ROOT, 'bin', process.platform === 'win32' ? 'cloudflared.exe' : 'cloudflared');
+  return existsSync(bundled) ? bundled : 'cloudflared';
+}
 
 export function loadConfig(env = process.env, requireDiscord = true) {
   const errors = [];
@@ -18,9 +23,9 @@ export function loadConfig(env = process.env, requireDiscord = true) {
   if (!/^#[\da-f]{6}$/i.test(color)) errors.push('EMBED_COLOR: gebruik bijvoorbeeld #B91C1C.');
   const config = {
     token, clientId: (env.CLIENT_ID ?? '').trim(),
-    transcriptViewerMode: (env.TRANSCRIPT_VIEWER_MODE || 'files').trim(),
+    transcriptViewerMode: (env.TRANSCRIPT_VIEWER_MODE || 'local').trim(),
     transcriptPort: integer('TRANSCRIPT_PORT', 8793, 1024, 65535),
-    cloudflaredPath: (env.CLOUDFLARED_PATH || 'cloudflared').trim(),
+    cloudflaredPath: cloudflaredExecutable(env),
     transcriptSiteURL: (env.TRANSCRIPT_SITE_URL ?? '').trim(),
     transcriptSiteToken: (env.TRANSCRIPT_SITE_TOKEN ?? '').trim(),
     transcriptUploadSecret: (env.TRANSCRIPT_UPLOAD_SECRET ?? '').trim(),

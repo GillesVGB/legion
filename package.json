@@ -1,6 +1,6 @@
 {
   "name": "legion-future-rp-bot",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "private": true,
   "description": "Nederlandstalige Discord-bot voor Legion in Future RP",
   "type": "module",

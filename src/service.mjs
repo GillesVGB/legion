@@ -6,6 +6,7 @@ import { caseChannelName } from './channel-names.mjs';
 import { parseAge } from './application.mjs';
 import { refreshRecruitment, requireApplicationsOpen } from './recruitment.mjs';
 import { deliverAcceptance } from './admissions.mjs';
+import { requireOpenCase, recoverGuildCases } from './case-recovery.mjs';
 
 export const quiet = { parse: [], repliedUser: false };
 export const isAdmin = interaction => interaction.memberPermissions?.has(P.Administrator) ?? false;
@@ -186,8 +187,8 @@ export async function createCase(ctx, interaction, kind, payload) {
 }
 
 export async function requestCaseDecision(ctx, interaction, id, decision) {
-  const dossier = ctx.store.caseById(id);
-  assertUser(dossier && dossier.channel_id === interaction.channelId && dossier.status === 'open', 'Dit dossier is niet meer open of deze knop staat in het verkeerde kanaal.');
+  if (!interaction.deferred) await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const dossier = await requireOpenCase(ctx, interaction, id);
   const ticket = dossier.kind === 'ticket';
   if (ticket) {
     requireTickets(ctx.config);
@@ -198,8 +199,8 @@ export async function requestCaseDecision(ctx, interaction, id, decision) {
     assertUser(['accept', 'reject', 'close'].includes(decision), 'Ongeldige sollicitatieactie.');
   }
   const label = decision === 'close' ? ticket ? 'Ticket sluiten' : 'Sollicitatie sluiten' : decision === 'accept' ? 'Sollicitant aannemen' : 'Sollicitant afwijzen';
-  await interaction.reply({ content: `${label}? De bot maakt het transcript en verwijdert daarna dit kanaal.${decision === 'accept' && dossier.payload.template ? '\nControleer de antwoorden en de minimumleeftijd van 16 jaar voordat je bevestigt.' : ''}${decision === 'accept' && ctx.config.memberRoleId ? '\nDe ingestelde ledenrol wordt toegekend.' : ''}`,
-    flags: MessageFlags.Ephemeral, components: [row(
+  await interaction.editReply({ content: `${label}? De bot maakt het transcript en verwijdert daarna dit kanaal.${decision === 'accept' && dossier.payload.template ? '\nControleer de antwoorden en de minimumleeftijd van 16 jaar voordat je bevestigt.' : ''}${decision === 'accept' && ctx.config.memberRoleId ? '\nDe ingestelde ledenrol wordt toegekend.' : ''}`,
+    components: [row(
       button(`case:confirm:${id}:${decision}:${interaction.user.id}`, 'Bevestigen', decision === 'accept' ? ButtonStyle.Success : ButtonStyle.Danger),
       button(`case:cancel:${id}:${interaction.user.id}`, 'Annuleren')
     )], allowedMentions: quiet });
@@ -207,7 +208,7 @@ export async function requestCaseDecision(ctx, interaction, id, decision) {
 
 export async function startInterview(ctx, interaction, id) {
   requireStaff(interaction, ctx.config);
-  const dossier = ctx.store.caseById(id);
+  const dossier = await requireOpenCase(ctx, interaction, id);
   assertUser(dossier?.kind === 'application' && dossier.status === 'open' && dossier.channel_id === interaction.channelId, 'Dit is geen open sollicitatie in dit kanaal.');
   const guild = interaction.guild;
   const member = await guild.members.fetch(dossier.owner_id).catch(() => null);
@@ -256,7 +257,7 @@ export async function cleanupInterviews(ctx, guild) {
 
 export async function decideCase(ctx, interaction, id, decision) {
   const { config, store } = ctx;
-  const dossier = store.caseById(id);
+  const dossier = await requireOpenCase(ctx, interaction, id);
   assertUser(dossier && dossier.channel_id === interaction.channelId && dossier.status === 'open', 'Dit dossier is al afgehandeld of hoort bij een ander kanaal.');
   if (dossier.kind === 'ticket') {
     requireTickets(config);
@@ -330,6 +331,7 @@ export async function cleanupClosedCases(ctx, client) {
 
 export async function reconcileCases(ctx, guild) {
   const channels = await guild.channels.fetch();
+  await recoverGuildCases(ctx, guild, channels);
   for (const dossier of ctx.store.activeCases()) {
     const channel = dossier.channel_id ? channels.get(dossier.channel_id) : channels.find(x => x?.topic?.includes(`dossier:${dossier.id} |`));
     if (!channel) {
