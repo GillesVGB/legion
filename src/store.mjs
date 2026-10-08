@@ -16,6 +16,7 @@ export class Store {
     this.config = config;
     if (!filename) mkdirSync(config.dataDir, { recursive: true });
     this.db = new DatabaseSync(filename ?? join(config.dataDir, `legion-${config.guildId}.sqlite`));
+    const previousSchema=this.db.prepare('PRAGMA user_version').get().user_version;
     this.db.exec(`
       PRAGMA journal_mode = WAL;
       PRAGMA busy_timeout = 5000;
@@ -93,6 +94,11 @@ export class Store {
         next_attempt INTEGER NOT NULL DEFAULT 0, last_error TEXT
       );
       CREATE UNIQUE INDEX IF NOT EXISTS one_pending_promotion ON promotions(member_id) WHERE status IN ('pending','approving');
+      CREATE TABLE IF NOT EXISTS promotion_votes (
+        proposal_id TEXT NOT NULL, voter_id TEXT NOT NULL,
+        response TEXT NOT NULL CHECK(response IN ('approve','reject')),
+        updated_at INTEGER NOT NULL, PRIMARY KEY(proposal_id,voter_id)
+      );
       CREATE TABLE IF NOT EXISTS mission_progress (
         user_id TEXT NOT NULL, day TEXT NOT NULL, kind TEXT NOT NULL, amount INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY(user_id,day,kind)
@@ -101,8 +107,12 @@ export class Store {
         user_id TEXT NOT NULL, day TEXT NOT NULL, mission_id TEXT NOT NULL, reward INTEGER NOT NULL,
         PRIMARY KEY(user_id,day,mission_id)
       );
-      PRAGMA user_version = 6;
+      PRAGMA user_version = 7;
     `);
+    if(previousSchema<7){
+      this.db.exec("UPDATE promotions SET status='pending',approver_id=NULL,dirty=1,next_attempt=0 WHERE status='approving' AND (SELECT COUNT(*) FROM promotion_votes WHERE proposal_id=promotions.id)<3;");
+      this.db.exec("UPDATE promotions SET dirty=1,next_attempt=0 WHERE status='pending';");
+    }
   }
 
   close() { this.db.close(); }

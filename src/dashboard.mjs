@@ -14,7 +14,7 @@ import { refreshRecruitment } from './recruitment.mjs';
 import { publishRoster } from './roster.mjs';
 import { applicationQueue } from './application-status.mjs';
 import { cancelActivity } from './activities.mjs';
-import { decidePromotion } from './promotions.mjs';
+import { decidePromotion,promotionVotes,promotionVoteReply,PROMOTION_LEAD_ROLE_ID } from './promotions.mjs';
 import { missions,missionDay } from './mission-definitions.mjs';
 
 const secret = () => randomBytes(32).toString('base64url');
@@ -102,7 +102,7 @@ export class Dashboard {
     failure(guilds.length, 403, 'Je hebt geen leidingtoegang meer.');
     return { user, guilds, selectedGuild: guilds.some(g => g.id === session.guildId) ? session.guildId : guilds[0].id, csrf: session.csrf, expires: session.expires };
   }
-  summary(ctx, guild) {
+  summary(ctx, guild, viewer) {
     const { config, store } = ctx;
     const name = id => guild.members.cache.get(id)?.displayName || id;
     const avatar = id => guild.members.cache.get(id)?.displayAvatarURL?.({ size: 64 }) || null;
@@ -137,7 +137,8 @@ export class Dashboard {
       roster: config.roster || null,
       planningChannelId:config.planningChannelId,
       plannings:store.db.prepare('SELECT * FROM activities ORDER BY starts_at DESC LIMIT 100').all().map(item=>({...item,url:item.message_id?`https://discord.com/channels/${guild.id}/${item.channel_id}/${item.message_id}`:null,participants:store.db.prepare('SELECT user_id,response FROM activity_rsvps WHERE activity_id=? ORDER BY updated_at').all(item.id).map(person=>({...person,name:name(person.user_id)}))})),
-      promotions:store.db.prepare('SELECT * FROM promotions ORDER BY created_at DESC LIMIT 100').all().map(item=>({...item,member_name:name(item.member_id),role_name:guild.roles.cache.get(item.role_id)?.name||item.role_id,url:item.message_id?`https://discord.com/channels/${guild.id}/${item.channel_id}/${item.message_id}`:null})),
+      canVotePromotions:viewer?.roles.cache.has(PROMOTION_LEAD_ROLE_ID)??false,
+      promotions:store.db.prepare('SELECT * FROM promotions ORDER BY created_at DESC LIMIT 100').all().map(item=>({...item,voting:promotionVotes(ctx,item.id),member_name:name(item.member_id),role_name:guild.roles.cache.get(item.role_id)?.name||item.role_id,url:item.message_id?`https://discord.com/channels/${guild.id}/${item.channel_id}/${item.message_id}`:null})),
       missions:{day:missionDay(),definitions:missions,claimedToday:store.db.prepare('SELECT COUNT(*) AS total FROM mission_claims WHERE day=?').get(missionDay()).total} };
   }
   async interaction(ctx, guild, member, caseId) {
@@ -161,7 +162,7 @@ export class Dashboard {
     if(['promotion.approve','promotion.reject'].includes(value.action)) {
       assertUser(/^[a-f0-9]{12}$/.test(value.id)&&value.confirm===true,'Bevestig eerst welk promotievoorstel je wilt beoordelen.');
       const result=await decidePromotion(ctx,guild,member,value.id,value.action.endsWith('approve')?'approve':'reject');
-      return {message:result.status==='approved'?'Promotie goedgekeurd en gangrang aangepast.':result.status==='approving'?'Promotie wordt automatisch verder gecontroleerd.':'Promotievoorstel afgewezen.'};
+      return {message:promotionVoteReply(result)};
     }
     const reason = () => { assertUser(typeof value.reason === 'string' && value.reason.trim() && value.reason.length <= 500, 'Geef een reden van maximaal 500 tekens.'); return value.reason.trim(); };
     const userId = () => { assertUser(/^\d{17,20}$/.test(value.userId), 'Kies een geldig Discord-lid.'); return value.userId; };
@@ -254,7 +255,7 @@ export class Dashboard {
       const match=/^\/api\/dashboard\/guilds\/(\d{17,20})\/(summary|actions|cases\/([a-f0-9]{12})\/messages)$/.exec(path);
       failure(match,404,'Pagina niet gevonden.');
       const {ctx,guild,member}=await this.authorized(session,match[1]);
-      if(match[2]==='summary'){ failure(request.method==='GET',405,'Gebruik GET.');send(200,this.summary(ctx,guild));return true; }
+      if(match[2]==='summary'){ failure(request.method==='GET',405,'Gebruik GET.');send(200,this.summary(ctx,guild,member));return true; }
       if(match[2]==='actions'){
         failure(request.method==='POST',405,'Gebruik POST.'); const value=await bodyJSON(request);
         const key=`${guild.id}:dashboard:${member.id}`;

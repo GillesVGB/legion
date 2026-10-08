@@ -59,7 +59,7 @@ Botrechten: **Kanalen bekijken, Berichten versturen, Berichtgeschiedenis lezen, 
 | `/planning datum tijd afspreekpunt` | Leiding plaatst een tekstbericht met vier emoji-reacties in het vaste gangkanaal. |
 | `/planning-overzicht` | Bekijk privé de komende activiteiten in de gangserver. |
 | `/planning-annuleren id` | Leiding sluit een planning en stopt nieuwe aanwezigheidskeuzes. |
-| `/promotie lid rang motivatie` | Vraag een hogere gangrang aan of stel als leiding een ander lid voor. |
+| `/promotie lid rang motivatie` | Stel een hogere gangrang voor; vanaf drie unieke Lead-stemmen beslist de meerderheid. |
 | `/missies` | Bekijk drie dagelijkse fun-missies en claim verdiende fictieve coins. |
 | `/ticket openen` | Open direct een privéticket, uitsluitend in de tweede guild. |
 | `/ticket sluiten` | Sluit het huidige ticket met een bevestiging. |

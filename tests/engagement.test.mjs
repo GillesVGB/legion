@@ -9,7 +9,7 @@ import { Store } from '../src/store.mjs';
 import { loadConfig } from '../src/config.mjs';
 import { commands } from '../src/commands.mjs';
 import { createActivity,activityById,activityMessage,attendanceChoices,planningTime,handlePlanningReaction,syncPlanningReactions,cancelActivity,syncActivities,clearPlanningReactions } from '../src/activities.mjs';
-import { createPromotion,decidePromotion,promotionById,syncPromotions } from '../src/promotions.mjs';
+import { createPromotion,decidePromotion,promotionById,syncPromotions,promotionVotes,PROMOTION_LEAD_ROLE_ID } from '../src/promotions.mjs';
 import { applicationQueue,showApplicationStatus } from '../src/application-status.mjs';
 import { createCase,decideCase,reconcileCases } from '../src/service.mjs';
 import { recruitmentState } from '../src/recruitment.mjs';
@@ -19,7 +19,10 @@ import { syncCommands } from '../src/command-sync.mjs';
 import { Dashboard } from '../src/dashboard.mjs';
 import { Locks } from '../src/locks.mjs';
 
-const fixture=t=>{const f=dashboardFixture();t.after(f.close);const main=f.contexts.values().next().value,guild=f.guilds.get(main.config.guildId);return{...f,main,guild};};
+const fixture=t=>{const f=dashboardFixture();t.after(f.close);const main=f.contexts.values().next().value,guild=f.guilds.get(main.config.guildId);guild.addMember('100000000000000080','Lead twee',[PROMOTION_LEAD_ROLE_ID,main.config.memberRoleId]);guild.addMember('100000000000000081','Lead drie',[PROMOTION_LEAD_ROLE_ID,main.config.memberRoleId]);return{...f,main,guild};};
+const leadIds=[ACTOR,'100000000000000080','100000000000000081'];
+async function castThree(f,id,choices=['approve','approve','approve']){let result;for(let i=0;i<3;i++)result=await decidePromotion(f.main,f.guild,f.guild.members.cache.get(leadIds[i]),id,choices[i]);return result;}
+function seedVotes(f,id,choices=['approve','approve','approve']){for(let i=0;i<3;i++)f.main.store.db.prepare('INSERT INTO promotion_votes(proposal_id,voter_id,response,updated_at) VALUES(?,?,?,?)').run(id,leadIds[i],choices[i],Date.now()+i);}
 function interaction(f,user=ACTOR,guild=f.guild) {const member=guild.members.cache.get(user);return{guild,guildId:guild.id,channelId:f.main.config.logChannelId,channel:guild.channels.cache.get(f.main.config.logChannelId),client:f.client,user:member.user,member,memberPermissions:member.permissions,editReply:async()=>{},reply:async()=>{},deferReply:async()=>{}};}
 const future=()=>({date:missionDay(Date.now()+2*86400000),time:'20:30',location:'Legion HQ'});
 async function planning(t){const f=fixture(t);const item=await createActivity(f.main,interaction(f),future());const activity=activityById(f.main,item.id),message=f.guild.channels.cache.get(activity.channel_id).posted.get(activity.message_id);return{...f,activity,message};}
@@ -78,17 +81,98 @@ test('planning weigert verkeerde rechten en ongeldige tijden; zomer- en winterti
   const channel=f.guild.channels.cache.get(f.main.config.planningChannelId);channel.permissionsFor=()=>new PermissionsBitField([P.ViewChannel,P.SendMessages,P.ReadMessageHistory,P.AddReactions]);
   await assert.rejects(createActivity(f.main,interaction(f),future()),/Berichten beheren/);
 });
-test('promotie vereist leidinggoedkeuring, controleert rangvolgorde en bewaart andere rollen',async t=>{
+test('promotie vereist drie Lead-stemmen, controleert rangvolgorde en bewaart andere rollen',async t=>{
   const f=fixture(t),user='100000000000000035',target=f.guild.members.cache.get(user),role=f.main.config.roster.roleIds[7];
   const proposal=await createPromotion(f.main,interaction(f),{memberId:user,roleId:role,reason:'Actief aanwezig en helpt recruits.'});
-  assert.ok(proposal.posted);await assert.rejects(decidePromotion(f.main,f.guild,f.guild.members.cache.get(OTHER),proposal.id,'approve'),/leiding/);
+  assert.ok(proposal.posted);await assert.rejects(decidePromotion(f.main,f.guild,f.guild.members.cache.get(OTHER),proposal.id,'approve'),/Lead-rol/);
   const original=target.roles.cache.get(f.main.config.memberRoleId);
-  const done=await decidePromotion(f.main,f.guild,f.guild.members.cache.get(ACTOR),proposal.id,'approve');
+  const first=await decidePromotion(f.main,f.guild,f.guild.members.cache.get(ACTOR),proposal.id,'approve');assert.equal(first.status,'pending');assert.equal(first.voting.total,1);assert.equal(target.roles.cache.has(role),false);
+  const second=await decidePromotion(f.main,f.guild,f.guild.members.cache.get(leadIds[1]),proposal.id,'approve');assert.equal(second.status,'pending');assert.equal(target.roles.cache.has(role),false);
+  const done=await decidePromotion(f.main,f.guild,f.guild.members.cache.get(leadIds[2]),proposal.id,'reject');
   assert.equal(done.status,'approved');assert.ok(target.roles.cache.has(role));assert.equal(target.roles.cache.get(f.main.config.memberRoleId),original);
   assert.equal(f.main.config.roster.roleIds.filter(id=>target.roles.cache.has(id)).length,1);
   await assert.rejects(decidePromotion(f.main,f.guild,f.guild.members.cache.get(ACTOR),proposal.id,'approve'),/beoordeeld/);
-  assert.equal(f.calls.filter(call=>call.method==='roles.set').length,1);
+  assert.equal(f.calls.filter(call=>call.method==='roles.add').length,1);assert.equal(f.calls.filter(call=>call.method==='roles.set').length,0);
   await assert.rejects(createPromotion(f.main,interaction(f),{memberId:user,roleId:f.main.config.roster.roleIds[9],reason:'Test'}),/hogere rang/);
+});
+test('een hoge niet-gangrol zoals + blokkeert Chef niet en blijft behouden',async t=>{
+  const f=fixture(t),user='100000000000000035',member=f.guild.members.cache.get(user),role=f.main.config.roster.roleIds[0];
+  const extra={id:'100000000000000150',name:'+',position:150,managed:false,permissions:new PermissionsBitField(P.Administrator),comparePositionTo(other){return this.position-other.position;}};
+  f.guild.roles.cache.set(extra.id,extra);member.roles.cache.set(extra.id,extra);member.roles.highest=extra;member.permissions=new PermissionsBitField(P.Administrator);
+  const proposal=await createPromotion(f.main,interaction(f,user),{memberId:user,roleId:role,reason:'Een Chef-voorstel met een hogere aparte rol.'});
+  const done=await castThree(f,proposal.id,['approve','reject','approve']);
+  assert.equal(done.status,'approved');assert.ok(member.roles.cache.has(role));assert.ok(member.roles.cache.has(extra.id));
+  assert.equal(f.calls.some(call=>call.method==='roles.remove'&&call.role===extra.id),false);
+  assert.equal(f.calls.some(call=>call.method==='roles.set'),false);
+});
+test('dubbel stemmen telt eenmaal; veranderen past die ene stem aan en een meerderheid tegen wijzigt geen rang',async t=>{
+  const f=fixture(t),user='100000000000000035',role=f.main.config.roster.roleIds[7];
+  const proposal=await createPromotion(f.main,interaction(f),{memberId:user,roleId:role,reason:'Stemwijzigingtest'});
+  await decidePromotion(f.main,f.guild,f.guild.members.cache.get(ACTOR),proposal.id,'approve');
+  await decidePromotion(f.main,f.guild,f.guild.members.cache.get(ACTOR),proposal.id,'approve');
+  assert.equal(promotionVotes(f.main,proposal.id).total,1);
+  await decidePromotion(f.main,f.guild,f.guild.members.cache.get(ACTOR),proposal.id,'reject');
+  assert.equal(promotionVotes(f.main,proposal.id).approve,0);assert.equal(promotionVotes(f.main,proposal.id).reject,1);
+  await decidePromotion(f.main,f.guild,f.guild.members.cache.get(leadIds[1]),proposal.id,'approve');
+  const result=await decidePromotion(f.main,f.guild,f.guild.members.cache.get(leadIds[2]),proposal.id,'reject');
+  assert.equal(result.status,'rejected');assert.equal(result.voting.total,3);
+  assert.equal(f.calls.filter(call=>call.method==='roles.add'||call.method==='roles.remove').length,0);
+});
+test('administrators zonder de exacte Lead-rol en bots met de rol mogen niet stemmen',async t=>{
+  const f=fixture(t),user='100000000000000035',role=f.main.config.roster.roleIds[7];
+  const proposal=await createPromotion(f.main,interaction(f),{memberId:user,roleId:role,reason:'Toegangscontrole'});
+  const admin=f.guild.addMember('100000000000000082','Admin zonder Lead',[f.main.config.memberRoleId],true);
+  const robot=f.guild.addMember('100000000000000083','Testbot met Lead',[PROMOTION_LEAD_ROLE_ID],true,true);
+  for(const actor of [admin,robot])await assert.rejects(decidePromotion(f.main,f.guild,actor,proposal.id,'approve'),/Lead-rol/);
+  assert.equal(promotionVotes(f.main,proposal.id).total,0);
+});
+test('een verloren Lead-rol telt niet mee vóór de uitslag',async t=>{
+  const f=fixture(t),user='100000000000000035',role=f.main.config.roster.roleIds[7];
+  const proposal=await createPromotion(f.main,interaction(f),{memberId:user,roleId:role,reason:'Lead-rol gewijzigd'});
+  await decidePromotion(f.main,f.guild,f.guild.members.cache.get(ACTOR),proposal.id,'approve');
+  f.guild.members.cache.get(ACTOR).roles.cache.delete(PROMOTION_LEAD_ROLE_ID);
+  await decidePromotion(f.main,f.guild,f.guild.members.cache.get(leadIds[1]),proposal.id,'approve');
+  const second=await decidePromotion(f.main,f.guild,f.guild.members.cache.get(leadIds[2]),proposal.id,'reject');
+  assert.equal(second.status,'pending');assert.equal(second.voting.total,2);
+  const extra=f.guild.addMember('100000000000000082','Nieuwe Lead',[PROMOTION_LEAD_ROLE_ID,f.main.config.memberRoleId]);
+  const result=await decidePromotion(f.main,f.guild,extra,proposal.id,'approve');assert.equal(result.status,'approved');
+});
+test('gelijkstand blijft open en een extra unieke Lead-stem bepaalt de meerderheid',async t=>{
+  const f=fixture(t),user='100000000000000035',role=f.main.config.roster.roleIds[7];
+  const fourth=f.guild.addMember('100000000000000082','Vierde Lead',[PROMOTION_LEAD_ROLE_ID,f.main.config.memberRoleId]);
+  const fifth=f.guild.addMember('100000000000000083','Vijfde Lead',[PROMOTION_LEAD_ROLE_ID,f.main.config.memberRoleId]);
+  const proposal=await createPromotion(f.main,interaction(f),{memberId:user,roleId:role,reason:'Herstelde stemming met gelijkstand'});
+  seedVotes(f,proposal.id,['approve','reject','approve']);
+  f.main.store.db.prepare('INSERT INTO promotion_votes(proposal_id,voter_id,response,updated_at) VALUES(?,?,?,?)').run(proposal.id,fourth.id,'reject',Date.now());
+  await syncPromotions(f.main,f.guild);assert.equal(promotionById(f.main,proposal.id).status,'pending');
+  const result=await decidePromotion(f.main,f.guild,fifth,proposal.id,'approve');assert.equal(result.status,'approved');assert.equal(result.voting.approve,3);assert.equal(result.voting.reject,2);
+});
+test('gelijktijdige Lead-stemmen voeren een promotie maar één keer uit',async t=>{
+  const f=fixture(t),user='100000000000000035',role=f.main.config.roster.roleIds[7];
+  const proposal=await createPromotion(f.main,interaction(f),{memberId:user,roleId:role,reason:'Gelijktijdige stemming'});
+  await Promise.all(leadIds.map(id=>decidePromotion(f.main,f.guild,f.guild.members.cache.get(id),proposal.id,'approve')));
+  assert.equal(promotionById(f.main,proposal.id).status,'approved');assert.equal(promotionVotes(f.main,proposal.id).total,3);
+  assert.equal(f.calls.filter(call=>call.method==='roles.add').length,1);assert.equal(f.calls.filter(call=>call.method==='roles.remove').length,1);
+});
+test('twee stemmen blijven bij een herstart bewaard en de derde Lead-stem beslist',async t=>{
+  const f=fixture(t),folder=mkdtempSync(join(tmpdir(),'legion-votes-')),config={...f.main.config,dataDir:folder};
+  const first=new Store(config),ctx={...f.main,store:first};
+  const proposal=await createPromotion(ctx,interaction(f),{memberId:'100000000000000035',roleId:f.main.config.roster.roleIds[7],reason:'Blijvende stemmen'});
+  for(const id of leadIds.slice(0,2))await decidePromotion(ctx,f.guild,f.guild.members.cache.get(id),proposal.id,'approve');
+  first.close();const second=new Store(config);ctx.store=second;
+  t.after(()=>{second.close();assert.ok(folder.startsWith(join(tmpdir(),'legion-votes-')));rmSync(folder,{recursive:true,force:true});});
+  assert.equal(promotionVotes(ctx,proposal.id).total,2);assert.equal(promotionById(ctx,proposal.id).status,'pending');
+  const result=await decidePromotion(ctx,f.guild,f.guild.members.cache.get(leadIds[2]),proposal.id,'reject');assert.equal(result.status,'approved');
+});
+test('botrechten blijven gecontroleerd voor de gewenste gangrang en oude goedkeuring zonder drie stemmen wordt niet uitgevoerd',async t=>{
+  const f=fixture(t),user='100000000000000035',role=f.main.config.roster.roleIds[0];
+  const target=f.guild.roles.cache.get(role),position=target.position;target.position=150;
+  await assert.rejects(createPromotion(f.main,interaction(f),{memberId:user,roleId:role,reason:'Te hoge gangrol'}),/botrol.*boven/);
+  target.position=position;
+  const proposal=await createPromotion(f.main,interaction(f),{memberId:user,roleId:role,reason:'Oud onafgerond voorstel'});
+  f.main.store.db.prepare("UPDATE promotions SET status='approving',approver_id=? WHERE id=?").run(ACTOR,proposal.id);
+  await syncPromotions(f.main,f.guild);
+  assert.equal(promotionById(f.main,proposal.id).status,'pending');assert.equal(f.calls.filter(call=>call.method==='roles.add').length,0);
 });
 test('leden kunnen zichzelf voorstellen, geen andere leden; verkeerde berichten en dubbele voorstellen worden geweigerd',async t=>{
   const f=fixture(t),user='100000000000000035',role=f.main.config.roster.roleIds[7];
@@ -96,12 +180,13 @@ test('leden kunnen zichzelf voorstellen, geen andere leden; verkeerde berichten 
   const proposal=await createPromotion(f.main,interaction(f,user),{memberId:user,roleId:role,reason:'Ik neem verantwoordelijkheid.'});
   await assert.rejects(createPromotion(f.main,interaction(f),{memberId:user,roleId:role,reason:'Test'}),/al een open/);
   await assert.rejects(decidePromotion(f.main,f.guild,f.guild.members.cache.get(ACTOR),proposal.id,'approve',{channelId:'wrong',messageId:proposal.posted.id}),/oorspronkelijke/);
-  const done=await decidePromotion(f.main,f.guild,f.guild.members.cache.get(ACTOR),proposal.id,'reject');assert.equal(done.status,'rejected');
+  const done=await castThree(f,proposal.id,['reject','approve','reject']);assert.equal(done.status,'rejected');
   assert.equal(f.calls.filter(call=>call.method==='roles.set').length,0);
 });
 test('een promotie die tijdens de rolwijziging herstartte wordt gecontroleerd en één keer afgerond',async t=>{
   const f=fixture(t),user='100000000000000035',role=f.main.config.roster.roleIds[7];
   const proposal=await createPromotion(f.main,interaction(f),{memberId:user,roleId:role,reason:'Hersteltest'});
+  seedVotes(f,proposal.id);
   f.main.store.db.prepare("UPDATE promotions SET status='approving',approver_id=? WHERE id=?").run(ACTOR,proposal.id);
   await f.guild.members.cache.get(user).roles.set([f.main.config.memberRoleId,role]);
   await syncPromotions(f.main,f.guild);await syncPromotions(f.main,f.guild);
@@ -111,22 +196,22 @@ test('een promotie die tijdens de rolwijziging herstartte wordt gecontroleerd en
 test('een tijdelijke Discord-storing houdt de goedgekeurde promotie in verwerking en herstelt zonder dubbele rangwijziging',async t=>{
   const f=fixture(t),user='100000000000000035',role=f.main.config.roster.roleIds[7],member=f.guild.members.cache.get(user);
   const proposal=await createPromotion(f.main,interaction(f),{memberId:user,roleId:role,reason:'Netwerkhersteltest'});
-  const set=member.roles.set;let attempts=0;
-  member.roles.set=async values=>{if(++attempts===1)throw Object.assign(new Error('Testverbinding onderbroken'),{code:'ECONNRESET'});return set(values);};
-  const result=await decidePromotion(f.main,f.guild,f.guild.members.cache.get(ACTOR),proposal.id,'approve');
+  const add=member.roles.add;let attempts=0;
+  member.roles.add=async value=>{if(++attempts===1)throw Object.assign(new Error('Testverbinding onderbroken'),{code:'ECONNRESET'});return add(value);};
+  const result=await castThree(f,proposal.id);
   assert.equal(result.status,'approving');
   await syncPromotions(f.main,f.guild,Date.now()+61000);
   assert.equal(promotionById(f.main,proposal.id).status,'approved');assert.equal(attempts,2);
-  assert.equal(f.calls.filter(call=>call.method==='roles.set').length,1);
+  assert.equal(f.calls.filter(call=>call.method==='roles.add').length,1);
 });
 test('migratie van schema 5 bewaart coins, gangwarns en open sollicitaties',t=>{
   const f=fixture(t),folder=mkdtempSync(join(tmpdir(),'legion-migration-')),config={...f.main.config,dataDir:folder};
   const old=new Store(config);old.adjustCoins(OTHER,500,ACTOR,'Oude fixturecoins');old.addWarn(OTHER,ACTOR,'Oude fixturewarn');
   const dossier=old.reserveCase('application',OTHER,{template:true});old.bindCase(dossier.id,'fixture-channel');old.openCase(dossier.id,'fixture-message');
-  old.db.exec('DROP TABLE activities; DROP TABLE activity_rsvps; DROP TABLE promotions; DROP TABLE mission_progress; DROP TABLE mission_claims; PRAGMA user_version=5;');old.close();
+  old.db.exec('DROP TABLE activities; DROP TABLE activity_rsvps; DROP TABLE promotions; DROP TABLE promotion_votes; DROP TABLE mission_progress; DROP TABLE mission_claims; PRAGMA user_version=5;');old.close();
   const upgraded=new Store(config);t.after(()=>{upgraded.close();assert.ok(folder.startsWith(join(tmpdir(),'legion-migration-')));rmSync(folder,{recursive:true,force:true});});
   assert.equal(upgraded.wallet(OTHER).balance,config.startingCoins+500);assert.equal(upgraded.warnCount(OTHER),1);assert.equal(upgraded.caseById(dossier.id).status,'open');
-  assert.equal(upgraded.db.prepare('PRAGMA user_version').get().user_version,6);assert.equal(upgraded.missionStatus(OTHER).missions.length,3);
+  assert.equal(upgraded.db.prepare('PRAGMA user_version').get().user_version,7);assert.equal(upgraded.missionStatus(OTHER).missions.length,3);
 });
 test('missies tellen echte gameacties, betalen eenmaal en resetten op Belgische middernacht',t=>{
   const f=fixture(t),store=f.main.store,now=Date.parse('2026-10-08T12:00:00Z');

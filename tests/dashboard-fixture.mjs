@@ -35,11 +35,12 @@ export function dashboardFixture() {
     const addMember=(id,name,ids,admin=false,bot=false)=>{
       const member={id,guild,client,displayName:name,displayAvatarURL:()=>null,permissions:new PermissionsBitField(admin?P.Administrator:0n)};
       const user={id,username:name.replace(/ /g,'_').toLowerCase(),bot,send:async payload=>{calls.push({method:'dm',user:id,payload});return{id:String(++message)};}};
-      member.user=user;member.roles={cache:new Collection(ids.map(id=>[id,roles.get(id)])),highest:role('highest','Rang',admin?100:12),add:async value=>{member.roles.cache.set(value.id,value);},set:async values=>{member.roles.cache=new Collection(values.map(id=>[id,roles.get(id)]));member.roles.highest=[...member.roles.cache.values()].sort((a,b)=>b.position-a.position)[0]||role('none','Geen rang',0);calls.push({method:'roles.set',user:id,roles:values});}};
+      member.user=user;member.roles={cache:new Collection(ids.map(id=>[id,roles.get(id)])),highest:role('highest','Rang',admin?100:12),add:async value=>{const roleId=typeof value==='string'?value:value.id;member.roles.cache.set(roleId,roles.get(roleId)||value);calls.push({method:'roles.add',user:id,role:roleId});},remove:async roleId=>{member.roles.cache.delete(roleId);calls.push({method:'roles.remove',user:id,role:roleId});},set:async values=>{member.roles.cache=new Collection(values.map(id=>[id,roles.get(id)]));member.roles.highest=[...member.roles.cache.values()].sort((a,b)=>b.position-a.position)[0]||role('none','Geen rang',0);calls.push({method:'roles.set',user:id,roles:values});}};
       cache.set(id,member);return member;
     };
     guild.addMember=addMember;
     guild.members.me=addMember(base.clientId,'Legion',[],true,true);
+    guild.members.fetchMe=async()=>guild.members.me;
     addMember(ACTOR,'Voorbeeld leiding',settings.staffRoleIds,true);addMember(OTHER,'Nieuw communitylid',[]);
     const names=['Jay Vega','Noah Moreau','Luca Renaud','Milan Dupont','Rafael Leclerc','Enzo Laurent','Milo Ferrand','Alex Mercier','Samuel Beaufort','Louis Pascal','Finn Laurent','Victor Dumont','Lucas Martin','Nolan Pierre','Daan Lefevre','Elias Lucien','Tygo Roland'];
     for(let i=0;i<names.length;i++)addMember(String(BigInt('100000000000000020')+BigInt(i)),names[i],[settings.memberRoleId,...(settings.roster?[settings.roster.roleIds[Math.min(i,settings.roster.roleIds.length-1)]]:[])]);
