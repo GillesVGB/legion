@@ -1,10 +1,10 @@
 import { ChannelType, PermissionFlagsBits as P, MessageFlags, ButtonStyle, ButtonBuilder, EmbedBuilder } from 'discord.js';
 import { assertUser, UserError } from './errors.mjs';
-import { embed, panel, caseMessages, applicationControls, row, button, safeText } from './ui.mjs';
+import { embed, panel, caseMessages, applicationControls, withApplicationWaitingNotice, row, button, safeText } from './ui.mjs';
 import { archiveTranscript, saveLocalTranscript } from './transcripts.mjs';
 import { caseChannelName } from './channel-names.mjs';
 import { parseAge } from './application.mjs';
-import { refreshRecruitment, requireApplicationsOpen } from './recruitment.mjs';
+import { refreshRecruitment, requireApplicationsOpen, requireRecruitmentSpace, applicationWaitingNotice } from './recruitment.mjs';
 import { deliverAcceptance } from './admissions.mjs';
 import { requireOpenCase, recoverGuildCases } from './case-recovery.mjs';
 
@@ -173,7 +173,8 @@ export async function createCase(ctx, interaction, kind, payload) {
     const message = await postCaseMessages(channel, config, dossier, ctx.recruitment);
     store.openCase(dossier.id, message.id);
     await writeLog(ctx, interaction.guild, kind === 'ticket' ? 'Ticket geopend' : 'Sollicitatie ontvangen', `<@${interaction.user.id}> • <#${channel.id}> • dossier \`${dossier.id}\``);
-    await interaction.editReply({ content: `Je ${kind === 'ticket' ? 'ticket' : 'sollicitatie'} is aangemaakt: <#${channel.id}>.`, allowedMentions: quiet });
+    const waitingNotice = kind === 'application' ? applicationWaitingNotice(ctx.recruitment) : '';
+    await interaction.editReply({ content: `Je ${kind === 'ticket' ? 'ticket' : 'sollicitatie'} is aangemaakt: <#${channel.id}>.${waitingNotice ? `\n\n⏳ ${waitingNotice}` : ''}`, allowedMentions: quiet });
   } catch (error) {
     // Na een geslaagde creatie blijft het dossier geldig als alleen de reactie mislukt.
     if (store.caseById(dossier.id)?.status === 'open') throw error;
@@ -275,7 +276,7 @@ export async function decideCase(ctx, interaction, id, decision) {
     assertUser(interaction.guild.members.me.permissions.has(P.ManageRoles) && interaction.guild.members.me.roles.highest.comparePositionTo(role) > 0, 'De bot kan de ledenrol niet geven. Plaats zijn rol boven de ledenrol en geef Rollen beheren.');
     if (config.recruitment && !member.roles.cache.has(config.memberRoleId)) {
       await refreshRecruitment(ctx, interaction.guild);
-      requireApplicationsOpen(ctx);
+      requireRecruitmentSpace(ctx);
     }
     if (Object.hasOwn(dossier.payload, 'age')) assertUser(parseAge(dossier.payload.age) !== null && parseAge(dossier.payload.age) >= (config.recruitment?.minimumAge ?? 16), 'Deze sollicitant voldoet niet aan de minimale leeftijd.');
     await member.roles.add(role, `Legion sollicitatie ${dossier.id} geaccepteerd`);
@@ -358,7 +359,10 @@ export async function reconcileCases(ctx, guild) {
     } else {
       const original = await channel.messages.fetch(dossier.message_id).catch(() => null);
       if (original?.author.id === guild.members.me.id) {
-        await original.edit({ embeds: original.embeds.map(card => EmbedBuilder.from(card).setColor(ctx.recruitment?.color ?? 0x22C55E)),
+        await original.edit({ embeds: original.embeds.map((card, index) => {
+          const updated = EmbedBuilder.from(card).setColor(ctx.recruitment?.color ?? 0x22C55E);
+          return dossier.kind === 'application' && index === 0 ? withApplicationWaitingNotice(updated, ctx.recruitment) : updated;
+        }),
           ...(dossier.kind === 'application' ? { components: [applicationControls(dossier)] } : {}) });
       }
     }

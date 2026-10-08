@@ -46,11 +46,11 @@ test('een kanaal verdwijnt pas na een volledig opgeslagen transcript en herstel 
   await assert.rejects(removeClosedCase(ctx, client, { ...closed, status: 'open' }), /gesloten dossier/);
 });
 
-test('directe sollicitatie heeft de volledige template, vier acties en tickets vragen geen invoer', () => {
+test('directe sollicitatie heeft de volledige template, statusknop en tickets vragen geen invoer', () => {
   const payload = caseMessages(config, { kind: 'application', id: 'abc', owner_id: 'member', payload: { template: true } });
   assert.equal(payload.length, 1);
   assert.equal(payload[0].embeds[0].toJSON().description, applicationTemplate);
-  assert.equal(payload[0].components[0].toJSON().components.length, 4);
+  assert.equal(payload[0].components[0].toJSON().components.length, 5);
   const ticket = commands(500).find(cmd => cmd.name === 'ticket');
   assert.equal(ticket.options.find(option => option.name === 'openen').options?.length ?? 0, 0);
 });

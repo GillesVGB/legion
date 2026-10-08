@@ -1,7 +1,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, escapeMarkdown } from 'discord.js';
 import { handValue, showCards } from './cards.mjs';
 import { applicationSteps, applicationIntro, applicationThanks, applicationGuidance, applicationTemplate } from './application.mjs';
-import { recruitmentState } from './recruitment.mjs';
+import { recruitmentState, applicationWaitingNotice } from './recruitment.mjs';
 
 export const safeText = value => escapeMarkdown(String(value)).replaceAll('@', '@\u200b');
 export const row = (...buttons) => new ActionRowBuilder().addComponents(...buttons);
@@ -25,7 +25,7 @@ export function panel(config, type = 'alles', recruitment) {
   const card = embed(config, title, description);
   card.setColor(state?.color ?? 0x22C55E);
   if (state && (combined || type === 'sollicitaties')) card.addFields({ name: `Sollicitatiestatus: ${state.icon} ${state.label}`,
-    value: `${state.count === null ? 'Ledenstand wordt opgehaald.' : `**${state.count}/${config.recruitment.capacity}** plaatsen bezet. Nog **${Math.max(0, config.recruitment.capacity - state.count)}** beschikbaar.`}\n\n🟢 Open\n🟠 Open, beperkte plaatsen\n🔴 Vol` });
+    value: `${state.count === null ? 'Ledenstand wordt opgehaald.' : `**${state.count}/${config.recruitment.capacity}** plaatsen bezet. Nog **${Math.max(0, config.recruitment.capacity - state.count)}** beschikbaar.`}${applicationWaitingNotice(state) ? `\n\n⏳ ${applicationWaitingNotice(state)}` : ''}\n\n🟢 Open\n🟠 Open, beperkte plaatsen\n🔴 Vol — solliciteren blijft mogelijk` });
   return { embeds: [card], components: [row(...buttons)] };
 }
 const input = (id, label, style, maxLength, placeholder) => new TextInputBuilder()
@@ -54,17 +54,22 @@ export const applicationControls = dossier => row(
   button(`application:interview:${dossier.id}`, 'Gesprek starten', ButtonStyle.Primary),
   button(`application:askaccept:${dossier.id}`, 'Aannemen', ButtonStyle.Success),
   button(`application:askreject:${dossier.id}`, 'Afwijzen', ButtonStyle.Danger),
-  button(`application:askclose:${dossier.id}`, 'Sollicitatie sluiten')
+  button(`application:askclose:${dossier.id}`, 'Sollicitatie sluiten'),
+  button(`application:status:${dossier.id}`, 'Sollicitatiestatus')
 );
 
 export function caseMessages(config, dossier, recruitment) {
   config = { ...config, color: dossier.status === 'accepted' ? 0x22C55E : ['rejected','closed'].includes(dossier.status) ? 0xEF4444 : recruitment?.color ?? (config.recruitment ? 0xF59E0B : 0x22C55E) };
   if (dossier.kind === 'application' && dossier.payload.template) return [{
     content: `<@${dossier.owner_id}> Vul de template hieronder in en plaats je antwoorden in dit kanaal.`,
-    embeds: [embed(config, 'Legion — Sollicitatie', applicationTemplate)],
+    embeds: [withApplicationWaitingNotice(embed(config, 'Legion — Sollicitatie', applicationTemplate), recruitment)],
     components: [applicationControls(dossier)]
   }];
-  if (dossier.kind !== 'application' || !Object.hasOwn(dossier.payload, 'age')) return [caseMessage(config, dossier)];
+  if (dossier.kind !== 'application' || !Object.hasOwn(dossier.payload, 'age')) {
+    const message = caseMessage(config, dossier);
+    if (dossier.kind === 'application') withApplicationWaitingNotice(message.embeds[0], recruitment);
+    return [message];
+  }
   return applicationSteps.map((fields, step) => {
     const card = embed(config, 'Legion — Sollicitatie', step === 0 ? `${applicationIntro}\n\nLid: <@${dossier.owner_id}> • Dossier: \`${dossier.id}\`` : step === 2 ? applicationThanks : 'Legion — Sollicitatie (vervolg)');
     for (const field of fields) {
@@ -76,8 +81,16 @@ export function caseMessages(config, dossier, recruitment) {
         offset = end;
       }
     }
+    if (step === 0) withApplicationWaitingNotice(card, recruitment);
     return { embeds: [card], components: step === 2 ? [applicationControls(dossier)] : [] };
   });
+}
+export function withApplicationWaitingNotice(card, recruitment) {
+  const fields = (card.data.fields ?? []).filter(field => field.name !== 'Langere wachttijd');
+  card.setFields(fields);
+  const notice = applicationWaitingNotice(recruitment);
+  if (notice) card.addFields({ name: 'Langere wachttijd', value: `⏳ ${notice}` });
+  return card;
 }
 export function caseMessage(config, dossier) {
   const applicant = dossier.kind === 'application';

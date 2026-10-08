@@ -1,6 +1,7 @@
 [
   {
     "guildId": "1555685630640652338",
+    "planningChannelId": "1555685633266163793",
     "admission": { "targetGuildId": "1555685630640652338", "inviteChannelId": "1555685632704249927", "targetRoleId": "1555685630640652347", "inviteMaxAgeSeconds": 86400 },
     "ticketsEnabled": false,
     "panelChannelId": "",
@@ -22,6 +23,7 @@
   },
   {
     "guildId": "1555726440933363753",
+    "planningChannelId": "",
     "admission": { "targetGuildId": "1555685630640652338", "inviteChannelId": "1555685632704249927", "targetRoleId": "1555685630640652347", "inviteMaxAgeSeconds": 86400 },
     "ticketsEnabled": true,
     "panelChannelId": "1555726441759375398",

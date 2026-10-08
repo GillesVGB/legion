@@ -35,7 +35,7 @@ export function dashboardFixture() {
     const addMember=(id,name,ids,admin=false,bot=false)=>{
       const member={id,guild,client,displayName:name,displayAvatarURL:()=>null,permissions:new PermissionsBitField(admin?P.Administrator:0n)};
       const user={id,username:name.replace(/ /g,'_').toLowerCase(),bot,send:async payload=>{calls.push({method:'dm',user:id,payload});return{id:String(++message)};}};
-      member.user=user;member.roles={cache:new Collection(ids.map(id=>[id,roles.get(id)])),highest:role('highest','Rang',admin?100:12),add:async value=>{member.roles.cache.set(value.id,value);}};
+      member.user=user;member.roles={cache:new Collection(ids.map(id=>[id,roles.get(id)])),highest:role('highest','Rang',admin?100:12),add:async value=>{member.roles.cache.set(value.id,value);},set:async values=>{member.roles.cache=new Collection(values.map(id=>[id,roles.get(id)]));member.roles.highest=[...member.roles.cache.values()].sort((a,b)=>b.position-a.position)[0]||role('none','Geen rang',0);calls.push({method:'roles.set',user:id,roles:values});}};
       cache.set(id,member);return member;
     };
     guild.addMember=addMember;
@@ -51,11 +51,27 @@ export function dashboardFixture() {
         permissionsFor:target=>new PermissionsBitField(target.id===base.clientId||config.staffRoleIds.includes(target.id)||target.permissions?.has(P.Administrator)?P.Administrator:0n),
         delete:async()=>{channels.delete(id);calls.push({method:'channel.delete',id});},
         messages:{fetch:async options=>typeof options==='string'?posted.get(options)||null:new Collection([...posted].filter(([id,m])=>!options.before||BigInt(id)<BigInt(options.before)).slice(0,100))},
-        send:async payload=>{const id=String(BigInt('100000000000000500')+BigInt(++message));const item={id,createdTimestamp:Date.now(),author:client.user,member:{displayName:'Legion'},content:payload.content||'',attachments:new Collection(),embeds:(payload.embeds||[]).map(card=>({toJSON:()=>card.toJSON()})),edit:async()=>{}};posted.set(id,item);return item;},posted};
+        setName:async value=>{channel.name=value;},
+        send:async payload=>{
+          const id=String(BigInt('100000000000000500')+BigInt(++message));
+          const item={id,channelId:channel.id,guild,channel,partial:false,createdTimestamp:Date.now(),author:client.user,member:{displayName:'Legion'},content:'',attachments:new Collection(),embeds:[],components:[]};
+          const apply=payload=>{if(payload.content!==undefined)item.content=payload.content;if(payload.embeds)item.embeds=payload.embeds.map(card=>{const json=card.toJSON?.()||card;return{...json,toJSON:()=>json};});if(payload.components)item.components=payload.components.map(row=>row.toJSON?.()||row);};
+          item.edit=async payload=>{apply(payload);calls.push({method:'message.edit',id,payload});return item;};
+          item.delete=async()=>posted.delete(id);item.fetch=async()=>item;
+          item.reactions={cache:new Collection()};
+          item.react=async emoji=>{
+            let reaction=item.reactions.cache.get(emoji);
+            if(!reaction){const users=new Collection();reaction={emoji:{name:emoji},message:item,partial:false,
+              users:{cache:users,fetch:async options=>new Collection([...users].filter(([id])=>!options?.after||BigInt(id)>BigInt(options.after)).slice(0,options?.limit||100)),remove:async user=>{users.delete(user);calls.push({method:'reaction.remove',emoji,user});}}};
+              Object.defineProperty(reaction,'me',{get:()=>users.has(client.user.id)});item.reactions.cache.set(emoji,reaction);}
+            reaction.users.cache.set(client.user.id,{...client.user,bot:true});calls.push({method:'reaction.add',emoji,id});return reaction;
+          };
+          apply(payload);posted.set(id,item);return item;
+        },posted};
       channels.set(id,channel);return channel;
     };
     guild.makeChannel=makeChannel;
-    for(const id of [config.logChannelId,config.warnLogChannelId,config.applicationTranscriptChannelId,config.ticketTranscriptChannelId,config.panelChannelId,config.admission.inviteChannelId].filter(Boolean))makeChannel(id,'legion-beheer');
+    for(const id of [config.logChannelId,config.warnLogChannelId,config.applicationTranscriptChannelId,config.ticketTranscriptChannelId,config.panelChannelId,config.planningChannelId,config.admission.inviteChannelId].filter(Boolean))makeChannel(id,'legion-beheer');
     if(config.roster)makeChannel(config.roster.channelId,'ledenlijst');
     ctx.store.wallet('100000000000000020');ctx.store.adjustCoins('100000000000000020',2500,ACTOR,'Voorbeeldsaldo');
     ctx.store.wallet('100000000000000021');ctx.store.adjustCoins('100000000000000021',1350,ACTOR,'Voorbeeldsaldo');

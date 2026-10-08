@@ -1,4 +1,4 @@
-import { Client, Events, GatewayIntentBits, MessageFlags, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { Client, Events, GatewayIntentBits, Partials, MessageFlags, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { randomInt } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { loadConfig } from './config.mjs';
@@ -15,16 +15,21 @@ import { deliverAcceptance, expireAcceptanceInvites, admissionJoined, revokeAcce
 import { countRecruitment, refreshRecruitment, requireApplicationsOpen } from './recruitment.mjs';
 import { publishRoster } from './roster.mjs';
 import { fishCatch } from './fishing.mjs';
+import { missionMessage, handleMissionButton } from './missions.mjs';
+import { showApplicationStatus } from './application-status.mjs';
+import { handlePlanningCommand,handlePlanningReaction,clearPlanningReactions,syncActivities } from './activities.mjs';
+import { handlePromotionCommand,handlePromotionButton,syncPromotions } from './promotions.mjs';
+import { syncCommands } from './command-sync.mjs';
 import { quiet, isStaff, requireStaff, requireAdmin, requireTickets, configureGuild, publishPanel,
   createCase, requestCaseDecision, decideCase, startInterview, cleanupInterviews, cleanupClosedCases, warningMessage, staffLogChannel, warnLogChannel, writeWarnLog, reconcileCases } from './service.mjs';
 
 const base = loadConfig();
 console.log(`Legion versie ${JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version}: dashboard ${base.dashboardPublicURL ? 'via hostingadres' : 'via tunnel'}.`);
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent], allowedMentions: quiet });
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMessageReactions], partials:[Partials.Message,Partials.Channel,Partials.Reaction,Partials.User], allowedMentions: quiet });
 const locks = new Locks();
 const contexts = new Map();
 const cooldowns = new Map();
-const gameCommands = new Set(['saldo', 'daily', 'leaderboard', 'blackjack', 'coinflip', 'dobbel', '8ball', 'steenpapier', 'fish']);
+const gameCommands = new Set(['saldo', 'daily', 'leaderboard', 'blackjack', 'coinflip', 'dobbel', '8ball', 'steenpapier', 'fish', 'missies']);
 const privateReply = { flags: MessageFlags.Ephemeral, allowedMentions: quiet };
 let shuttingDown = false;
 let stopViewer;
@@ -113,6 +118,7 @@ async function games(ctx, interaction) {
   const user = interaction.user.id;
   const name = interaction.commandName;
   const coins = config.content.coinName;
+  if (name === 'missies') return interaction.reply(missionMessage(ctx,user));
   if (name === 'saldo') return interaction.reply({ allowedMentions: quiet, content: `<@${user}> heeft **${store.wallet(user).balance} ${coins}**. Dit zijn alleen fictieve Discord-punten.` });
   if (name === 'daily') {
     const result = store.daily(user);
@@ -167,10 +173,11 @@ async function handleCommand(ctx, interaction) {
   const name = interaction.commandName;
   if (name === 'help') {
     return interaction.reply({ ...privateReply, embeds: [embed(config, 'Legion | Commands', [
-      '**Algemeen:** /info, /regels, /rangen, /solliciteren, /mijnwarns',
+      '**Algemeen:** /info, /regels, /rangen, /solliciteren, /sollicitatiestatus, /mijnwarns',
+      ...(!config.ticketsEnabled ? ['**Gang:** /planning, /planning-overzicht, /planning-annuleren, /promotie'] : []),
       ...(config.ticketsEnabled ? ['**Tickets:** /ticket openen, /ticket sluiten'] : []),
       '**Games:** /blackjack, /coinflip, /dobbel, /8ball, /steenpapier, /fish',
-      '**Coins:** /saldo, /daily, /leaderboard',
+      '**Coins:** /saldo, /daily, /leaderboard, /missies',
       '**Leiding:** /dashboard, /gangwarn geven, /gangwarn bekijken, /gangwarn intrekken',
       '**Aangenomen:** /uitnodiging voor je persoonlijke ganginvite',
       '**Administrators:** /inrichten, /setup',
@@ -178,6 +185,9 @@ async function handleCommand(ctx, interaction) {
     ].join('\n'))] });
   }
   if (['info', 'regels', 'rangen'].includes(name)) return info(ctx, interaction, name);
+  if (name === 'sollicitatiestatus') return showApplicationStatus(ctx,interaction);
+  if (['planning','planning-overzicht','planning-annuleren'].includes(name)) return handlePlanningCommand(ctx,interaction);
+  if (name === 'promotie') return handlePromotionCommand(ctx,interaction);
   if (name === 'dashboard') {
     requireStaff(interaction, config);
     await interaction.deferReply(privateReply);
@@ -233,6 +243,8 @@ async function handleCommand(ctx, interaction) {
 
 async function handleButton(ctx, interaction) {
   const [type, action, id, extra, confirmer] = interaction.customId.split(':');
+  if (type === 'mission') { requireGames(ctx,interaction); return handleMissionButton(ctx,interaction); }
+  if (type === 'promotion') return handlePromotionButton(ctx,interaction);
   if (type === 'info') return info(ctx, interaction);
   if (type === 'ticket') {
     requireTickets(ctx.config);
@@ -240,6 +252,7 @@ async function handleButton(ctx, interaction) {
     if (action === 'askclose') return requestCaseDecision(ctx, interaction, id, 'close');
   }
   if (type === 'application') {
+    if (action === 'status') return showApplicationStatus(ctx,interaction,id);
     if (action === 'new') return startApplication(ctx, interaction);
     if (action === 'continue') return startApplication(ctx, interaction);
     if (action === 'interview') return locks.run(`${interaction.guildId}:case-decision:${id}`, async () => {
@@ -340,6 +353,7 @@ client.once(Events.ClientReady, async ready => {
     const guild = client.guilds.cache.get(guildId);
     if (!guild) { console.error(`Guild ${guildId}: nodig de bot eerst uit in deze guild.`); continue; }
     try {
+      await syncCommands(ctx,guild).catch(error=>console.error(`Guild ${guildId}: commands bijwerken wacht op herstart (${error.code??error.name}).`));
       await guild.members.fetchMe();
       await guild.roles.fetch();
       await refreshRecruitment(ctx, guild);
@@ -447,6 +461,7 @@ async function drainTranscripts() {
       if (!ctx.ready) continue;
       const guild = client.guilds.cache.get(ctx.config.guildId);
       if (guild) await cleanupInterviews(ctx, guild);
+      if (guild) { await syncActivities(ctx,guild); await syncPromotions(ctx,guild); }
       for (const notice of ctx.store.pendingAcceptances()) await locks.run(`${ctx.config.guildId}:admission:${notice.case_id}`, () => deliverAcceptance(ctx, client, notice.case_id));
       await expireAcceptanceInvites(ctx, client);
       for (const delivery of ctx.store.pendingTranscripts()) {
@@ -460,6 +475,12 @@ const transcriptTimer = setInterval(() => drainTranscripts().catch(() => {}), 60
 transcriptTimer.unref();
 
 client.on(Events.Error, error => console.error(`Discord-verbinding: ${error.code ?? error.name}.`));
+for(const [event,added] of [[Events.MessageReactionAdd,true],[Events.MessageReactionRemove,false]])client.on(event,(reaction,user)=>{
+  const ctx=contexts.get(reaction.message.guildId);if(!ctx?.ready||user.id===client.user?.id)return;
+  handlePlanningReaction(ctx,reaction,user,added).catch(error=>console.error(`Planningreactie wordt opnieuw gesynchroniseerd (${error.code??error.name}).`));
+});
+client.on(Events.MessageReactionRemoveAll,message=>{const ctx=contexts.get(message.guildId);if(ctx?.ready)clearPlanningReactions(ctx,message).catch(()=>{});});
+client.on(Events.MessageReactionRemoveEmoji,reaction=>{const ctx=contexts.get(reaction.message.guildId);if(ctx?.ready)clearPlanningReactions(ctx,reaction.message,reaction.emoji.name).catch(()=>{});});
 async function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;

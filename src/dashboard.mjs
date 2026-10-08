@@ -12,6 +12,10 @@ import { resendAcceptance } from './admissions.mjs';
 import { refreshMembers } from './members.mjs';
 import { refreshRecruitment } from './recruitment.mjs';
 import { publishRoster } from './roster.mjs';
+import { applicationQueue } from './application-status.mjs';
+import { cancelActivity } from './activities.mjs';
+import { decidePromotion } from './promotions.mjs';
+import { missions,missionDay } from './mission-definitions.mjs';
 
 const secret = () => randomBytes(32).toString('base64url');
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -102,7 +106,8 @@ export class Dashboard {
     const { config, store } = ctx;
     const name = id => guild.members.cache.get(id)?.displayName || id;
     const avatar = id => guild.members.cache.get(id)?.displayAvatarURL?.({ size: 64 }) || null;
-    const cases = store.db.prepare("SELECT c.*,a.status AS dm_status,a.last_error AS dm_error FROM cases c LEFT JOIN acceptance_notifications a ON a.case_id=c.id WHERE c.status!='creating' ORDER BY c.created_at DESC LIMIT 200").all().map(({ payload, ...item }) => ({ ...item, owner_name: name(item.owner_id), owner_avatar: avatar(item.owner_id) }));
+    const queue=applicationQueue(store);
+    const cases = store.db.prepare("SELECT c.*,a.status AS dm_status,a.last_error AS dm_error FROM cases c LEFT JOIN acceptance_notifications a ON a.case_id=c.id WHERE c.status!='creating' ORDER BY c.created_at DESC LIMIT 200").all().map(({ payload, ...item }) => ({ ...item, queue:queue.get(item.id)||null, owner_name: name(item.owner_id), owner_avatar: avatar(item.owner_id) }));
     const transcripts = store.db.prepare("SELECT c.id,c.kind,c.status,c.owner_id,c.closed_at,t.state,v.view_id,v.secret_key FROM cases c LEFT JOIN transcripts t ON t.case_id=c.id LEFT JOIN transcript_views v ON v.case_id=c.id WHERE c.status IN ('accepted','rejected','closed') ORDER BY c.closed_at DESC LIMIT 200").all().map(({ view_id, secret_key, ...item }) => ({ ...item, owner_name: name(item.owner_id), url: view_id && config.transcriptSiteURL ? this.allowLocalPreview ? `${this.currentOrigin()}/t/${view_id}#k=${secret_key}` : transcriptViewURL(config, { view_id, secret_key }) : null }));
     const warnings = store.db.prepare('SELECT * FROM warnings ORDER BY created_at DESC LIMIT 200').all().map(item => ({ ...item, user_name: name(item.user_id), actor_name: name(item.actor_id) }));
     const wallets = new Map(store.db.prepare('SELECT user_id,balance FROM wallets').all().map(item => [item.user_id,item.balance]));
@@ -129,7 +134,11 @@ export class Dashboard {
       channels: [...guild.channels.cache.values()].filter(channel => channel.type === 0).map(channel => ({id:channel.id,name:channel.name})),
       commands: commands(config.maxBet,config.ticketsEnabled).map(command => ({name:command.name,description:command.description})),
       admission: config.admission ? { targetGuildId: config.admission.targetGuildId, maxAge: config.admission.inviteMaxAgeSeconds, restricted: true, maxUses: 1 } : null,
-      roster: config.roster || null };
+      roster: config.roster || null,
+      planningChannelId:config.planningChannelId,
+      plannings:store.db.prepare('SELECT * FROM activities ORDER BY starts_at DESC LIMIT 100').all().map(item=>({...item,url:item.message_id?`https://discord.com/channels/${guild.id}/${item.channel_id}/${item.message_id}`:null,participants:store.db.prepare('SELECT user_id,response FROM activity_rsvps WHERE activity_id=? ORDER BY updated_at').all(item.id).map(person=>({...person,name:name(person.user_id)}))})),
+      promotions:store.db.prepare('SELECT * FROM promotions ORDER BY created_at DESC LIMIT 100').all().map(item=>({...item,member_name:name(item.member_id),role_name:guild.roles.cache.get(item.role_id)?.name||item.role_id,url:item.message_id?`https://discord.com/channels/${guild.id}/${item.channel_id}/${item.message_id}`:null})),
+      missions:{day:missionDay(),definitions:missions,claimedToday:store.db.prepare('SELECT COUNT(*) AS total FROM mission_claims WHERE day=?').get(missionDay()).total} };
   }
   async interaction(ctx, guild, member, caseId) {
     const dossier = ctx.store.caseById(caseId);
@@ -144,6 +153,16 @@ export class Dashboard {
   async action(ctx, guild, member, value) {
     const { store, config } = ctx;
     const actor = member.id;
+    if(value.action==='planning.cancel') {
+      assertUser(/^[a-f0-9]{12}$/.test(value.id)&&value.confirm===true,'Bevestig eerst welke planning je wilt annuleren.');
+      await cancelActivity(ctx,guild,value.id,actor);
+      return {message:'Planning geannuleerd. Nieuwe aanwezigheidsreacties worden niet meer verwerkt.'};
+    }
+    if(['promotion.approve','promotion.reject'].includes(value.action)) {
+      assertUser(/^[a-f0-9]{12}$/.test(value.id)&&value.confirm===true,'Bevestig eerst welk promotievoorstel je wilt beoordelen.');
+      const result=await decidePromotion(ctx,guild,member,value.id,value.action.endsWith('approve')?'approve':'reject');
+      return {message:result.status==='approved'?'Promotie goedgekeurd en gangrang aangepast.':result.status==='approving'?'Promotie wordt automatisch verder gecontroleerd.':'Promotievoorstel afgewezen.'};
+    }
     const reason = () => { assertUser(typeof value.reason === 'string' && value.reason.trim() && value.reason.length <= 500, 'Geef een reden van maximaal 500 tekens.'); return value.reason.trim(); };
     const userId = () => { assertUser(/^\d{17,20}$/.test(value.userId), 'Kies een geldig Discord-lid.'); return value.userId; };
     if (value.action === 'warn.add') {

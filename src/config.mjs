@@ -66,7 +66,7 @@ export function loadConfig(env = process.env, requireDiscord = true) {
       if (typeof guild.guildId !== 'string' || !snowflake.test(guild.guildId) || seen.has(guild.guildId)) errors.push('guilds.json: elk guildId moet geldig en uniek zijn.');
       seen.add(guild.guildId);
       if (typeof guild.ticketsEnabled !== 'boolean') errors.push(`Guild ${guild.guildId}: ticketsEnabled moet true of false zijn.`);
-      for (const key of ['panelChannelId', 'memberRoleId', 'ticketCategoryId', 'applicationCategoryId', 'logChannelId', 'gameChannelId', 'warnLogChannelId', 'applicationTranscriptChannelId', 'ticketTranscriptChannelId']) {
+      for (const key of ['panelChannelId', 'planningChannelId', 'memberRoleId', 'ticketCategoryId', 'applicationCategoryId', 'logChannelId', 'gameChannelId', 'warnLogChannelId', 'applicationTranscriptChannelId', 'ticketTranscriptChannelId']) {
         if (typeof guild[key] !== 'string' || (guild[key] && !snowflake.test(guild[key]))) errors.push(`Guild ${guild.guildId}: ${key} moet leeg of een geldig Discord-ID zijn.`);
       }
       if (!Array.isArray(guild.staffRoleIds) || guild.staffRoleIds.some(x => typeof x !== 'string' || !snowflake.test(x) || x === guild.guildId)) errors.push(`Guild ${guild.guildId}: staffRoleIds moet een lijst met staffrol-ID's zijn; @everyone is niet toegestaan.`);

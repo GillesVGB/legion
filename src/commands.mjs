@@ -32,6 +32,19 @@ export function commands(maxBet, ticketsEnabled = true) {
         .addStringOption(reasonOption)),
     cmd('mijnwarns', 'Bekijk alleen je eigen gangwarns'),
     cmd('solliciteren', 'Open direct een prive sollicitatieticket met de Legion-template'),
+    cmd('sollicitatiestatus', 'Bekijk privé je sollicitatiestatus en plek in de binnenkomstvolgorde'),
+    cmd('planning', 'Plaats een planning in het vaste Legion-planningkanaal (alleen leiding)')
+      .addStringOption(o=>o.setName('datum').setDescription('Datum: DD-MM-JJJJ, bijvoorbeeld 12-10-2026').setRequired(true).setMaxLength(10))
+      .addStringOption(o=>o.setName('tijd').setDescription('Belgische tijd: UU:MM, bijvoorbeeld 20:30').setRequired(true).setMaxLength(5))
+      .addStringOption(o=>o.setName('afspreekpunt').setDescription('Waar verzamelen we?').setRequired(true).setMaxLength(160)),
+    cmd('planning-overzicht','Bekijk de komende Legion-activiteiten'),
+    cmd('planning-annuleren','Annuleer een planning (alleen leiding)')
+      .addStringOption(o=>o.setName('id').setDescription('Planning-ID onderaan het bericht').setRequired(true).setMinLength(12).setMaxLength(12)),
+    cmd('promotie','Stel een hogere gangrang voor; de leiding beoordeelt het voorstel')
+      .addUserOption(userOption)
+      .addRoleOption(o=>o.setName('rang').setDescription('De voorgestelde hogere gangrang').setRequired(true))
+      .addStringOption(o=>o.setName('motivatie').setDescription('Waarom past deze promotie bij het lid?').setRequired(true).setMaxLength(500)),
+    cmd('missies','Bekijk je dagelijkse fun-missies, voortgang en coinbeloningen'),
     cmd('ticket', 'Open of sluit je prive ticket')
       .addSubcommand(s => s.setName('openen').setDescription('Open direct een prive ticket'))
       .addSubcommand(s => s.setName('sluiten').setDescription('Sluit het ticket in dit kanaal met bevestiging')),
@@ -47,5 +60,6 @@ export function commands(maxBet, ticketsEnabled = true) {
     cmd('steenpapier', 'Steen, papier, schaar tegen de bot').addStringOption(o => o.setName('keuze').setDescription('Jouw keuze').setRequired(true)
       .addChoices({ name: 'Steen', value: 'steen' }, { name: 'Papier', value: 'papier' }, { name: 'Schaar', value: 'schaar' }))
   ];
-  return result.filter(command => ticketsEnabled || command.name !== 'ticket').map(command => command.toJSON());
+  return result.filter(command => (ticketsEnabled || command.name !== 'ticket') &&
+    (!ticketsEnabled || !['planning','planning-overzicht','planning-annuleren','promotie'].includes(command.name))).map(command => command.toJSON());
 }

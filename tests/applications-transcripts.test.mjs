@@ -7,7 +7,7 @@ import { applicationFields, applicationSteps, applicationText, validateApplicati
 import { applicationModal, caseMessages, safeText } from '../src/ui.mjs';
 import { transcriptDocuments, splitUTF8, fetchTranscriptMessages, archiveTranscript } from '../src/transcripts.mjs';
 import { warnLogChannel } from '../src/service.mjs';
-import { recruitmentState, requireApplicationsOpen, countRecruitment } from '../src/recruitment.mjs';
+import { recruitmentState, requireApplicationsOpen, requireRecruitmentSpace, countRecruitment } from '../src/recruitment.mjs';
 
 const base = loadConfig({}, false);
 const config = { ...base, ...base.guilds[1] };
@@ -60,7 +60,7 @@ test('volledige antwoorden blijven zichtbaar en passen ook bij markdown binnen e
     assert.ok(length <= 6000);
   }
   assert.equal(messages[0].components.length, 0);
-  assert.equal(messages[2].components[0].toJSON().components.length, 4);
+  assert.equal(messages[2].components[0].toJSON().components.length, 5);
 });
 
 test('transcripts worden alleen in de community-guild naar de juiste kanalen ingepland', t => {
@@ -142,12 +142,15 @@ test('gangwarnkanaal moet in de juiste guild staan en botrechten hebben', async 
 });
 
 test('statusgrenzen zijn groen tot 19, oranje vanaf 20 en rood vanaf 25', () => {
-  for (const [count, icon, closed] of [[0, '🟢', false], [19, '🟢', false], [20, '🟠', false], [24, '🟠', false], [25, '🔴', true], [30, '🔴', true]]) {
+  for (const [count, icon, closed] of [[0, '🟢', false], [19, '🟢', false], [20, '🟠', false], [24, '🟠', false], [25, '🔴', false], [30, '🔴', false]]) {
     assert.equal(recruitmentState(count).icon, icon);
     assert.equal(recruitmentState(count).closed, closed);
   }
   assert.equal(recruitmentState(null).closed, true);
-  assert.throws(() => requireApplicationsOpen({ config, recruitment: recruitmentState(25) }), /zit vol/);
+  requireApplicationsOpen({ config, recruitment: recruitmentState(25) });
+  assert.throws(() => requireRecruitmentSpace({ config, recruitment: recruitmentState(25) }), /zit vol/);
+  requireRecruitmentSpace({ config, recruitment: recruitmentState(24) });
+  assert.throws(() => requireApplicationsOpen({ config, recruitment: recruitmentState(null) }), /gecontroleerd/);
   requireApplicationsOpen({ config, recruitment: recruitmentState(24) });
 });
 
@@ -161,7 +164,7 @@ test('ledenstand telt alleen mensen met de community-ledenrol', () => {
   assert.equal(countRecruitment(ctx, { members: { cache } }).count, 1);
 });
 
-test('leeftijd wordt gecontroleerd en het paneel sluit sollicitaties bij 25 leden', async () => {
+test('leeftijd blijft gecontroleerd en het rode paneel laat solliciteren bij 25 leden toe met een wachttijdmelding', async () => {
   assert.match(validateApplicationStep(0, { ...stepAnswers(0), age: '15' }), /minimale leeftijd/);
   assert.equal(validateApplicationStep(0, { ...stepAnswers(0), age: '16 jaar' }), null);
   assert.match(validateApplicationStep(0, { ...stepAnswers(0), age: 'onbekend' }), /hele jaren/);
@@ -169,8 +172,9 @@ test('leeftijd wordt gecontroleerd en het paneel sluit sollicitaties bij 25 lede
   const open = panel(config, 'alles', recruitmentState(20));
   const full = panel(config, 'alles', recruitmentState(25));
   assert.equal(open.components[0].toJSON().components.find(button => button.custom_id === 'application:new').disabled, false);
-  assert.equal(full.components[0].toJSON().components.find(button => button.custom_id === 'application:new').disabled, true);
+  assert.equal(full.components[0].toJSON().components.find(button => button.custom_id === 'application:new').disabled, false);
   assert.equal(full.components[0].toJSON().components.find(button => button.custom_id === 'ticket:new').disabled ?? false, false);
   assert.ok(full.embeds[0].toJSON().description.includes('We kijken niet alleen naar je huidige niveau'));
   assert.ok(full.embeds[0].toJSON().fields[0].name.includes('🔴 Vol'));
+  assert.match(full.embeds[0].toJSON().fields[0].value, /bekijken.*langer duren/);
 });

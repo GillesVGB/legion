@@ -43,6 +43,22 @@ Als een bestaande sollicitatie na een verhuizing geen dossier in de database hee
 
 Ticket- en sollicitatie-embeds volgen de ledenstand: **groen** bij 0–19, **oranje** bij 20–24 en **rood** vanaf 25. Een aangenomen dossier en de aanname-DM zijn groen; afgewezen of gesloten dossiers zijn rood.
 
+Ook bij **25/25** en de rode status blijft solliciteren mogelijk. Het paneel, de bevestiging en het sollicitatieticket melden dat het bekijken van de sollicitatie langer kan duren. Aannemen van een nieuw ganglid wacht op een vrije plaats; de sollicitatie blijft intussen open. De wachttijdmelding in bestaande open tickets verdwijnt automatisch zodra er weer plaats is.
+
+## Planning, promoties, wachtlijst en fun-missies
+
+**Planning:** in de gangserver `1555685630640652338` gebruikt de leiding bijvoorbeeld `/planning datum:12-10-2026 tijd:20:30 afspreekpunt:Legion HQ`. De bot plaatst uitsluitend in kanaal `1555685633266163793` een gewoon tekstbericht, zonder embed of knoppen. Het bericht bevat datum, Belgische tijd, afspreekpunt en de voorbereiding: volledig geheald, voertuig afgetankt, repairkits en benodigde spullen mee, op tijd aanwezig en duidelijke communicatie.
+
+De bot voegt zelf vier reacties toe: **🟢 Ik ben erbij**, **🕒 Ik ben later**, **🔴 Ik ben er niet bij** en **🟠 Ik weet het nog niet zeker**. Leden klikken op een reactie; wisselen vervangt hun keuze. De keuze en aantallen worden in SQLite opgeslagen. Na een herstart controleert de bot ook de echte Discord-reacties. Bij meerdere tegenstrijdige reacties uit een offline periode wordt een eerder opgeslagen keuze behouden; zonder eerdere keuze worden de tegenstrijdige reacties verwijderd, zodat het lid opnieuw één keuze kan maken. De bot heeft **Reacties toevoegen**, **Berichten beheren** en **Berichtgeschiedenis lezen** nodig. Planning is niet beschikbaar in de community-server.
+
+**Promoties:** `/promotie lid rang motivatie` is alleen in de gangserver beschikbaar. Leden kunnen zichzelf voorstellen; de leiding kan ook anderen voorstellen. De leiding beoordeelt het voorstel met Goedkeuren of Afwijzen, in Discord of het dashboard. Er kan één open voorstel per lid zijn. Alleen een hogere, ingestelde gangrang onder de botrol kan worden toegekend. Goedkeuren vervangt de bestaande gangrang en bewaart andere rollen; de ledenlijst werkt bij. Een gewone leidingrol kan geen eigen voorstel goedkeuren of hogere rollen beheren. Administrators kunnen hun eigen voorstellen beoordelen.
+
+**Wachtlijst:** `/sollicitatiestatus` en de statusknop in het sollicitatieticket geven uitsluitend aan de sollicitant en leiding inzicht in de eigen status. Binnenkomstvolgorde wordt berekend over open sollicitaties en verandert wanneer dossiers worden afgehandeld. Een gepland gesprek wordt apart vermeld. De leiding bepaalt de beoordelingsvolgorde. Bij een volle gang blijft aanmelden mogelijk met de melding dat bekijken langer kan duren.
+
+**Fun-missies:** `/missies` is een publieke gamefunctie in beide guilds. Vijf keer vissen geeft **175** extra coins, een afgerond blackjackspel **200**, en een geclaimde daily **100**. Voortgang telt alleen echte, succesvolle botacties. Beloningen kunnen uitsluitend door de speler zelf en één keer per missie per dag worden geclaimd. Nieuwe missies starten om **00:00 Belgische tijd**, ook bij zomer- en wintertijd. Coins zijn fictieve Discord-punten.
+
+Het dashboard heeft nieuwe pagina’s **Planning** en **Promotievoorstellen**; Games & coins toont de missies. Nieuwe slashcommands worden na een codewijziging automatisch per guild geregistreerd bij het opstarten. De database wordt zonder dataverlies uitgebreid naar schema 6. Houd de hele `data/`-map bij updates en verhuizingen.
+
 ## Persoonlijke uitnodigingen
 
 Bij aannemen krijgt de sollicitant een DM naar de gangserver **1555685630640652338**. De uitnodiging gebruikt Discord `target_user_ids`, uitsluitend met zijn gebruikers-ID, en `max_uses: 1`. De bot controleert de toegestane gebruiker na het maken van de invite. Zonder bevestigde beperking wordt geen uitnodiging verstuurd.

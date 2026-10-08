@@ -6,6 +6,7 @@ import { assertUser, UserError } from './errors.mjs';
 import { makeDeck, natural, resultOf, finishDealer, handValue } from './cards.mjs';
 import { applicationSteps, validateApplicationStep } from './application.mjs';
 import { fishCatch } from './fishing.mjs';
+import { missions, missionDay } from './mission-definitions.mjs';
 
 const newId = () => randomBytes(6).toString('hex');
 export const DAY = 24 * 60 * 60 * 1000;
@@ -72,7 +73,35 @@ export class Store {
         status TEXT NOT NULL DEFAULT 'pending', invite_code TEXT, expires_at INTEGER,
         dm_id TEXT, next_attempt INTEGER NOT NULL DEFAULT 0, last_error TEXT
       );
-      PRAGMA user_version = 5;
+      CREATE TABLE IF NOT EXISTS activities (
+        id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL,
+        location TEXT NOT NULL, starts_at INTEGER NOT NULL, ends_at INTEGER NOT NULL,
+        creator_id TEXT NOT NULL, channel_id TEXT NOT NULL, message_id TEXT,
+        status TEXT NOT NULL DEFAULT 'open', dirty INTEGER NOT NULL DEFAULT 1,
+        next_attempt INTEGER NOT NULL DEFAULT 0, last_error TEXT
+      );
+      CREATE TABLE IF NOT EXISTS activity_rsvps (
+        activity_id TEXT NOT NULL, user_id TEXT NOT NULL,
+        response TEXT NOT NULL CHECK(response IN ('yes','late','no','maybe')),
+        updated_at INTEGER NOT NULL, PRIMARY KEY(activity_id,user_id)
+      );
+      CREATE TABLE IF NOT EXISTS promotions (
+        id TEXT PRIMARY KEY, member_id TEXT NOT NULL, role_id TEXT NOT NULL,
+        proposer_id TEXT NOT NULL, reason TEXT NOT NULL, created_at INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending', approver_id TEXT, closed_at INTEGER,
+        channel_id TEXT NOT NULL, message_id TEXT, dirty INTEGER NOT NULL DEFAULT 1,
+        next_attempt INTEGER NOT NULL DEFAULT 0, last_error TEXT
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS one_pending_promotion ON promotions(member_id) WHERE status IN ('pending','approving');
+      CREATE TABLE IF NOT EXISTS mission_progress (
+        user_id TEXT NOT NULL, day TEXT NOT NULL, kind TEXT NOT NULL, amount INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY(user_id,day,kind)
+      );
+      CREATE TABLE IF NOT EXISTS mission_claims (
+        user_id TEXT NOT NULL, day TEXT NOT NULL, mission_id TEXT NOT NULL, reward INTEGER NOT NULL,
+        PRIMARY KEY(user_id,day,mission_id)
+      );
+      PRAGMA user_version = 6;
     `);
   }
 
@@ -257,6 +286,7 @@ export class Store {
       if (wallet.last_daily && now < next) return { available: false, next };
       this.db.prepare('UPDATE wallets SET balance=balance+?,last_daily=? WHERE user_id=?')
         .run(this.config.dailyCoins, now, user);
+      this.missionProgress(user, 'daily', now);
       return { available: true, balance: wallet.balance + this.config.dailyCoins };
     });
   }
@@ -277,12 +307,13 @@ export class Store {
   leaderboard() {
     return this.db.prepare('SELECT user_id,balance FROM wallets ORDER BY balance DESC,user_id ASC LIMIT 10').all();
   }
-  fish(user, roll) {
+  fish(user, roll, now = Date.now()) {
     const caught = fishCatch(roll);
     return this.transaction(() => {
       const wallet = this.wallet(user);
       const change = Math.max(-wallet.balance, caught.coins) || 0;
       this.db.prepare('UPDATE wallets SET balance=balance+? WHERE user_id=?').run(change, user);
+      this.missionProgress(user, 'fish', now);
       return { caught, change, balance: wallet.balance + change };
     });
   }
@@ -303,19 +334,46 @@ export class Store {
       this.db.prepare('UPDATE wallets SET balance=balance-? WHERE user_id=?').run(bet, user);
       this.db.prepare('INSERT INTO games(id,user_id,state,status,expires) VALUES(?,?,?,?,?)')
         .run(game.id, user, JSON.stringify(game), 'active', game.expires);
-      if (natural(game.player) || natural(game.dealer)) return this.settleInside(game, resultOf(game));
+      if (natural(game.player) || natural(game.dealer)) return this.settleInside(game, resultOf(game), now);
       return this.game(game.id);
     });
   }
   bindGame(id, channel, message) {
     this.db.prepare('UPDATE games SET channel_id=?,message_id=? WHERE id=?').run(channel, message, id);
   }
-  settleInside(game, result) {
+  settleInside(game, result, now = Date.now()) {
     const updated = this.db.prepare("UPDATE games SET state=?,status='done',revision=revision+1 WHERE id=? AND status='active' AND revision=?")
       .run(JSON.stringify({ ...game, result }), game.id, game.revision);
     assertUser(updated.changes === 1, 'Dit blackjackspel is al gewijzigd of afgelopen.');
     this.db.prepare('UPDATE wallets SET balance=balance+? WHERE user_id=?').run(result.credit, game.userId);
+    this.missionProgress(game.userId, 'blackjack', now);
     return this.game(game.id);
+  }
+  missionProgress(user, kind, now = Date.now()) {
+    const definition = missions.find(mission => mission.kind === kind);
+    assertUser(definition, 'Onbekende missie.');
+    this.db.prepare('INSERT INTO mission_progress(user_id,day,kind,amount) VALUES(?,?,?,1) ON CONFLICT(user_id,day,kind) DO UPDATE SET amount=MIN(amount+1,?)')
+      .run(user, missionDay(now), kind, definition.target);
+  }
+  missionStatus(user, now = Date.now()) {
+    const day = missionDay(now);
+    const amounts = new Map(this.db.prepare('SELECT kind,amount FROM mission_progress WHERE user_id=? AND day=?').all(user,day).map(item=>[item.kind,item.amount]));
+    const claimed = new Set(this.db.prepare('SELECT mission_id FROM mission_claims WHERE user_id=? AND day=?').all(user,day).map(item=>item.mission_id));
+    return { day, missions: missions.map(mission=>({ ...mission, progress:amounts.get(mission.kind)||0, claimed:claimed.has(mission.id) })) };
+  }
+  claimMissions(user, expectedDay, now = Date.now()) {
+    return this.transaction(() => {
+      assertUser(expectedDay === missionDay(now), 'Deze missiekaart is van een andere dag. Gebruik /missies voor je nieuwe missies.');
+      const completed = this.missionStatus(user,now).missions.filter(mission=>mission.progress>=mission.target&&!mission.claimed);
+      assertUser(completed.length, 'Je hebt nog geen nieuwe beloning klaarstaan. Rond een missie af en bekijk /missies opnieuw.');
+      const reward = completed.reduce((total,mission)=>total+mission.reward,0);
+      const wallet = this.wallet(user);
+      assertUser(wallet.balance+reward <= 1000000000, 'Je saldo is te hoog om deze beloning toe te voegen.');
+      for (const mission of completed) this.db.prepare('INSERT INTO mission_claims(user_id,day,mission_id,reward) VALUES(?,?,?,?)').run(user,expectedDay,mission.id,mission.reward);
+      this.db.prepare('UPDATE wallets SET balance=balance+? WHERE user_id=?').run(reward,user);
+      this.audit('mission.claim',user,{day:expectedDay,reward,missions:completed.map(mission=>mission.id)});
+      return { reward,balance:wallet.balance+reward };
+    });
   }
   playGame(id, user, revision, action, now = Date.now()) {
     return this.transaction(() => {
@@ -328,11 +386,11 @@ export class Store {
       if (now >= game.expires || action === 'stand') {
         const result = finishDealer(game);
         if (now >= game.expires) result.text = `Tijd verlopen; automatisch gepast. ${result.text}`;
-        return this.settleInside(game, result);
+        return this.settleInside(game, result, now);
       }
       game.player.push(game.deck.pop());
       if (handTotal(game) >= 21) {
-        return this.settleInside(game, handTotal(game) > 21 ? resultOf(game) : finishDealer(game));
+        return this.settleInside(game, handTotal(game) > 21 ? resultOf(game) : finishDealer(game), now);
       }
       const saved = this.db.prepare("UPDATE games SET state=?,revision=revision+1 WHERE id=? AND status='active' AND revision=?")
         .run(JSON.stringify(game), id, revision);
