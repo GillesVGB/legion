@@ -77,7 +77,7 @@ export class Store {
       CREATE TABLE IF NOT EXISTS activities (
         id TEXT PRIMARY KEY, title TEXT NOT NULL, description TEXT NOT NULL,
         location TEXT NOT NULL, starts_at INTEGER NOT NULL, ends_at INTEGER NOT NULL,
-        creator_id TEXT NOT NULL, channel_id TEXT NOT NULL, message_id TEXT,
+        creator_id TEXT NOT NULL, channel_id TEXT NOT NULL, message_id TEXT, date_label TEXT NOT NULL DEFAULT '',
         status TEXT NOT NULL DEFAULT 'open', dirty INTEGER NOT NULL DEFAULT 1,
         next_attempt INTEGER NOT NULL DEFAULT 0, last_error TEXT
       );
@@ -107,8 +107,9 @@ export class Store {
         user_id TEXT NOT NULL, day TEXT NOT NULL, mission_id TEXT NOT NULL, reward INTEGER NOT NULL,
         PRIMARY KEY(user_id,day,mission_id)
       );
-      PRAGMA user_version = 7;
+      PRAGMA user_version = 8;
     `);
+    if(!this.db.prepare('PRAGMA table_info(activities)').all().some(column=>column.name==='date_label'))this.db.exec("ALTER TABLE activities ADD COLUMN date_label TEXT NOT NULL DEFAULT '';");
     if(previousSchema<7){
       this.db.exec("UPDATE promotions SET status='pending',approver_id=NULL,dirty=1,next_attempt=0 WHERE status='approving' AND (SELECT COUNT(*) FROM promotion_votes WHERE proposal_id=promotions.id)<3;");
       this.db.exec("UPDATE promotions SET dirty=1,next_attempt=0 WHERE status='pending';");

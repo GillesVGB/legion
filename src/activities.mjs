@@ -14,6 +14,10 @@ export const attendanceChoices=[
 ];
 export const planningPreparation='### Kom voorbereid\n• Zorg dat je volledig bent geheald.\n• Tank je voertuig vooraf helemaal vol.\n• Neem voldoende repairkits en de benodigde spullen mee.\n• Sta op tijd klaar op het afspreekpunt.\n• Volg de aanwijzingen van de leiding en houd de communicatie duidelijk.';
 export function requirePlanningGuild(ctx){assertUser(ctx.config.guildId==='1555685630640652338'&&ctx.config.planningChannelId,'De planning wordt alleen in de Legion-gangserver beheerd.');}
+export function planningDateLabel(value){
+  const input=String(value).trim().toLowerCase().replace(/\s+/g,'');
+  return input==='dezeavond'?'Deze avond':input==='morgenavond'?'Morgenavond':'';
+}
 export function planningTime(date,time,now=Date.now()) {
   let y,m,d;
   const input=String(date).trim().toLowerCase().replace(/\s+/g,' ');
@@ -61,8 +65,9 @@ export function activityMessage(ctx,activity,now=Date.now()) {
   const open=activity.status==='open'&&now<activity.ends_at;
   const date=new Date(activity.starts_at);
   const dateText=date.toLocaleDateString('nl-BE',{timeZone:'Europe/Brussels',day:'2-digit',month:'2-digit',year:'numeric'});
+  const displayDate=activity.date_label?`${activity.date_label} (${dateText})`:dateText;
   const timeText=date.toLocaleTimeString('nl-BE',{timeZone:'Europe/Brussels',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
-  let content=`## Legion — Planning\n**Activiteit:** ${safeText(activity.title)}\n**Datum:** ${dateText}\n**Tijd:** ${timeText} (Belgische tijd) · <t:${Math.floor(activity.starts_at/1000)}:R>\n**Afspreekpunt:** ${safeText(activity.location)}\n`;
+  let content=`## Legion — Planning\n**Activiteit:** ${safeText(activity.title)}\n**Datum:** ${displayDate}\n**Tijd:** ${timeText} (Belgische tijd) · <t:${Math.floor(activity.starts_at/1000)}:R>\n**Afspreekpunt:** ${safeText(activity.location)}\n`;
   if(activity.description)content+=`\n${safeText(activity.description)}\n`;
   content+=`\n${planningPreparation}\n\n### Laat weten of je erbij bent\n`;
   content+=attendanceChoices.map(choice=>`${choice.emoji}: ${choice.label} — **${responses.filter(item=>item.response===choice.id).length}**`).join('\n');
@@ -100,7 +105,7 @@ export async function createActivity(ctx,interaction,input,now=Date.now()) {
   assertUser(channel.permissionsFor(interaction.guild.members.me)?.has([P.AddReactions,P.ManageMessages]),'Geef de bot Reacties toevoegen en Berichten beheren, zodat ieder lid één aanwezigheidskeuze kan maken.');
   const id=randomBytes(6).toString('hex');
   ctx.store.transaction(()=>{
-    ctx.store.db.prepare('INSERT INTO activities(id,title,description,location,starts_at,ends_at,creator_id,channel_id) VALUES(?,?,?,?,?,?,?,?)').run(id,title,description,location,starts,starts+duration*60000,interaction.user.id,channel.id);
+    ctx.store.db.prepare('INSERT INTO activities(id,title,description,location,starts_at,ends_at,creator_id,channel_id,date_label) VALUES(?,?,?,?,?,?,?,?,?)').run(id,title,description,location,starts,starts+duration*60000,interaction.user.id,channel.id,planningDateLabel(input.date));
     ctx.store.audit('planning.create',interaction.user.id,{id,starts,channel:channel.id});
   });
   const posted=await publishActivity(ctx,interaction.guild,id).catch(error=>{ctx.store.db.prepare('UPDATE activities SET last_error=?,next_attempt=? WHERE id=?').run(String(error.code||error.name),Date.now()+60000,id);return null;});

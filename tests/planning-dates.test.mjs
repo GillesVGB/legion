@@ -1,8 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {planningTime,planningDateSuggestions,handlePlanningAutocomplete,createActivity,activityById} from '../src/activities.mjs';
+import {planningTime,planningDateSuggestions,handlePlanningAutocomplete,createActivity,activityById,activityMessage} from '../src/activities.mjs';
 import {commands} from '../src/commands.mjs';
 import {dashboardFixture,ACTOR} from './dashboard-fixture.mjs';
+import {Store} from '../src/store.mjs';
+import {mkdtempSync,rmSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 
 test('planning accepteert een vaste datum, deze avond en morgenavond met dezelfde opgegeven tijd',()=>{
   const now=Date.parse('2026-10-09T12:00:00Z');
@@ -41,5 +45,38 @@ test('morgenavond wordt als concrete datum opgeslagen en een voorbij tijdstip sc
   await assert.rejects(createActivity(ctx,interaction,{date:'deze avond',time:'20:30',location:'Legion HQ'},now),/toekomst/);
   const result=await createActivity(ctx,interaction,{date:'morgenavond',time:'20:30',location:'Legion HQ'},now);
   assert.equal(activityById(ctx,result.id).starts_at,Date.parse('2026-10-10T18:30:00Z'));
-  assert.ok(result.posted.content.includes('10/10/2026'));assert.equal(result.posted.embeds.length,0);
+  assert.ok(result.posted.content.includes('**Datum:** Morgenavond (10/10/2026)'));assert.equal(result.posted.embeds.length,0);
+});
+test('het gekozen avondlabel blijft bij bijwerken en herstarten bewaard; vaste datums krijgen geen avondlabel',async t=>{
+  const f=dashboardFixture();t.after(f.close);
+  const source=f.contexts.values().next().value,guild=f.guilds.get(source.config.guildId),member=guild.members.cache.get(ACTOR);
+  const folder=mkdtempSync(join(tmpdir(),'legion-planning-label-'));
+  const config={...source.config,dataDir:folder};const first=new Store(config),ctx={...source,config,store:first};
+  const interaction={guild,guildId:guild.id,channelId:config.logChannelId,user:member.user,member,memberPermissions:member.permissions};
+  const now=Date.parse('2026-10-09T12:00:00Z');
+  const tonight=await createActivity(ctx,interaction,{date:'deze avond',time:'20:30',location:'Legion HQ'},now);
+  const tomorrow=await createActivity(ctx,interaction,{date:'morgenavond',time:'20:30',location:'Legion HQ'},now);
+  const explicit=await createActivity(ctx,interaction,{date:'12-10-2026',time:'20:30',location:'Legion HQ'},now);
+  assert.ok(tonight.posted.content.includes('**Datum:** Deze avond (09/10/2026)'));
+  assert.ok(explicit.posted.content.includes('**Datum:** 12/10/2026\n'));
+  first.close();const second=new Store(config);ctx.store=second;
+  t.after(()=>{second.close();assert.ok(folder.startsWith(join(tmpdir(),'legion-planning-label-')));rmSync(folder,{recursive:true,force:true});});
+  const saved=activityById(ctx,tomorrow.id);
+  second.db.prepare('INSERT INTO activity_rsvps(activity_id,user_id,response,updated_at) VALUES(?,?,?,?)').run(saved.id,ACTOR,'yes',now);
+  const updated=activityMessage(ctx,saved,now+3600000);
+  assert.ok(updated.content.includes('**Datum:** Morgenavond (10/10/2026)'));assert.ok(updated.content.includes('Ik ben erbij — **1**'));
+});
+test('oude planningen zonder avondlabel worden zonder verlies gemigreerd',t=>{
+  const f=dashboardFixture();t.after(f.close);
+  const source=f.contexts.values().next().value,folder=mkdtempSync(join(tmpdir(),'legion-planning-migration-')),config={...source.config,dataDir:folder};
+  const old=new Store(config);
+  old.db.exec('ALTER TABLE activities DROP COLUMN date_label; PRAGMA user_version=7;');
+  old.db.prepare('INSERT INTO activities(id,title,description,location,starts_at,ends_at,creator_id,channel_id) VALUES(?,?,?,?,?,?,?,?)').run('0123456789ab','Oude planning','','Legion HQ',Date.parse('2026-10-12T18:30:00Z'),Date.parse('2026-10-12T20:30:00Z'),ACTOR,config.planningChannelId);
+  old.close();
+  const upgraded=new Store(config),ctx={...source,config,store:upgraded};
+  t.after(()=>{upgraded.close();assert.ok(folder.startsWith(join(tmpdir(),'legion-planning-migration-')));rmSync(folder,{recursive:true,force:true});});
+  const saved=activityById(ctx,'0123456789ab');
+  assert.equal(saved.date_label,'');assert.equal(saved.title,'Oude planning');
+  assert.equal(upgraded.db.prepare('PRAGMA user_version').get().user_version,8);
+  assert.ok(activityMessage(ctx,saved).content.includes('**Datum:** 12/10/2026\n'));
 });
