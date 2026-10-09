@@ -14,11 +14,19 @@ export const attendanceChoices=[
 ];
 export const planningPreparation='### Kom voorbereid\n• Zorg dat je volledig bent geheald.\n• Tank je voertuig vooraf helemaal vol.\n• Neem voldoende repairkits en de benodigde spullen mee.\n• Sta op tijd klaar op het afspreekpunt.\n• Volg de aanwijzingen van de leiding en houd de communicatie duidelijk.';
 export function requirePlanningGuild(ctx){assertUser(ctx.config.guildId==='1555685630640652338'&&ctx.config.planningChannelId,'De planning wordt alleen in de Legion-gangserver beheerd.');}
-export function planningTime(date,time) {
+export function planningTime(date,time,now=Date.now()) {
   let y,m,d;
-  let match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-  if(match)[,y,m,d]=match.map(Number);
-  else {match=/^(\d{2})[-/](\d{2})[-/](\d{4})$/.exec(date);assertUser(match,'Gebruik voor de datum DD-MM-JJJJ, bijvoorbeeld 12-10-2026.');[,d,m,y]=match.map(Number);}
+  const input=String(date).trim().toLowerCase().replace(/\s+/g,' ');
+  const relative=input==='deze avond'||input==='dezeavond'?0:input==='morgenavond'||input==='morgen avond'?1:null;
+  if(relative!==null){
+    const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Brussels',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(now)).map(part=>[part.type,part.value]));
+    const calendar=new Date(Date.UTC(+parts.year,+parts.month-1,+parts.day+relative,12));
+    y=calendar.getUTCFullYear();m=calendar.getUTCMonth()+1;d=calendar.getUTCDate();
+  }else{
+    let match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(input);
+    if(match)[,y,m,d]=match.map(Number);
+    else {match=/^(\d{2})[-/](\d{2})[-/](\d{4})$/.exec(input);assertUser(match,'Gebruik DD-MM-JJJJ, deze avond of morgenavond.');[,d,m,y]=match.map(Number);}
+  }
   const clock=/^(\d{2}):(\d{2})$/.exec(time);
   assertUser(clock&&Number(clock[1])<24&&Number(clock[2])<60,'Gebruik een geldige tijd in UU:MM, bijvoorbeeld 20:30.');
   const h=Number(clock[1]),minute=Number(clock[2]);
@@ -29,6 +37,23 @@ export function planningTime(date,time) {
   });
   assertUser(candidates.length===1,candidates.length?'Dit tijdstip komt twee keer voor door de wintertijd. Kies een tijd buiten dat overgangsuur.':'Deze datum of tijd bestaat niet. Controleer ook de overgang naar de zomertijd.');
   return candidates[0];
+}
+export function planningDateSuggestions(value,now=Date.now()){
+  const compact=String(value||'').trim().toLowerCase().replace(/\s+/g,'');
+  const choices=[['Deze avond','deze avond'],['Morgenavond','morgenavond']].map(([name,value])=>{
+    const date=new Date(planningTime(value,'20:00',now)).toLocaleDateString('nl-BE',{timeZone:'Europe/Brussels',day:'2-digit',month:'2-digit',year:'numeric'});
+    return {name:`${name} (${date})`,value};
+  }).filter(choice=>!compact||choice.name.toLowerCase().replace(/\s+/g,'').includes(compact)||choice.value.replace(/\s+/g,'').includes(compact));
+  const typed=String(value||'').trim();
+  if(/^\d{2}[-/]\d{2}[-/]\d{4}$|^\d{4}-\d{2}-\d{2}$/.test(typed)){
+    try{planningTime(typed,'20:00',now);choices.unshift({name:typed,value:typed});}catch{}
+  }
+  return choices;
+}
+export async function handlePlanningAutocomplete(ctx,interaction,now=Date.now()){
+  const option=interaction.options.getFocused(true);
+  const choices=ctx?.config.guildId==='1555685630640652338'&&ctx.config.planningChannelId&&option.name==='datum'?planningDateSuggestions(option.value,now):[];
+  await interaction.respond(choices);
 }
 export const activityById=(ctx,id)=>ctx.store.db.prepare('SELECT * FROM activities WHERE id=?').get(id);
 export function activityMessage(ctx,activity,now=Date.now()) {
@@ -66,7 +91,7 @@ export async function publishActivity(ctx,guild,id) {
 export async function createActivity(ctx,interaction,input,now=Date.now()) {
   requirePlanningGuild(ctx);
   requireStaff(interaction,ctx.config);
-  const starts=planningTime(input.date,input.time),duration=input.duration??120;
+  const starts=planningTime(input.date,input.time,now),duration=input.duration??120;
   assertUser(starts>=now+60000&&starts<=now+366*86400000,'Kies een tijdstip vanaf één minuut in de toekomst, binnen een jaar.');
   assertUser(Number.isInteger(duration)&&duration>=15&&duration<=720,'Kies een duur van 15 tot 720 minuten.');
   const title=(input.title||'Gangactiviteit').trim(),location=input.location?.trim(),description=(input.description||'').trim();

@@ -17,7 +17,7 @@ import { publishRoster } from './roster.mjs';
 import { fishCatch } from './fishing.mjs';
 import { missionMessage, handleMissionButton } from './missions.mjs';
 import { showApplicationStatus } from './application-status.mjs';
-import { handlePlanningCommand,handlePlanningReaction,clearPlanningReactions,syncActivities } from './activities.mjs';
+import { handlePlanningCommand,handlePlanningAutocomplete,handlePlanningReaction,clearPlanningReactions,syncActivities } from './activities.mjs';
 import { handlePromotionCommand,handlePromotionButton,syncPromotions } from './promotions.mjs';
 import { syncCommands } from './command-sync.mjs';
 import { quiet, isStaff, requireStaff, requireAdmin, requireTickets, configureGuild, publishPanel,
@@ -329,6 +329,12 @@ async function openDirectCase(ctx, interaction, kind) {
 }
 
 client.on(Events.InteractionCreate, async interaction => {
+  if(interaction.isAutocomplete()){
+    const ctx=contexts.get(interaction.guildId);
+    try{if(interaction.commandName==='planning')await handlePlanningAutocomplete(ctx,interaction);else await interaction.respond([]);}
+    catch{if(!interaction.responded)await interaction.respond([]).catch(()=>{});}
+    return;
+  }
   try {
     assertUser(interaction.inGuild(), 'Gebruik deze bot in een Legion-guild.');
     const ctx = contexts.get(interaction.guildId);

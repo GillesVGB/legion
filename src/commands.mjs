@@ -34,7 +34,7 @@ export function commands(maxBet, ticketsEnabled = true) {
     cmd('solliciteren', 'Open direct een prive sollicitatieticket met de Legion-template'),
     cmd('sollicitatiestatus', 'Bekijk privé je sollicitatiestatus en plek in de binnenkomstvolgorde'),
     cmd('planning', 'Plaats een planning in het vaste Legion-planningkanaal (alleen leiding)')
-      .addStringOption(o=>o.setName('datum').setDescription('Datum: DD-MM-JJJJ, bijvoorbeeld 12-10-2026').setRequired(true).setMaxLength(10))
+      .addStringOption(o=>o.setName('datum').setDescription('DD-MM-JJJJ, deze avond of morgenavond').setRequired(true).setMaxLength(32).setAutocomplete(true))
       .addStringOption(o=>o.setName('tijd').setDescription('Belgische tijd: UU:MM, bijvoorbeeld 20:30').setRequired(true).setMaxLength(5))
       .addStringOption(o=>o.setName('afspreekpunt').setDescription('Waar verzamelen we?').setRequired(true).setMaxLength(160)),
     cmd('planning-overzicht','Bekijk de komende Legion-activiteiten'),
