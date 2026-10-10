@@ -134,17 +134,30 @@ export class Store {
         user_id TEXT NOT NULL, amount INTEGER NOT NULL CHECK(amount>0), reported_at INTEGER NOT NULL,
         status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),
         note TEXT NOT NULL DEFAULT '', reviewer_id TEXT, reviewed_at INTEGER, payment_id TEXT,
+        withdrawn_at INTEGER, withdrawn_by TEXT, withdraw_reason TEXT,
         message_id TEXT, dirty INTEGER NOT NULL DEFAULT 1, next_attempt INTEGER NOT NULL DEFAULT 0,
         last_error TEXT
       );
       CREATE UNIQUE INDEX IF NOT EXISTS gangpot_pending_member ON gangpot_claims(period_id,user_id) WHERE status='pending';
-      PRAGMA user_version = 9;
+      CREATE TABLE IF NOT EXISTS gangpot_removals (
+        id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE, user_id TEXT NOT NULL, period_id TEXT NOT NULL,
+        actor_id TEXT NOT NULL, amount INTEGER NOT NULL, claim_count INTEGER NOT NULL,
+        reason TEXT NOT NULL, created_at INTEGER NOT NULL
+      );
     `);
+    const gangpotColumns=new Set(this.db.prepare('PRAGMA table_info(gangpot_claims)').all().map(column=>column.name));
+    for(const [name,type] of [['withdrawn_at','INTEGER'],['withdrawn_by','TEXT'],['withdraw_reason','TEXT']])if(!gangpotColumns.has(name))this.db.exec(`ALTER TABLE gangpot_claims ADD COLUMN ${name} ${type};`);
+    if(previousSchema<10)this.db.exec(`UPDATE gangpot_claims SET
+      withdrawn_at=(SELECT voided_at FROM gangpot_entries WHERE id=payment_id),
+      withdrawn_by=(SELECT voided_by FROM gangpot_entries WHERE id=payment_id),
+      withdraw_reason=(SELECT void_reason FROM gangpot_entries WHERE id=payment_id),dirty=1,next_attempt=0
+      WHERE payment_id IN (SELECT id FROM gangpot_entries WHERE voided_at IS NOT NULL);`);
     if(!this.db.prepare('PRAGMA table_info(activities)').all().some(column=>column.name==='date_label'))this.db.exec("ALTER TABLE activities ADD COLUMN date_label TEXT NOT NULL DEFAULT '';");
     if(previousSchema<7){
       this.db.exec("UPDATE promotions SET status='pending',approver_id=NULL,dirty=1,next_attempt=0 WHERE status='approving' AND (SELECT COUNT(*) FROM promotion_votes WHERE proposal_id=promotions.id)<3;");
       this.db.exec("UPDATE promotions SET dirty=1,next_attempt=0 WHERE status='pending';");
     }
+    this.db.exec('PRAGMA user_version = 10;');
   }
 
   close() { this.db.close(); }

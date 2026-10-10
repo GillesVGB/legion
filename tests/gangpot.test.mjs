@@ -8,13 +8,14 @@ import {Store} from '../src/store.mjs';
 import {commands} from '../src/commands.mjs';
 import {Dashboard} from '../src/dashboard.mjs';
 import {Locks} from '../src/locks.mjs';
-import {gangpotWindow,syncGangpot,reportGangpotPayment,reviewGangpotPayment,gangpotBalance,gangpotPaid,gangpotMembers,recordGangpotEntry,voidGangpotEntry,handleGangpotCommand,handleGangpotReview} from '../src/gangpot.mjs';
+import {gangpotWindow,syncGangpot,reportGangpotPayment,reviewGangpotPayment,gangpotBalance,gangpotPaid,gangpotMembers,gangpotSummary,recordGangpotEntry,voidGangpotEntry,removeGangpotPayment,handleGangpotCommand,handleGangpotReview} from '../src/gangpot.mjs';
 
 const SAT=Date.parse('2026-10-10T10:00:00Z'),DEADLINE=Date.parse('2026-10-17T21:59:30Z'),END=Date.parse('2026-10-17T22:00:00Z');
 const fixture=t=>{const f=dashboardFixture();t.after(f.close);const main=f.contexts.values().next().value,guild=f.guilds.get(main.config.guildId);for(const id of [ACTOR,OTHER])guild.members.cache.get(id).roles.cache.set(main.config.gangpot.memberRoleId,guild.roles.cache.get(main.config.gangpot.memberRoleId));return{...f,main,guild,lead:guild.members.cache.get(ACTOR)};};
 const period=f=>f.main.store.db.prepare("SELECT * FROM gangpot_periods WHERE id='2026-10-17'").get();
 const claim=(f,user=OTHER,amount=25000,key=`claim-request-${user}`)=>reportGangpotPayment(f.main,{userId:user,amount,periodId:period(f).id,requestId:key,note:'In-game overgemaakt'},SAT);
 const warns=(f,user)=>f.main.store.db.prepare("SELECT * FROM warnings WHERE user_id=? AND reason LIKE 'Gangpot t/m %'").all(user);
+const removal=(f,user=OTHER,key='payment-removal-request')=>({userId:user,periodId:period(f).id,actor:ACTOR,requestId:key,reason:'Per ongeluk goedgekeurd'});
 
 test('gangpottermijnen eindigen zaterdag 23:59 Belgische tijd, inclusief eerste weekend en wintertijd',()=>{
   const config={startsOn:'2026-10-10',weeklyAmount:25000};
@@ -218,4 +219,88 @@ test('dashboard beoordeelt bestaande meldingen met Lead-controle; oude directe b
   await assert.rejects(handleGangpotReview(f.main,{customId:`gangpot:approve:${item.id}`,channelId:'wrong',message:{id:item.message_id},deferReply:async()=>{}}),/hoort niet/);
   await dashboard.action(f.main,f.guild,f.lead,{action:'gangpot.approve',id:item.id,confirm:true});assert.equal(gangpotBalance(f.main),25000);
   assert.equal(dashboard.summary(f.main,f.guild,f.lead).canReviewGangpot,true);assert.equal(dashboard.summary(f.main,f.guild,admin).canReviewGangpot,false);
+});
+
+test('betalingen verwijderen per gebruiker corrigeert alle deelbetalingen, laat andere leden en donaties ongemoeid en bewaart historie',async t=>{
+  const f=fixture(t);await syncGangpot(f.main,f.client,SAT);
+  const first=claim(f,OTHER,10000);await reviewGangpotPayment(f.main,f.guild,f.lead,first.id,'approve',()=>SAT+1000);
+  const second=claim(f,OTHER,15000,'second-part-request');await reviewGangpotPayment(f.main,f.guild,f.lead,second.id,'approve',()=>SAT+2000);
+  const other=claim(f,ACTOR);await reviewGangpotPayment(f.main,f.guild,f.lead,other.id,'approve',()=>SAT+3000);
+  recordGangpotEntry(f.main,{kind:'donation',amount:7000,requestId:'donation-remove-test',actor:ACTOR},SAT+3000);
+  const wallet=f.main.store.wallet(OTHER).balance;
+  const result=removeGangpotPayment(f.main,removal(f),SAT+4000);
+  assert.equal(result.amount,25000);assert.equal(result.claim_count,2);assert.equal(gangpotBalance(f.main),32000);
+  assert.equal(gangpotPaid(f.main,period(f),OTHER).total,0);assert.equal(gangpotPaid(f.main,period(f),ACTOR).total,25000);
+  assert.equal(f.main.store.wallet(OTHER).balance,wallet);assert.equal(warns(f,OTHER).length,0);
+  assert.equal(f.main.store.db.prepare('SELECT COUNT(*) AS n FROM gangpot_entries').get().n,4);
+  assert.equal(gangpotSummary(f.main,f.guild,SAT).claims.find(item=>item.id===first.id).status,'revoked');
+  await assert.rejects(reviewGangpotPayment(f.main,f.guild,f.lead,first.id,'approve',()=>SAT+5000),/verwijderd/);
+  await syncGangpot(f.main,f.client,SAT+5000);
+  const closed=f.main.store.db.prepare('SELECT * FROM gangpot_claims WHERE id=?').get(first.id),message=f.guild.channels.cache.get(f.main.config.gangpot.paymentsChannelId).posted.get(closed.message_id);
+  assert.equal(message.components.length,0);assert.equal(message.embeds[0].title,'Legion — Betaling verwijderd');
+  assert.ok(!f.guild.channels.cache.get(f.main.config.gangpot.totalChannelId).posted.first().embeds[0].fields[0].value.includes(`<@${OTHER}>`));
+  const again=claim(f,OTHER,25000,'new-after-removal');await reviewGangpotPayment(f.main,f.guild,f.lead,again.id,'approve',()=>SAT+6000);
+  assert.equal(removeGangpotPayment(f.main,removal(f),SAT+7000).id,result.id); // Herhaald verzoek raakt de nieuwe betaling niet.
+  assert.equal(gangpotBalance(f.main),57000);
+});
+
+test('een open betaalmelding verwijderen geeft geen saldo-afboeking en blokkeert goedkeuren via een oude knop',async t=>{
+  const f=fixture(t);await syncGangpot(f.main,f.client,SAT);const first=claim(f);
+  const result=removeGangpotPayment(f.main,removal(f),SAT+1000);assert.equal(result.amount,0);assert.equal(result.claim_count,1);
+  assert.equal(gangpotBalance(f.main),0);await assert.rejects(reviewGangpotPayment(f.main,f.guild,f.lead,first.id,'approve',()=>SAT+2000),/verwijderd/);
+  const second=claim(f,OTHER,25000,'new-pending-request');assert.equal(second.status,'pending');assert.notEqual(second.id,first.id);
+});
+
+test('een verwijderde betaling na de deadline leidt één keer tot de bestaande gangwarnregel',async t=>{
+  const f=fixture(t);await syncGangpot(f.main,f.client,SAT);const first=claim(f);
+  await reviewGangpotPayment(f.main,f.guild,f.lead,first.id,'approve',()=>DEADLINE);
+  await syncGangpot(f.main,f.client,END);assert.equal(warns(f,OTHER).length,0);
+  removeGangpotPayment(f.main,removal(f),END+1000);const id=warns(f,OTHER)[0].id;
+  await syncGangpot(f.main,f.client,END+2000);await syncGangpot(f.main,f.client,END+61000);
+  assert.equal(warns(f,OTHER).length,1);assert.equal(warns(f,OTHER)[0].id,id);
+});
+
+test('een verwijdering die het saldo negatief zou maken verandert geen betaling, melding of historie',async t=>{
+  const f=fixture(t);await syncGangpot(f.main,f.client,SAT);const first=claim(f);
+  await reviewGangpotPayment(f.main,f.guild,f.lead,first.id,'approve',()=>SAT+1000);
+  recordGangpotEntry(f.main,{kind:'expense',amount:20000,actor:ACTOR,requestId:'already-spent-request'},SAT+2000);
+  assert.throws(()=>removeGangpotPayment(f.main,removal(f),SAT+3000),/saldo niet negatief/);
+  assert.equal(gangpotBalance(f.main),5000);assert.equal(gangpotPaid(f.main,period(f),OTHER).total,25000);
+  assert.equal(f.main.store.db.prepare('SELECT withdrawn_at FROM gangpot_claims WHERE id=?').get(first.id).withdrawn_at,null);
+  assert.equal(f.main.store.db.prepare('SELECT COUNT(*) AS n FROM gangpot_removals').get().n,0);
+});
+
+test('refresh en verwijderen vereisen leiding; het command selecteert de gebruiker en werkt de bestaande berichten direct bij',async t=>{
+  const f=fixture(t);t.mock.method(Date,'now',()=>SAT);await syncGangpot(f.main,f.client,SAT);const first=claim(f);
+  await reviewGangpotPayment(f.main,f.guild,f.lead,first.id,'approve',()=>SAT);
+  const command=(sub,user=ACTOR)=>{const member=f.guild.members.cache.get(user);return{id:`command-${sub}-request`,createdTimestamp:SAT,guild:f.guild,client:f.client,user:member.user,member,memberPermissions:member.permissions,options:{getSubcommand:()=>sub,getString:()=>null,getUser:name=>name==='gebruiker'?f.guild.members.cache.get(OTHER).user:null},deferReply:async()=>{},editReply:async value=>value};};
+  await assert.rejects(handleGangpotCommand(f.main,command('betaling-verwijderen',OTHER)),/leiding/);
+  await assert.rejects(handleGangpotCommand(f.main,command('refresh',OTHER)),/leiding/);
+  const total=f.guild.channels.cache.get(f.main.config.gangpot.totalChannelId),info=f.guild.channels.cache.get(f.main.config.gangpot.infoChannelId),ids=[total.posted.first().id,info.posted.first().id];
+  total.posted.first().embeds[0].description='Verouderd';
+  const refreshed=await handleGangpotCommand(f.main,command('refresh'));assert.ok(refreshed.content.includes('bijgewerkt'));
+  assert.ok(total.posted.first().embeds[0].description.includes('$25.000'));
+  const deleted=await handleGangpotCommand(f.main,command('betaling-verwijderen'));assert.ok(deleted.content.includes('verwijderd'));
+  assert.equal(gangpotBalance(f.main),0);assert.deepEqual([total.posted.first().id,info.posted.first().id],ids);
+  const schema=commands(10000,false).find(item=>item.name==='gangpot').options;
+  assert.ok(schema.find(item=>item.name==='refresh'));assert.equal(schema.find(item=>item.name==='betaling-verwijderen').options[0].name,'gebruiker');
+});
+
+test('schema 9 migreert eerdere correcties naar ingetrokken betaalmeldingen en bewaart gegevens bij herstart',async t=>{
+  const f=fixture(t),dir=mkdtempSync(join(tmpdir(),'legion-gangpot-')),path=join(dir,'guild.sqlite');
+  t.after(()=>{assert.ok(resolve(dir).startsWith(resolve(tmpdir())+sep+'legion-gangpot-'));rmSync(dir,{recursive:true,force:true});});
+  f.main.store.close();f.main.store=new Store(f.main.config,path);await syncGangpot(f.main,f.client,SAT);
+  const first=claim(f);const result=await reviewGangpotPayment(f.main,f.guild,f.lead,first.id,'approve',()=>SAT+1000);
+  // Simuleer de vorige release: de transactie was gecorrigeerd, de melding toonde nog een vinkje.
+  f.main.store.db.prepare('UPDATE gangpot_entries SET voided_at=?,voided_by=?,void_reason=? WHERE id=?').run(SAT+2000,ACTOR,'Oude correctie',result.payment_id);
+  f.main.store.db.exec('ALTER TABLE gangpot_claims DROP COLUMN withdrawn_at; ALTER TABLE gangpot_claims DROP COLUMN withdrawn_by; ALTER TABLE gangpot_claims DROP COLUMN withdraw_reason; DROP TABLE gangpot_removals; PRAGMA user_version=9;');
+  f.main.store.close();f.main.store=new Store(f.main.config,path);
+  const migrated=f.main.store.db.prepare('SELECT * FROM gangpot_claims WHERE id=?').get(first.id);
+  assert.equal(migrated.withdrawn_at,SAT+2000);assert.equal(migrated.withdraw_reason,'Oude correctie');assert.equal(gangpotBalance(f.main),0);
+  const newClaim=claim(f,OTHER,25000,'new-payment-after-migration');
+  const removalResult=removeGangpotPayment(f.main,removal(f),SAT+3000);
+  f.main.store.close();f.main.store=new Store(f.main.config,path);
+  assert.equal(f.main.store.db.prepare('PRAGMA user_version').get().user_version,10);
+  assert.equal(f.main.store.db.prepare('SELECT id FROM gangpot_removals').get().id,removalResult.id);
+  assert.ok(f.main.store.db.prepare('SELECT withdrawn_at FROM gangpot_claims WHERE id=?').get(newClaim.id).withdrawn_at);
 });

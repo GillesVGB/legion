@@ -151,15 +151,43 @@ export function voidGangpotEntry(ctx,id,actor,reason,now=Date.now()){
     const entry=ctx.store.db.prepare('SELECT * FROM gangpot_entries WHERE id=?').get(id);assertUser(entry&&!entry.voided_at,'Deze registratie bestaat niet of is al gecorrigeerd.');
     assertUser(entry.kind==='expense'||gangpotBalance(ctx)>=entry.amount,'Corrigeer eerst de bijbehorende uitgaven, zodat het saldo niet negatief wordt.');
     ctx.store.db.prepare('UPDATE gangpot_entries SET voided_at=?,voided_by=?,void_reason=? WHERE id=?').run(now,actor,reason.trim(),id);
+    ctx.store.db.prepare('UPDATE gangpot_claims SET withdrawn_at=?,withdrawn_by=?,withdraw_reason=?,dirty=1,next_attempt=0 WHERE payment_id=? AND withdrawn_at IS NULL').run(now,actor,reason.trim(),id);
     ctx.store.audit('gangpot.void',actor,{id,reason:reason.trim()});
     if(entry.period_id)reconcileDebt(ctx,periodById(ctx,entry.period_id),entry.user_id,actor,now);
     ctx.store.setSetting('gangpot:dirty','1');return entry;
   });
 }
+export function removeGangpotPayment(ctx,input,now=Date.now()){
+  requireGangPot(ctx);
+  assertUser(/^\d{17,20}$/.test(input.userId),'Kies een geldige gebruiker.');
+  assertUser(typeof input.requestId==='string'&&input.requestId.length>=8&&input.requestId.length<=100,'Ongeldig verwijderverzoek.');
+  const reason=String(input.reason||'Betaling verwijderd via /gangpot betaling-verwijderen.').trim();
+  assertUser(reason&&reason.length<=500,'Gebruik een reden van maximaal 500 tekens.');
+  return ctx.store.transaction(()=>{
+    const existing=ctx.store.db.prepare('SELECT * FROM gangpot_removals WHERE request_id=?').get(input.requestId);
+    if(existing){assertUser(existing.user_id===input.userId&&existing.period_id===input.periodId&&existing.actor_id===input.actor,'Dit verzoek is al voor een andere verwijdering gebruikt.');return existing;}
+    const period=periodById(ctx,input.periodId);assertUser(period,'Deze termijn bestaat niet.');
+    const entries=ctx.store.db.prepare("SELECT * FROM gangpot_entries WHERE kind='payment' AND user_id=? AND period_id=? AND voided_at IS NULL").all(input.userId,period.id);
+    const claims=ctx.store.db.prepare("SELECT * FROM gangpot_claims WHERE user_id=? AND period_id=? AND withdrawn_at IS NULL AND (status='pending' OR payment_id IN (SELECT id FROM gangpot_entries WHERE voided_at IS NULL))").all(input.userId,period.id);
+    assertUser(entries.length||claims.length,'Deze gebruiker heeft geen actieve betaling of open betaalmelding voor deze termijn.');
+    const amount=entries.reduce((sum,item)=>sum+item.amount,0);
+    assertUser(amount<=gangpotBalance(ctx),'Corrigeer eerst de bijbehorende uitgaven, zodat het saldo niet negatief wordt.');
+    for(const entry of entries){
+      ctx.store.db.prepare('UPDATE gangpot_entries SET voided_at=?,voided_by=?,void_reason=? WHERE id=?').run(now,input.actor,reason,entry.id);
+      ctx.store.audit('gangpot.void',input.actor,{id:entry.id,reason});
+    }
+    for(const claim of claims)ctx.store.db.prepare("UPDATE gangpot_claims SET withdrawn_at=?,withdrawn_by=?,withdraw_reason=?,status=CASE WHEN status='pending' THEN 'rejected' ELSE status END,dirty=1,next_attempt=0 WHERE id=?").run(now,input.actor,reason,claim.id);
+    reconcileDebt(ctx,period,input.userId,input.actor,now);
+    const id=uid();ctx.store.db.prepare('INSERT INTO gangpot_removals(id,request_id,user_id,period_id,actor_id,amount,claim_count,reason,created_at) VALUES(?,?,?,?,?,?,?,?,?)').run(id,input.requestId,input.userId,period.id,input.actor,amount,claims.length,reason,now);
+    ctx.store.audit('gangpot.remove',input.actor,{id,user:input.userId,period:period.id,amount,entries:entries.map(item=>item.id),claims:claims.map(item=>item.id),reason});
+    ctx.store.setSetting('gangpot:dirty','1');
+    return ctx.store.db.prepare('SELECT * FROM gangpot_removals WHERE id=?').get(id);
+  });
+}
 export function gangpotSummary(ctx,guild,now=Date.now()){
   if(!ctx.config.gangpot)return null;
   const period=currentPeriod(ctx,now),members=gangpotMembers(ctx,period,now).map(item=>({...item,name:guild.members.cache.get(item.user_id)?.displayName||item.user_id}));
-  const claims=ctx.store.db.prepare('SELECT * FROM gangpot_claims ORDER BY reported_at DESC LIMIT 200').all().map(item=>({...item,userName:guild.members.cache.get(item.user_id)?.displayName||item.user_id,reviewerName:guild.members.cache.get(item.reviewer_id)?.displayName||item.reviewer_id,url:item.message_id?`https://discord.com/channels/${guild.id}/${ctx.config.gangpot.paymentsChannelId}/${item.message_id}`:null}));
+  const claims=ctx.store.db.prepare('SELECT * FROM gangpot_claims ORDER BY reported_at DESC LIMIT 200').all().map(item=>({...item,status:item.withdrawn_at?'revoked':item.status,userName:guild.members.cache.get(item.user_id)?.displayName||item.user_id,reviewerName:guild.members.cache.get(item.withdrawn_by||item.reviewer_id)?.displayName||(item.withdrawn_by||item.reviewer_id),url:item.message_id?`https://discord.com/channels/${guild.id}/${ctx.config.gangpot.paymentsChannelId}/${item.message_id}`:null}));
   return{balance:gangpotBalance(ctx),weeklyAmount:ctx.config.gangpot.weeklyAmount,period,members,claims,periods:ctx.store.db.prepare('SELECT * FROM gangpot_periods ORDER BY starts_at DESC LIMIT 16').all(),entries:ctx.store.db.prepare('SELECT * FROM gangpot_entries ORDER BY created_at DESC LIMIT 100').all().map(item=>({...item,userName:guild.members.cache.get(item.user_id)?.displayName||item.user_id,actorName:guild.members.cache.get(item.actor_id)?.displayName||item.actor_id})),infoChannelId:ctx.config.gangpot.infoChannelId,memberRoleId:ctx.config.gangpot.memberRoleId,paymentsChannelId:ctx.config.gangpot.paymentsChannelId,totalChannelId:ctx.config.gangpot.totalChannelId};
 }
 export function reportGangpotPayment(ctx,input,now=Date.now()){
@@ -189,6 +217,7 @@ export async function reviewGangpotPayment(ctx,guild,member,id,decision,clock=Da
     return ctx.store.transaction(()=>{
       const now=clock(),claim=ctx.store.db.prepare('SELECT * FROM gangpot_claims WHERE id=?').get(id);
       assertUser(claim,'Deze betaalmelding bestaat niet.');
+      assertUser(!claim.withdrawn_at,'Deze betaling of betaalmelding is verwijderd. Het lid moet een nieuwe melding maken.');
       if(claim.status!=='pending')return claim; // Een tweede klik telt nooit nog een betaling.
       assertUser(claim.reported_at<=now,'Deze betaalmelding kan nog niet worden beoordeeld.');
       let payment;
@@ -204,6 +233,7 @@ export async function reviewGangpotPayment(ctx,guild,member,id,decision,clock=Da
   });
 }
 export function gangpotClaimMessage(ctx,claim){
+  if(claim.withdrawn_at)return{embeds:[embed(ctx.config,'Legion — Betaling verwijderd',`**Lid:** <@${claim.user_id}>\n**Termijn:** t/m ${claim.period_id}\n**Bedrag:** ${gangpotMoney(claim.amount)}\n**Status:** ⚪ Verwijderd\n**Door:** <@${claim.withdrawn_by}>\n**Reden:** ${safeText(claim.withdraw_reason||'Registratie gecorrigeerd.')}\n\nDeze betaling telt niet meer mee. Het lid kan opnieuw /gangpot betaling gebruiken. De oorspronkelijke deadline blijft gelden.`).setColor(0x64748B).setFooter({text:`Legion • Gangpotmelding ${claim.id}`})],components:[],allowedMentions:quiet};
   const pending=claim.status==='pending',approved=claim.status==='approved';
   const card=embed(ctx.config,'Legion — Betaalmelding',`**Lid:** <@${claim.user_id}>\n**Termijn:** t/m ${claim.period_id}\n**Gemeld bedrag:** ${gangpotMoney(claim.amount)}\n**Status:** ${pending?'🟠 Wacht op Lead-vinkje':approved?'✅ Goedgekeurd':'❌ Afgekeurd'}${claim.reviewer_id?`\n**Beoordeeld door:** <@${claim.reviewer_id}>`:''}${claim.note?`\n\n**Toelichting:** ${safeText(claim.note)}`:''}\n\n${pending?'Lead: controleer of het bedrag werkelijk in-game is ontvangen. Zonder volledige goedkeuring vóór zaterdag 23:59 volgt automatisch een gangwarn.':approved?'Het bedrag is toegevoegd aan de gangpot. Een vinkje na de deadline verwijdert een gangwarn niet.':'Er is geen bedrag toegevoegd. Meld je betaling opnieuw zodra deze klopt; de deadline blijft gelden.'}`).setColor(pending?0xF59E0B:approved?0x22C55E:0xEF4444).setFooter({text:`Legion • Gangpotmelding ${claim.id}`});
   return{embeds:[card],components:[row(button(`gangpot:approve:${claim.id}`,'✅ Goedkeuren',ButtonStyle.Success).setDisabled(!pending),button(`gangpot:reject:${claim.id}`,'❌ Afkeuren',ButtonStyle.Danger).setDisabled(!pending))],allowedMentions:quiet};
@@ -310,6 +340,13 @@ export async function handleGangpotCommand(ctx,interaction){
   await interaction.deferReply({flags:MessageFlags.Ephemeral});
   const submittedAt=interaction.createdTimestamp??Date.now();
   await syncGangpot(ctx,interaction.client,submittedAt);
+  if(action==='refresh')return interaction.editReply({content:'Gangpotinformatie, totaal en betaaloverzicht zijn bijgewerkt.',allowedMentions:quiet});
+  if(action==='betaling-verwijderen'){
+    const period=selectPeriod(ctx,interaction.options.getString('termijn'),submittedAt);
+    const result=removeGangpotPayment(ctx,{userId:interaction.options.getUser('gebruiker',true).id,periodId:period.id,actor:interaction.user.id,requestId:interaction.id,reason:interaction.options.getString('reden')},Date.now());
+    await syncGangpot(ctx,interaction.client);
+    return interaction.editReply({content:`Betaling van <@${result.user_id}> voor **${result.period_id}** verwijderd. **${gangpotMoney(result.amount)}** uit het totaal gehaald; **${result.claim_count}** melding(en) ingetrokken. De historie blijft bewaard. Gangpotsaldo: **${gangpotMoney(gangpotBalance(ctx))}**.`,allowedMentions:quiet});
+  }
   if(action==='overzicht'){const period=selectPeriod(ctx,interaction.options.getString('termijn'),submittedAt),items=gangpotMembers(ctx,period);return interaction.editReply({embeds:[embed(ctx.config,`Legion — Gangpot t/m ${period.id}`,dueLines(items.map(item=>({...item,expected:period.weekly_amount}))))],allowedMentions:quiet});}
   if(action==='betaling'){
     assertUser(gangpotEligible(ctx,interaction.guild.members.cache.get(interaction.user.id)),`Alleen leden met rol <@&${ctx.config.gangpot.memberRoleId}> moeten een gangpotbetaling melden.`);
