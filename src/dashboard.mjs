@@ -16,6 +16,7 @@ import { applicationQueue } from './application-status.mjs';
 import { cancelActivity } from './activities.mjs';
 import { decidePromotion,promotionVotes,promotionVoteReply,PROMOTION_LEAD_ROLE_ID } from './promotions.mjs';
 import { missions,missionDay } from './mission-definitions.mjs';
+import {gangpotSummary,syncGangpot,recordGangpotEntry,voidGangpotEntry,reviewGangpotPayment,GANGPOT_LEAD_ROLE_ID,gangpotMoney,requireGangPot} from './gangpot.mjs';
 
 const secret = () => randomBytes(32).toString('base64url');
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -135,6 +136,8 @@ export class Dashboard {
       commands: commands(config.maxBet,config.ticketsEnabled).map(command => ({name:command.name,description:command.description})),
       admission: config.admission ? { targetGuildId: config.admission.targetGuildId, maxAge: config.admission.inviteMaxAgeSeconds, restricted: true, maxUses: 1 } : null,
       roster: config.roster || null,
+      gangpot:gangpotSummary(ctx,guild),
+      canReviewGangpot:viewer?.roles.cache.has(GANGPOT_LEAD_ROLE_ID)??false,
       planningChannelId:config.planningChannelId,
       plannings:store.db.prepare('SELECT * FROM activities ORDER BY starts_at DESC LIMIT 100').all().map(item=>({...item,url:item.message_id?`https://discord.com/channels/${guild.id}/${item.channel_id}/${item.message_id}`:null,participants:store.db.prepare('SELECT user_id,response FROM activity_rsvps WHERE activity_id=? ORDER BY updated_at').all(item.id).map(person=>({...person,name:name(person.user_id)}))})),
       canVotePromotions:viewer?.roles.cache.has(PROMOTION_LEAD_ROLE_ID)??false,
@@ -154,6 +157,19 @@ export class Dashboard {
   async action(ctx, guild, member, value) {
     const { store, config } = ctx;
     const actor = member.id;
+    if(['gangpot.approve','gangpot.reject','gangpot.donation','gangpot.expense','gangpot.void'].includes(value.action)){
+      requireGangPot(ctx);assertUser(value.confirm===true,'Bevestig eerst dat deze in-game transactie werkelijk is ontvangen of uitgevoerd.');
+      const submittedAt=Date.now();await syncGangpot(ctx,this.client,submittedAt);
+      let result;
+      if(['gangpot.approve','gangpot.reject'].includes(value.action))result=await reviewGangpotPayment(ctx,guild,member,value.id,value.action.split('.')[1]);
+      else if(value.action==='gangpot.void')result=voidGangpotEntry(ctx,value.id,actor,value.reason);
+      else{
+        assertUser(typeof value.requestId==='string'&&value.requestId.length>=8,'Ongeldige registratie.');
+        result=recordGangpotEntry(ctx,{kind:value.action.split('.')[1],amount:value.amount,actor,requestId:value.requestId,note:value.note||'',paidAt:submittedAt});
+      }
+      await syncGangpot(ctx,this.client);
+      return{message:`Gangpotregistratie ${result.id} verwerkt. Saldo: ${gangpotMoney(gangpotSummary(ctx,guild).balance)}.`};
+    }
     if(value.action==='planning.cancel') {
       assertUser(/^[a-f0-9]{12}$/.test(value.id)&&value.confirm===true,'Bevestig eerst welke planning je wilt annuleren.');
       await cancelActivity(ctx,guild,value.id,actor);

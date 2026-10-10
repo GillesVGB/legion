@@ -20,6 +20,7 @@ import { showApplicationStatus } from './application-status.mjs';
 import { handlePlanningCommand,handlePlanningAutocomplete,handlePlanningReaction,clearPlanningReactions,syncActivities } from './activities.mjs';
 import { handlePromotionCommand,handlePromotionButton,syncPromotions } from './promotions.mjs';
 import { syncCommands } from './command-sync.mjs';
+import {handleGangpotCommand,handleGangpotStatus,handleGangpotReview,syncGangpot} from './gangpot.mjs';
 import { quiet, isStaff, requireStaff, requireAdmin, requireTickets, configureGuild, publishPanel,
   createCase, requestCaseDecision, decideCase, startInterview, cleanupInterviews, cleanupClosedCases, warningMessage, staffLogChannel, warnLogChannel, writeWarnLog, reconcileCases } from './service.mjs';
 
@@ -174,7 +175,7 @@ async function handleCommand(ctx, interaction) {
   if (name === 'help') {
     return interaction.reply({ ...privateReply, embeds: [embed(config, 'Legion | Commands', [
       '**Algemeen:** /info, /regels, /rangen, /solliciteren, /sollicitatiestatus, /mijnwarns',
-      ...(!config.ticketsEnabled ? ['**Gang:** /planning, /planning-overzicht, /planning-annuleren, /promotie'] : []),
+      ...(!config.ticketsEnabled ? ['**Gang:** /planning, /planning-overzicht, /planning-annuleren, /promotie, /gangpot'] : []),
       ...(config.ticketsEnabled ? ['**Tickets:** /ticket openen, /ticket sluiten'] : []),
       '**Games:** /blackjack, /coinflip, /dobbel, /8ball, /steenpapier, /fish',
       '**Coins:** /saldo, /daily, /leaderboard, /missies',
@@ -188,6 +189,7 @@ async function handleCommand(ctx, interaction) {
   if (name === 'sollicitatiestatus') return showApplicationStatus(ctx,interaction);
   if (['planning','planning-overzicht','planning-annuleren'].includes(name)) return handlePlanningCommand(ctx,interaction);
   if (name === 'promotie') return handlePromotionCommand(ctx,interaction);
+  if (name === 'gangpot') return handleGangpotCommand(ctx,interaction);
   if (name === 'dashboard') {
     requireStaff(interaction, config);
     await interaction.deferReply(privateReply);
@@ -243,6 +245,8 @@ async function handleCommand(ctx, interaction) {
 
 async function handleButton(ctx, interaction) {
   const [type, action, id, extra, confirmer] = interaction.customId.split(':');
+  if (type === 'gangpot'&&action==='status') return handleGangpotStatus(ctx,interaction);
+  if (type === 'gangpot') return handleGangpotReview(ctx,interaction);
   if (type === 'mission') { requireGames(ctx,interaction); return handleMissionButton(ctx,interaction); }
   if (type === 'promotion') return handlePromotionButton(ctx,interaction);
   if (type === 'info') return info(ctx, interaction);
@@ -466,6 +470,7 @@ async function drainTranscripts() {
     for (const ctx of contexts.values()) {
       if (!ctx.ready) continue;
       const guild = client.guilds.cache.get(ctx.config.guildId);
+      if (guild&&ctx.config.gangpot) await syncGangpot(ctx,client).catch(error=>console.error(`Gangpotcontrole wacht op herhaling (${error.code??error.name}).`));
       if (guild) await cleanupInterviews(ctx, guild);
       if (guild) { await syncActivities(ctx,guild); await syncPromotions(ctx,guild); }
       for (const notice of ctx.store.pendingAcceptances()) await locks.run(`${ctx.config.guildId}:admission:${notice.case_id}`, () => deliverAcceptance(ctx, client, notice.case_id));

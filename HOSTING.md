@@ -31,6 +31,8 @@ De bot moet **Server Members Intent** en **Message Content Intent** hebben. De l
 
 ## Dashboard
 
+**Update 1.6.0 — Gangpot:** na een herstart registreert de bot automatisch `/gangpot` in de hoofdserver. Leden doen `/gangpot betaling`; de Lead-rol `1555685630707769382` controleert met ✅ Goedkeuren of ❌ Afkeuren in `1558238040932225034` of via het dashboard. De weekbijdrage is $25.000. De eerste deadline is zondag 11 oktober 2026 om 23:59 Belgische tijd, daarna iedere zondag. Zonder volledige Lead-goedkeuring op tijd volgt automatisch één gangwarn per termijn, ook als een melding nog op controle wacht. Een later vinkje verwijdert die warn niet. Het bevestigde saldo wordt in `1555685634515927050` aangepast. Bewaar je bestaande `data/`; meldingen, betalingen en warns worden automatisch gemigreerd en blijven bij restarts bewaard.
+
 Het dashboard start ook als `TRANSCRIPT_VIEWER_MODE=files` of `remote` staat. Die instelling bepaalt alleen hoe transcripts worden bewaard. Zonder expliciet `CLOUDFLARED_PATH` zoekt de bot automatisch de meegeleverde client in `bin/` en daarna in PATH. Op Linux maakt `index.js` de client uitvoerbaar.
 
 Gebruik **/dashboard** in Discord met een leidingrol of als administrator. De bot geeft een privé inlogknop die twee minuten geldig is en één keer werkt. Het dashboard controleert bij ieder verzoek of je nog leiding bent in de geselecteerde guild. Je sessie duurt dertig minuten.

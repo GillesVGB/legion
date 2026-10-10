@@ -44,6 +44,23 @@ export function commands(maxBet, ticketsEnabled = true) {
       .addUserOption(userOption)
       .addRoleOption(o=>o.setName('rang').setDescription('De voorgestelde hogere gangrang').setRequired(true))
       .addStringOption(o=>o.setName('motivatie').setDescription('Waarom past deze promotie bij het lid?').setRequired(true).setMaxLength(500)),
+    cmd('gangpot','Gangpotbijdragen en bevestigde in-game betalingen beheren')
+      .addSubcommand(s=>s.setName('status').setDescription('Bekijk privé je eigen weekbijdrage en deadline'))
+      .addSubcommand(s=>s.setName('betaling').setDescription('Meld je eigen in-game betaling; Lead zet het vinkje')
+        .addIntegerOption(o=>o.setName('bedrag').setDescription('Betaald bedrag; standaard 25000').setMinValue(1).setMaxValue(100000000))
+        .addStringOption(o=>o.setName('termijn').setDescription('Zondag van de termijn: DD-MM-JJJJ; standaard huidige week').setMaxLength(10))
+        .addStringOption(o=>o.setName('notitie').setDescription('Aan wie heb je betaald of welke toelichting heb je?').setMaxLength(500)))
+      .addSubcommand(s=>s.setName('donatie').setDescription('Registreer extra in-game steun aan de gangpot (leiding)')
+        .addIntegerOption(o=>o.setName('bedrag').setDescription('Ontvangen donatie').setRequired(true).setMinValue(1).setMaxValue(100000000))
+        .addStringOption(o=>o.setName('notitie').setDescription('Van wie of waarvoor?').setMaxLength(500)))
+      .addSubcommand(s=>s.setName('uitgave').setDescription('Registreer een uitgave uit de gangpot (leiding)')
+        .addIntegerOption(o=>o.setName('bedrag').setDescription('Uitgegeven bedrag').setRequired(true).setMinValue(1).setMaxValue(100000000))
+        .addStringOption(reasonOption))
+      .addSubcommand(s=>s.setName('correctie').setDescription('Corrigeer een verkeerde registratie met behoud van historie (leiding)')
+        .addStringOption(o=>o.setName('id').setDescription('Transactie-ID uit de bevestiging of dashboard').setRequired(true).setMinLength(12).setMaxLength(12))
+        .addStringOption(reasonOption))
+      .addSubcommand(s=>s.setName('overzicht').setDescription('Bekijk het betaaloverzicht van een weektermijn (leiding)')
+        .addStringOption(o=>o.setName('termijn').setDescription('Zondag: DD-MM-JJJJ; standaard huidige week').setMaxLength(10))),
     cmd('missies','Bekijk je dagelijkse fun-missies, voortgang en coinbeloningen'),
     cmd('ticket', 'Open of sluit je prive ticket')
       .addSubcommand(s => s.setName('openen').setDescription('Open direct een prive ticket'))
@@ -61,5 +78,5 @@ export function commands(maxBet, ticketsEnabled = true) {
       .addChoices({ name: 'Steen', value: 'steen' }, { name: 'Papier', value: 'papier' }, { name: 'Schaar', value: 'schaar' }))
   ];
   return result.filter(command => (ticketsEnabled || command.name !== 'ticket') &&
-    (!ticketsEnabled || !['planning','planning-overzicht','planning-annuleren','promotie'].includes(command.name))).map(command => command.toJSON());
+    (!ticketsEnabled || !['planning','planning-overzicht','planning-annuleren','promotie','gangpot'].includes(command.name))).map(command => command.toJSON());
 }

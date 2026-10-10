@@ -1,6 +1,6 @@
 # Legion — Discord-bot voor Future RP
 
-Een Nederlandstalige bot met gangwarns, sollicitatietickets, privétickets, een automatische ledenlijst, informatie en games. De bot draait als **Legion#1420** op deze computer. Zie `LIVE-STATUS.md` voor de actuele installatie. Het downloadpakket bevat geen bot-token of database.
+Een Nederlandstalige bot met gangwarns, gangpotbetalingen, sollicitatietickets, privétickets, een automatische ledenlijst, informatie en games. De bot **Legion#1420** draait op Bot-Hosting.net. Zie `HOSTING.md` voor installatie en updates. Het downloadpakket bevat geen bot-token of database.
 
 ## Jouw servers
 
@@ -42,7 +42,7 @@ Rollen, kanaalinstellingen, warns, coins, spellen en dossiers zijn **per guild g
 
 Botrechten: **Kanalen bekijken, Berichten versturen, Berichtgeschiedenis lezen, Links insluiten, Bestanden bijvoegen, Kanalen beheren en Rollen beheren**. Plaats de botrol boven de rollen die hij moet beheren, zeker boven de ledenrol. Administrator is niet nodig voor de bot. Je eigen account moet administrator zijn om `/inrichten` en `/setup` te gebruiken.
 
-`npm run deploy` registreert 18 commands in de eerste guild en 19 in de tweede. Dit vervangt de bestaande guild-commands van deze bot-applicatie. Het script toont ook uitnodigingslinks met de juiste rechten.
+Nieuwe commands worden bij het starten automatisch geregistreerd: 27 in de hoofdserver en 23 in de community. `npm run deploy` kan dit ook handmatig doen; het vervangt de bestaande guild-commands van deze bot-applicatie.
 
 ## Commands
 
@@ -60,6 +60,11 @@ Botrechten: **Kanalen bekijken, Berichten versturen, Berichtgeschiedenis lezen, 
 | `/planning-overzicht` | Bekijk privé de komende activiteiten in de gangserver. |
 | `/planning-annuleren id` | Leiding sluit een planning en stopt nieuwe aanwezigheidskeuzes. |
 | `/promotie lid rang motivatie` | Stel een hogere gangrang voor; vanaf drie unieke Lead-stemmen beslist de meerderheid. |
+| `/gangpot betaling` | Meld je eigen in-game betaling van standaard $25.000; Lead moet goedkeuren. |
+| `/gangpot status` | Bekijk privé je goedgekeurde bedrag, pending melding en deadline. |
+| `/gangpot overzicht termijn:11-10-2026` | Leiding bekijkt een huidige of eerdere weektermijn. |
+| `/gangpot donatie bedrag`, `/gangpot uitgave bedrag reden` | Leiding registreert extra steun of echte uitgaven. |
+| `/gangpot correctie id reden` | Leiding corrigeert een registratie met behoud van historie. |
 | `/missies` | Bekijk drie dagelijkse fun-missies en claim verdiende fictieve coins. |
 | `/ticket openen` | Open direct een privéticket, uitsluitend in de tweede guild. |
 | `/ticket sluiten` | Sluit het huidige ticket met een bevestiging. |
@@ -78,11 +83,17 @@ Botrechten: **Kanalen bekijken, Berichten versturen, Berichtgeschiedenis lezen, 
 
 ## Hoe de systemen werken
 
+**Gangpot.** Alleen in de hoofdserver `1555685630640652338`. Ieder menselijk lid, inclusief leiding, betaalt **$25.000 in-game per week**. De eerste deadline is **zondag 11 oktober 2026 om 23:59 Belgische tijd**; daarna iedere zondag. Betaal in-game en doe zelf `/gangpot betaling` (optioneel `bedrag`, `termijn` en `notitie`). Een melding wordt in `1558238040932225034` geplaatst met **✅ Goedkeuren / ❌ Afkeuren**. Alleen de exacte Lead-rol `1555685630707769382` mag beslissen. Het gangpotsaldo in `1555685634515927050` telt uitsluitend goedgekeurde betalingen en extra donaties, min uitgaven; dit heeft geen invloed op fun-coins.
+
+**Deadline en gangwarn.** Zonder volledige goedkeuring vóór het einde van zondag krijgt het lid automatisch **één gangwarn per weektermijn**, ook zonder commando, bij afkeuring, bij een gedeeltelijk bedrag of als de melding nog pending is. Goedkeuring na de deadline telt wel voor het saldo, maar trekt de warn niet in. De bot logt de warn in het bestaande gangwarnkanaal en probeert een DM te sturen. De eerste controle na afloop verwerkt de termijn; na een offline periode gebeurt dit bij het opnieuw starten. Meldingen, vinkjes en warn-ID's blijven opgeslagen in `data/`, zodat restarts geen dubbele betaling of warn veroorzaken. Vertrokken leden en bots worden uitgesloten; bij een mislukte ledencontrole wacht de bot met bestraffen.
+
+**Dashboard — Gangpot.** Lead kan daar dezelfde betaalmeldingen goedkeuren of afkeuren. De leiding kan saldo, weekbijdragen en transactiehistorie bekijken en donaties, uitgaven en correcties registreren. De twee vaste Discord-overzichten worden aangepast in plaats van bij iedere herstart opnieuw geplaatst. Bewaar bij hostingupdates altijd de bestaande `data/` en `.env`.
+
 **Gangwarns.** Alleen de ingestelde leidingrollen en Discord-administrators kunnen warns beheren. Met een ingestelde ledenrol kun je alleen leden met die rol waarschuwen. Een gewoon stafflid kan geen administrator of lid met gelijke/hogere rang waarschuwen. Bij drie actieve warns bevat het leidinglog een duidelijke melding. Er volgt geen automatische kick of ban: de leiding beoordeelt de situatie. Als een DM niet kan worden afgeleverd, staat de warn wel opgeslagen en is hij via `/mijnwarns` te zien.
 
 **Sollicitaties.** Eén klik of `/solliciteren` opent direct een privé ticket. De embed bevat jouw volledige template. De sollicitant typt zijn antwoorden in het kanaal; er verschijnen geen formulieren. De minimumleeftijd blijft 16 jaar en wordt door de leiding gecontroleerd. De leiding kan **Gesprek starten**, **Aannemen**, **Afwijzen** of **Sollicitatie sluiten**. Gesprek starten maakt een privé spraakkanaal voor de sollicitant en leiding, met een link in het ticket. Een bestaande gespreksruimte wordt hergebruikt. Bij afhandelen wordt die ruimte verwijderd; het tekstkanaal wordt verwijderd nadat het transcript veilig is opgeslagen. Bij aannemen wordt de ledenrol gegeven. Er kan één open sollicitatie per persoon per guild bestaan. Reeds ingediende sollicitaties behouden hun antwoorden.
 
-**Plaatsen in de community-guild.** De bot telt mensen met rol `1555726440933363759` in guild `1555726440933363753`. Met 0-19 leden is de sollicitatiestatus groen, met 20-24 oranje en vanaf 25 rood. De status en het aantal beschikbare plekken veranderen automatisch bij rolwijzigingen en vertrek. Bij rood worden nieuwe sollicitaties geblokkeerd. Aannemen van een extra lid kan dan ook niet; de leiding krijgt uitleg. De capaciteit geldt voor de community-guild.
+**Plaatsen in de community-guild.** De bot telt mensen met rol `1555726440933363759` in guild `1555726440933363753`. Met 0-19 leden is de sollicitatiestatus groen, met 20-24 oranje en vanaf 25 rood. De status en het aantal beschikbare plekken veranderen automatisch bij rolwijzigingen en vertrek. Bij rood kunnen mensen nog solliciteren, met een melding dat de beoordeling langer kan duren. Aannemen van een extra lid wacht op een vrije plek. De capaciteit geldt voor de community-guild.
 
 **Tickets.** De knop en `/ticket openen` maken direct een privé kanaal, zonder formulier of verplichte vraag vooraf. De aanvrager typt zijn vraag in het kanaal. Alleen de aanvrager, leiding en Discord-administrators hebben toegang. Een persoon kan één open ticket hebben. Na sluiten maakt de bot het transcript en verwijdert daarna het kanaal. Bij een mislukte export blijft het kanaal tijdelijk gesloten totdat het opnieuw proberen slaagt. Een nieuw dossier openen kan maximaal eenmaal per minuut.
 

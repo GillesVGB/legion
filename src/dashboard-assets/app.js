@@ -16,6 +16,7 @@ const paths = {
   activity:'M3 12h4l3-8 4 16 3-8h4'
   ,planning:'M4 5h16v16H4z M8 2v6 M16 2v6 M4 11h16'
   ,promotions:'m4 12 8-8 8 8 M8 12v8h8v-8'
+  ,gangpot:'M3 6h18v14H3z M3 10h18 M16 14h3 M7 2h10v4'
 };
 const pages = {
   overview:['Overzicht','Een blik op alles wat er speelt.'], tickets:['Tickets','Beheer vragen, gesprekken en afgehandelde tickets.'],
@@ -25,6 +26,7 @@ const pages = {
   settings:['Instellingen','De basis voor een goed georganiseerde gang.'], activity:['Activiteit','Wat er gebeurde, wanneer en door wie.']
   ,planning:['Planning','Voorbereiden, verzamelen en aanwezigheid bijhouden.']
   ,promotions:['Promotievoorstellen','Een hogere rang, met beoordeling door de leiding.']
+  ,gangpot:['Gangpot','Betaalmeldingen, Lead-vinkjes en het bevestigde in-game saldo.']
 };
 const labels = {open:'Open',accepted:'Aangenomen',rejected:'Afgewezen',closed:'Gesloten',failed:'Mislukt',pending:'In wachtrij',sent:'DM verzonden',joined:'Gejoind',claimed:'Invite opgehaald',dm_blocked:'DM geblokkeerd',expired:'Verlopen',revoked:'Ingetrokken',ready:'In verwerking',done:'Opgeslagen',unavailable:'Niet beschikbaar',approved:'Goedgekeurd',approving:'Wordt verwerkt',cancelled:'Geannuleerd',ended:'Afgelopen'};
 const badge = status => `<span class="badge ${['accepted','approved','sent','joined','claimed','done'].includes(status)?'green':['open','pending','approving','ready','expired','dm_blocked'].includes(status)?'orange':['rejected','cancelled','failed','revoked','unavailable'].includes(status)?'red':'gray'}">${e(labels[status] || status)}</span>`;
@@ -126,10 +128,21 @@ function settingsPage() {
   const d=state.data,s=d.settings;
   return `<div class="grid equal">${card('Gangbeheer','Afspraken voor deze server',`<form id="general-settings" class="card-body">${field('warnThreshold','Warn-drempel',s.warnThreshold,'number','Vanaf dit aantal krijgt de leiding een extra melding.')}<div class="field"><label>Leidingrollen</label><input value="${e(d.guild.staffRoleNames.join(', '))}" disabled><small>Toegangsrollen worden door een administrator in Discord beheerd.</small></div><div class="field"><label>Sollicitatiecapaciteit</label><input value="25 plaatsen · beperkte plaatsen vanaf 20 · leeftijd 16+" disabled></div><div class="form-buttons"><button class="primary" type="submit">Opslaan</button></div></form>`)}${card('Discord-panelen','Je bestaande panelen blijven gekoppeld',`<div class="card-body">${d.panels.length?d.panels.map(panel=>`<div class="activity-row"><div class="activity-main"><strong>${e(panel.type==='alles'?'Tickets & solliciteren':panel.type)}</strong><p>Kanaal ${e(panel.channelId)}</p></div>${link('Openen',panel.url)}</div>`).join(''):empty('Geen paneel ingesteld','Plaats een paneel via /setup in Discord.')}<div style="margin-top:18px">${btn('Panelen vernieuwen','panel.refresh')}</div></div>`)}</div>${card('Hosting & opslag','Voor verhuizen of herstarten',`<div class="card-body"><div class="stats-inline"><div><strong>Node.js 24</strong><span>Aanbevolen runtime</span></div><div><strong>data/</strong><span>Blijvende botgegevens</span></div></div><p class="quota-note">Het dashboard, de transcripts en de bot starten samen via index.js. Neem bij een verhuizing de hele data-map en je private .env mee. De hosting moet deze data-map bij herstarten bewaren.</p><p class="muted" style="margin-top:13px">Na een nieuw tunneladres werken de transcriptknoppen automatisch bij. Een nieuwe dashboardlink krijg je via /dashboard.</p></div>`)}`;
 }
+function gangpotPage(){
+  const d=state.data.gangpot;
+  if(!d)return card('Gangpot in de hoofdserver','Selecteer Legion om de gangpot te beheren',empty('Alleen in de gangserver','In de community-server worden geen gangpotbijdragen bijgehouden.'));
+  const money=value=>'$'+number(value),pending=d.claims.filter(item=>item.status==='pending');
+  const status={paid:'🟢 Tijdig goedgekeurd',warned:'🔴 Gangwarn',late:'🟠 Te laat goedgekeurd',partial:'🟠 Gedeeltelijk',unpaid:'🟠 Geen goedkeuring',left:'Vertrokken'};
+  return `<div class="notice">Leden gebruiken <strong>/gangpot betaling</strong>. Alleen Lead kan ✅ goedkeuren of ❌ afkeuren. Iedere zondag om <strong>23:59 Belgische tijd</strong> volgt automatisch één gangwarn voor leden zonder volledige goedkeuring. Ook wachten op controle geeft geen uitstel.</div>`+
+    card('Bevestigde gangpot',d.period?`Huidige termijn t/m ${d.period.id}`:'De eerste termijn wordt gestart',`<div class="card-body"><div class="stats-inline"><div><strong>${money(d.balance)}</strong><span>Saldo in-game</span></div><div><strong>${money(d.weeklyAmount)}</strong><span>Per lid per week</span></div><div><strong>${pending.length}</strong><span>Wachten op Lead</span></div></div><div class="table-actions" style="margin-top:18px">${btn('Donatie registreren','gangpot.new-donation')}${btn('Uitgave registreren','gangpot.new-expense')}</div></div>`)+
+    card('Betaalmeldingen','Een vinkje telt pas vanaf het moment van goedkeuring',table(['Lid','Termijn','Bedrag','Toelichting','Status',''],d.claims.map(item=>[e(item.userName),e(item.period_id),money(item.amount),e(item.note),badge(item.status),`${item.url?link('Discord',item.url):''}${item.status==='pending'?btn('✅ Goedkeuren','gangpot.approve',`data-id="${e(item.id)}"${state.data.canReviewGangpot?'':' disabled'}`,'primary')+btn('❌ Afkeuren','gangpot.reject',`data-id="${e(item.id)}"${state.data.canReviewGangpot?'':' disabled'}`,'danger'):e(item.reviewerName||'')}`])))+
+    card('Weekbijdragen','Alle menselijke leden van de hoofdserver, inclusief leiding',table(['Lid','Goedgekeurd','Nog open','Status'],d.members.map(item=>[e(item.name),money(item.paid),money(item.remaining),e(status[item.status]||item.status)])))+
+    card('Transactiehistorie','Correcties blijven zichtbaar; fun-coins staan hier los van',table(['ID','Soort','Bedrag','Lid / leiding','Datum','Notitie',''],d.entries.map(item=>[e(item.id),e({payment:'Weekbijdrage',donation:'Donatie',expense:'Uitgave'}[item.kind]),money(item.amount),e(item.userName||item.actorName),e(date(item.created_at)),e(item.note),item.voided_at?badge('revoked'):btn('Corrigeren','gangpot.void-form',`data-id="${e(item.id)}"`,'danger')])));
+}
 function renderPage() {
   if(!state.data)return;navigation();const [title,description]=pages[state.page];$('#breadcrumb').textContent=title;$('#page-title').textContent=title;$('#page-description').textContent=description;$('#eyebrow').textContent=state.data.guild.name.toUpperCase();
   $('#page-actions').innerHTML=state.page==='warnings'&&state.data.guild.warningsEnabled?'<button class="primary" type="button" data-action="warn.new">+ Gangwarn geven</button>':state.page==='members'?'<button class="secondary" type="button" data-action="members.refresh">Leden synchroniseren ↻</button>':state.page==='applications'||state.page==='tickets'?'<button class="secondary" type="button" data-action="panel.refresh">Discord-paneel bijwerken</button>':'';
-  const renderers={overview,tickets:()=>caseTable('ticket'),applications:()=>caseTable('application'),transcripts:transcriptPage,warnings:warningPage,members:memberPage,games:gamesPage,planning:planningPage,promotions:promotionsPage,information:informationPage,settings:settingsPage,activity:()=>card('Activiteitenlog','Handelingen blijven lokaal bewaard',`<div class="card-body">${activityRows(state.data.activity)}</div>`)};
+  const renderers={overview,tickets:()=>caseTable('ticket'),applications:()=>caseTable('application'),transcripts:transcriptPage,warnings:warningPage,members:memberPage,games:gamesPage,planning:planningPage,promotions:promotionsPage,gangpot:gangpotPage,information:informationPage,settings:settingsPage,activity:()=>card('Activiteitenlog','Handelingen blijven lokaal bewaard',`<div class="card-body">${activityRows(state.data.activity)}</div>`)};
   $('#content').innerHTML=renderers[state.page]();bindForms();
 }
 function selectPage(page) { if(!pages[page])return;state.page=page;state.search='';state.filter='all';renderPage();document.body.classList.remove('menu-open');window.scrollTo({top:0,behavior:'smooth'}); }
@@ -161,6 +174,15 @@ function bindForms() {
   $('#general-settings')?.addEventListener('submit',async event=>{event.preventDefault();try{await action({action:'settings.save',settings:{warnThreshold:Number(new FormData(event.target).get('warnThreshold'))}});}catch{}});
   $('#information-settings')?.addEventListener('submit',async event=>{event.preventDefault();const f=new FormData(event.target);try{await action({action:'settings.save',settings:{content:{gangName:f.get('gangName'),serverName:f.get('serverName'),tagline:f.get('tagline'),information:f.get('information'),rules:String(f.get('rules')).split('\n').map(rule=>rule.trim()).filter(Boolean),applicationIntro:f.get('applicationIntro'),ticketIntro:f.get('ticketIntro')}}});}catch{}});
 }
+function gangpotForm(kind,id){
+  const correction=kind==='void';
+  openDialog(`<h2>${correction?'Gangpotregistratie corrigeren':kind==='donation'?'Donatie registreren':'Uitgave registreren'}</h2><p class="muted" style="margin:12px 0 20px">Registreer alleen werkelijk ontvangen of uitgegeven FiveM-geld. De historie blijft bewaard.</p><form id="gangpot-form">${correction?'':field('amount','Bedrag in-game',25000,'number')}<div class="field"><label for="gangpot-note">${correction?'Reden':'Toelichting'}</label><textarea name="note" id="gangpot-note" required maxlength="500"></textarea></div><div class="form-buttons"><button class="primary" type="submit">Registreren</button></div></form>`);
+  $('#gangpot-form').addEventListener('submit',async event=>{
+    event.preventDefault();const form=new FormData(event.target),note=form.get('note'),amount=Number(form.get('amount'));
+    if(!await confirmAction(correction?'Wil je deze registratie corrigeren? Het saldo en eventuele gangpotwarn worden opnieuw berekend.':`Bevestig dat dit bedrag werkelijk ${kind==='donation'?'ontvangen':'uitgegeven'} is: $${number(amount)}.`)){gangpotForm(kind,id);$('#gangpot-note').value=note;const input=$('#gangpot-form [name="amount"]');if(input)input.value=amount;return;}
+    try{await action({action:`gangpot.${kind}`,id,amount,note,reason:note,requestId:crypto.randomUUID(),confirm:true});$('#dialog').close();}catch{}
+  });
+}
 document.addEventListener('click',async event=>{
   const target=event.target.closest('[data-page],[data-action]');if(!target)return;
   if(target.dataset.page){selectPage(target.dataset.page);return;}
@@ -170,6 +192,13 @@ document.addEventListener('click',async event=>{
     if(name==='warn.new')return warningForm();
     if(name==='warn.remove')return warningForm(id);
     if(name==='coins.edit')return coinsForm(target.dataset.user);
+    if(name==='gangpot.new-donation')return gangpotForm('donation');
+    if(name==='gangpot.new-expense')return gangpotForm('expense');
+    if(name==='gangpot.void-form')return gangpotForm('void',id);
+    if(name==='gangpot.approve'||name==='gangpot.reject'){
+      if(!await confirmAction(name==='gangpot.approve'?'Is deze betaling werkelijk in-game ontvangen? Het vinkje geldt vanaf nu; een goedkeuring na de deadline verwijdert een gangwarn niet.':'Wil je deze betaalmelding afkeuren? Het lid krijgt geen vinkje en de deadline blijft gelden.'))return;
+      await action({action:name,id,confirm:true});return;
+    }
     if(name==='planning.cancel'||name==='promotion.approve'||name==='promotion.reject') {
       const question=name==='planning.cancel'?'Wil je deze planning annuleren? Er worden daarna geen nieuwe aanwezigheidskeuzes verwerkt.':name==='promotion.approve'?'Wil je stemmen voor deze promotie? Vanaf drie unieke Lead-stemmen bepaalt de meerderheid de uitslag.':'Wil je stemmen tegen deze promotie? Vanaf drie unieke Lead-stemmen bepaalt de meerderheid de uitslag.';
       if(!await confirmAction(question))return;await action({action:name,id,confirm:true});return;

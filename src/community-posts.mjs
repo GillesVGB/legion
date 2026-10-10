@@ -15,7 +15,7 @@ export async function communityChannel(guild,id) {
   return channel;
 }
 export async function updateCommunityPost(ctx,guild,table,item,payload,marker) {
-  assertUser(['activities','promotions'].includes(table),'Onbekend onderdeel.');
+  assertUser(['activities','promotions','gangpot_claims'].includes(table),'Onbekend onderdeel.');
   const channel=await communityChannel(guild,item.channel_id);
   let message=item.message_id?await channel.messages.fetch(item.message_id).catch(error=>{if(error.code===10008)return null;throw error;}):null;
   if(!message&&!item.message_id) {
@@ -34,7 +34,7 @@ export async function updateCommunityPost(ctx,guild,table,item,payload,marker) {
     return null; // Een bewust verwijderd bericht wordt niet opnieuw geplaatst.
   }
   assertUser(!message||message.author.id===guild.members.me.id,'Dit bericht hoort niet bij de Legion-bot.');
-  const posted=message?await message.edit({...payload,allowedMentions:quiet}):await channel.send({...payload,nonce:`${table}:${item.id}`,enforceNonce:true,allowedMentions:quiet});
+  const posted=message?await message.edit({...payload,allowedMentions:quiet}):await channel.send({...payload,nonce:`${table==='gangpot_claims'?'gp':table}:${item.id}`,enforceNonce:true,allowedMentions:quiet});
   ctx.store.db.prepare(`UPDATE ${table} SET message_id=?,dirty=0,next_attempt=0,last_error=NULL WHERE id=?`).run(posted.id,item.id);
   return posted;
 }

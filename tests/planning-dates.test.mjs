@@ -77,6 +77,6 @@ test('oude planningen zonder avondlabel worden zonder verlies gemigreerd',t=>{
   t.after(()=>{upgraded.close();assert.ok(folder.startsWith(join(tmpdir(),'legion-planning-migration-')));rmSync(folder,{recursive:true,force:true});});
   const saved=activityById(ctx,'0123456789ab');
   assert.equal(saved.date_label,'');assert.equal(saved.title,'Oude planning');
-  assert.equal(upgraded.db.prepare('PRAGMA user_version').get().user_version,8);
+  assert.equal(upgraded.db.prepare('PRAGMA user_version').get().user_version,9);
   assert.ok(activityMessage(ctx,saved).content.includes('**Datum:** 12/10/2026\n'));
 });

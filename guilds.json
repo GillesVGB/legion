@@ -2,6 +2,7 @@
   {
     "guildId": "1555685630640652338",
     "planningChannelId": "1555685633266163793",
+    "gangpot": { "paymentsChannelId": "1558238040932225034", "totalChannelId": "1555685634515927050", "weeklyAmount": 25000, "startsOn": "2026-10-10" },
     "admission": { "targetGuildId": "1555685630640652338", "inviteChannelId": "1555685632704249927", "targetRoleId": "1555685630640652347", "inviteMaxAgeSeconds": 86400 },
     "ticketsEnabled": false,
     "panelChannelId": "",

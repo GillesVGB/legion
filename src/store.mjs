@@ -107,7 +107,38 @@ export class Store {
         user_id TEXT NOT NULL, day TEXT NOT NULL, mission_id TEXT NOT NULL, reward INTEGER NOT NULL,
         PRIMARY KEY(user_id,day,mission_id)
       );
-      PRAGMA user_version = 8;
+      CREATE TABLE IF NOT EXISTS gangpot_periods (
+        id TEXT PRIMARY KEY, starts_at INTEGER NOT NULL, ends_at INTEGER NOT NULL,
+        weekly_amount INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'open'
+      );
+      CREATE TABLE IF NOT EXISTS gangpot_dues (
+        period_id TEXT NOT NULL, user_id TEXT NOT NULL, enrolled_at INTEGER NOT NULL,
+        active INTEGER NOT NULL DEFAULT 1, warn_id TEXT, warn_cleared_by_payment INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY(period_id,user_id)
+      );
+      CREATE TABLE IF NOT EXISTS gangpot_entries (
+        id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE,
+        kind TEXT NOT NULL CHECK(kind IN ('payment','donation','expense')),
+        user_id TEXT, period_id TEXT, amount INTEGER NOT NULL CHECK(amount>0),
+        actor_id TEXT NOT NULL, paid_at INTEGER NOT NULL, created_at INTEGER NOT NULL,
+        note TEXT NOT NULL DEFAULT '', voided_at INTEGER, voided_by TEXT, void_reason TEXT
+      );
+      CREATE TABLE IF NOT EXISTS gangpot_notifications (
+        id TEXT PRIMARY KEY, user_id TEXT NOT NULL, period_id TEXT NOT NULL,
+        warn_id TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN ('issue','revoke','restore')),
+        message TEXT NOT NULL, log_id TEXT, dm_id TEXT, dm_blocked INTEGER NOT NULL DEFAULT 0,
+        next_attempt INTEGER NOT NULL DEFAULT 0, last_error TEXT
+      );
+      CREATE TABLE IF NOT EXISTS gangpot_claims (
+        id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE, period_id TEXT NOT NULL,
+        user_id TEXT NOT NULL, amount INTEGER NOT NULL CHECK(amount>0), reported_at INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),
+        note TEXT NOT NULL DEFAULT '', reviewer_id TEXT, reviewed_at INTEGER, payment_id TEXT,
+        message_id TEXT, dirty INTEGER NOT NULL DEFAULT 1, next_attempt INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS gangpot_pending_member ON gangpot_claims(period_id,user_id) WHERE status='pending';
+      PRAGMA user_version = 9;
     `);
     if(!this.db.prepare('PRAGMA table_info(activities)').all().some(column=>column.name==='date_label'))this.db.exec("ALTER TABLE activities ADD COLUMN date_label TEXT NOT NULL DEFAULT '';");
     if(previousSchema<7){
@@ -261,13 +292,14 @@ export class Store {
       .run(event, actor, JSON.stringify(details), Date.now());
   }
   addWarn(user, actor, reason) {
-    return this.transaction(() => {
+    return this.transaction(() => this.addWarnInside(user,actor,reason));
+  }
+  addWarnInside(user,actor,reason,now=Date.now()) {
       const id = newId();
       this.db.prepare('INSERT INTO warnings(id,user_id,reason,actor_id,created_at) VALUES(?,?,?,?,?)')
-        .run(id, user, reason, actor, Date.now());
+        .run(id, user, reason, actor, now);
       this.audit('warn.add', actor, { id, user, reason });
       return { id, count: this.warnCount(user) };
-    });
   }
   warnCount(user) {
     return this.db.prepare('SELECT COUNT(*) AS count FROM warnings WHERE user_id=? AND removed_at IS NULL').get(user).count;
