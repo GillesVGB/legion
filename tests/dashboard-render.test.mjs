@@ -31,8 +31,9 @@ test('gangpotdashboard toont betaalmeldingen met Lead-vinkjes, escapt tekst en h
   const f=dashboardFixture();
   try{
     const main=f.contexts.values().next().value,guild=f.guilds.get(main.config.guildId),now=Date.parse('2026-10-10T10:00:00Z');
+    guild.members.cache.get('100000000000000099').roles.cache.set(main.config.gangpot.memberRoleId,guild.roles.cache.get(main.config.gangpot.memberRoleId));
     await syncGangpot(main,f.client,now);
-    reportGangpotPayment(main,{userId:'100000000000000099',periodId:'2026-10-11',amount:25000,requestId:'render-claim-request',note:'<script>bad()</script>'},now);
+    reportGangpotPayment(main,{userId:'100000000000000099',periodId:'2026-10-17',amount:25000,requestId:'render-claim-request',note:'<script>bad()</script>'},now);
     const data=new Dashboard({...f,locks:new Locks()}).summary(main,guild,guild.members.cache.get('100000000000000001'));
     const source=readFileSync(new URL('../src/dashboard-assets/app.js',import.meta.url),'utf8');
     const context=vm.createContext({data,Intl,Date,Number,String,Math,URL,console});

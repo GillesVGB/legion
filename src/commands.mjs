@@ -48,7 +48,7 @@ export function commands(maxBet, ticketsEnabled = true) {
       .addSubcommand(s=>s.setName('status').setDescription('Bekijk privé je eigen weekbijdrage en deadline'))
       .addSubcommand(s=>s.setName('betaling').setDescription('Meld je eigen in-game betaling; Lead zet het vinkje')
         .addIntegerOption(o=>o.setName('bedrag').setDescription('Betaald bedrag; standaard 25000').setMinValue(1).setMaxValue(100000000))
-        .addStringOption(o=>o.setName('termijn').setDescription('Zondag van de termijn: DD-MM-JJJJ; standaard huidige week').setMaxLength(10))
+        .addStringOption(o=>o.setName('termijn').setDescription('Zaterdag van de termijn: DD-MM-JJJJ; standaard huidige week').setMaxLength(10))
         .addStringOption(o=>o.setName('notitie').setDescription('Aan wie heb je betaald of welke toelichting heb je?').setMaxLength(500)))
       .addSubcommand(s=>s.setName('donatie').setDescription('Registreer extra in-game steun aan de gangpot (leiding)')
         .addIntegerOption(o=>o.setName('bedrag').setDescription('Ontvangen donatie').setRequired(true).setMinValue(1).setMaxValue(100000000))
@@ -60,7 +60,7 @@ export function commands(maxBet, ticketsEnabled = true) {
         .addStringOption(o=>o.setName('id').setDescription('Transactie-ID uit de bevestiging of dashboard').setRequired(true).setMinLength(12).setMaxLength(12))
         .addStringOption(reasonOption))
       .addSubcommand(s=>s.setName('overzicht').setDescription('Bekijk het betaaloverzicht van een weektermijn (leiding)')
-        .addStringOption(o=>o.setName('termijn').setDescription('Zondag: DD-MM-JJJJ; standaard huidige week').setMaxLength(10))),
+        .addStringOption(o=>o.setName('termijn').setDescription('Zaterdag: DD-MM-JJJJ; standaard huidige week').setMaxLength(10))),
     cmd('missies','Bekijk je dagelijkse fun-missies, voortgang en coinbeloningen'),
     cmd('ticket', 'Open of sluit je prive ticket')
       .addSubcommand(s => s.setName('openen').setDescription('Open direct een prive ticket'))

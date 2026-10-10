@@ -10,37 +10,40 @@ import {Dashboard} from '../src/dashboard.mjs';
 import {Locks} from '../src/locks.mjs';
 import {gangpotWindow,syncGangpot,reportGangpotPayment,reviewGangpotPayment,gangpotBalance,gangpotPaid,gangpotMembers,recordGangpotEntry,voidGangpotEntry,handleGangpotCommand,handleGangpotReview} from '../src/gangpot.mjs';
 
-const SAT=Date.parse('2026-10-10T10:00:00Z'),SUNDAY=Date.parse('2026-10-11T21:59:30Z'),END=Date.parse('2026-10-11T22:00:00Z');
-const fixture=t=>{const f=dashboardFixture();t.after(f.close);const main=f.contexts.values().next().value,guild=f.guilds.get(main.config.guildId);return{...f,main,guild,lead:guild.members.cache.get(ACTOR)};};
-const period=f=>f.main.store.db.prepare("SELECT * FROM gangpot_periods WHERE id='2026-10-11'").get();
+const SAT=Date.parse('2026-10-10T10:00:00Z'),DEADLINE=Date.parse('2026-10-17T21:59:30Z'),END=Date.parse('2026-10-17T22:00:00Z');
+const fixture=t=>{const f=dashboardFixture();t.after(f.close);const main=f.contexts.values().next().value,guild=f.guilds.get(main.config.guildId);for(const id of [ACTOR,OTHER])guild.members.cache.get(id).roles.cache.set(main.config.gangpot.memberRoleId,guild.roles.cache.get(main.config.gangpot.memberRoleId));return{...f,main,guild,lead:guild.members.cache.get(ACTOR)};};
+const period=f=>f.main.store.db.prepare("SELECT * FROM gangpot_periods WHERE id='2026-10-17'").get();
 const claim=(f,user=OTHER,amount=25000,key=`claim-request-${user}`)=>reportGangpotPayment(f.main,{userId:user,amount,periodId:period(f).id,requestId:key,note:'In-game overgemaakt'},SAT);
 const warns=(f,user)=>f.main.store.db.prepare("SELECT * FROM warnings WHERE user_id=? AND reason LIKE 'Gangpot t/m %'").all(user);
 
-test('gangpottermijnen eindigen zondag 23:59 Belgische tijd, inclusief eerste weekend en wintertijd',()=>{
+test('gangpottermijnen eindigen zaterdag 23:59 Belgische tijd, inclusief eerste weekend en wintertijd',()=>{
   const config={startsOn:'2026-10-10',weeklyAmount:25000};
   assert.equal(gangpotWindow(config,SAT).starts_at,Date.parse('2026-10-09T22:00:00Z'));
-  assert.equal(gangpotWindow(config,SUNDAY).id,'2026-10-11');
-  assert.equal(gangpotWindow(config,SUNDAY).ends_at,END);
-  assert.equal(gangpotWindow(config,END).id,'2026-10-18');
-  const dst=gangpotWindow(config,Date.parse('2026-10-25T12:00:00Z'));
-  assert.equal(dst.ends_at,Date.parse('2026-10-25T23:00:00Z'));
+  assert.equal(gangpotWindow(config,DEADLINE).id,'2026-10-17');
+  assert.equal(gangpotWindow(config,DEADLINE).ends_at,END);
+  assert.equal(gangpotWindow(config,END).id,'2026-10-24');
+  assert.equal(gangpotWindow(config,SAT).id,'2026-10-17'); // Niet al straffen op de dag waarop het systeem begint.
+  const dst=gangpotWindow(config,Date.parse('2026-10-30T12:00:00Z'));
+  assert.equal(dst.ends_at,Date.parse('2026-10-31T23:00:00Z'));
   assert.equal(dst.ends_at-dst.starts_at,169*3600000);
   assert.equal(gangpotWindow(config,Date.parse('2026-10-09T12:00:00Z')),null);
 });
 
-test('alle menselijke hoofdserverleden staan in de gangpot; vaste berichten worden aangepast en community wordt geweigerd',async t=>{
+test('leden met de ledenrol staan in de gangpot; uitleg en totaal blijven in afzonderlijke vaste berichten en community wordt geweigerd',async t=>{
   const f=fixture(t);await syncGangpot(f.main,f.client,SAT);
-  const humans=[...f.guild.members.cache.values()].filter(member=>!member.user.bot);
+  const humans=[...f.guild.members.cache.values()].filter(member=>!member.user.bot&&member.roles.cache.has(f.main.config.gangpot.memberRoleId));
   assert.equal(gangpotMembers(f.main,period(f),SAT).length,humans.length);
   assert.ok(gangpotMembers(f.main,period(f),SAT).some(item=>item.user_id===ACTOR));
-  const payment=f.guild.channels.cache.get('1558238040932225034'),total=f.guild.channels.cache.get('1555685634515927050');
-  const ids=[payment.posted.first().id,total.posted.first().id];
+  const payment=f.guild.channels.cache.get('1558238040932225034'),info=f.guild.channels.cache.get('1555685634515927050'),total=f.guild.channels.cache.get('1558420548000813126');
+  const ids=[info.posted.first().id,total.posted.first().id];
   f.main.store.db.prepare("DELETE FROM settings WHERE key LIKE 'gangpot:%'").run();
   await syncGangpot(f.main,f.client,SAT+60000);
-  assert.equal(payment.posted.size,1);assert.equal(total.posted.size,1);
-  assert.deepEqual([payment.posted.first().id,total.posted.first().id],ids);
-  assert.ok(payment.posted.first().embeds[0].description.includes('Ook een melding die nog op controle wacht geeft geen uitstel'));
-  assert.throws(()=>reportGangpotPayment(f.source,{userId:OTHER,amount:25000,requestId:'community-test',periodId:'2026-10-11'},SAT),/hoofdserver/);
+  assert.equal(payment.posted.size,0);assert.equal(info.posted.size,1);assert.equal(total.posted.size,1);
+  assert.deepEqual([info.posted.first().id,total.posted.first().id],ids);
+  assert.ok(info.posted.first().embeds[0].description.includes('Ook een melding die nog op controle wacht geeft geen uitstel'));
+  assert.equal(info.posted.first().embeds[0].fields,undefined);
+  assert.ok(!info.posted.first().embeds[0].description.includes('saldo'));
+  assert.throws(()=>reportGangpotPayment(f.source,{userId:OTHER,amount:25000,requestId:'community-test',periodId:'2026-10-17'},SAT),/hoofdserver/);
   assert.equal(commands(10000,true).some(command=>command.name==='gangpot'),false);
   const pay=commands(10000,false).find(command=>command.name==='gangpot').options.find(option=>option.name==='betaling');
   assert.ok(!pay.options.some(option=>['lid','betaald_op'].includes(option.name)));
@@ -71,20 +74,69 @@ test('één pending melding per lid/week, veilige herhaling en controle van bedr
 test('alleen een actuele Lead-rol kan goedkeuren; gelijktijdige vinkjes boeken precies één transactie',async t=>{
   const f=fixture(t);await syncGangpot(f.main,f.client,SAT);const item=claim(f);
   const admin=f.guild.addMember('100000000000000200','Admin zonder Lead',[],true);
-  await assert.rejects(reviewGangpotPayment(f.main,f.guild,admin,item.id,'approve',()=>SUNDAY),/Lead-rol/);
-  await assert.rejects(reviewGangpotPayment(f.main,f.guild,f.guild.members.cache.get(OTHER),item.id,'approve',()=>SUNDAY),/Lead-rol/);
-  await Promise.all([reviewGangpotPayment(f.main,f.guild,f.lead,item.id,'approve',()=>SUNDAY),reviewGangpotPayment(f.main,f.guild,f.lead,item.id,'reject',()=>SUNDAY)]);
+  await assert.rejects(reviewGangpotPayment(f.main,f.guild,admin,item.id,'approve',()=>DEADLINE),/Lead-rol/);
+  await assert.rejects(reviewGangpotPayment(f.main,f.guild,f.guild.members.cache.get(OTHER),item.id,'approve',()=>DEADLINE),/Lead-rol/);
+  await Promise.all([reviewGangpotPayment(f.main,f.guild,f.lead,item.id,'approve',()=>DEADLINE),reviewGangpotPayment(f.main,f.guild,f.lead,item.id,'reject',()=>DEADLINE)]);
   assert.equal(gangpotBalance(f.main),25000);assert.equal(f.main.store.db.prepare('SELECT COUNT(*) AS n FROM gangpot_entries').get().n,1);
   assert.equal(gangpotPaid(f.main,period(f),OTHER).on_time,25000);
+  await syncGangpot(f.main,f.client,DEADLINE);
+  const total=f.guild.channels.cache.get(f.main.config.gangpot.totalChannelId).posted.first(),info=f.guild.channels.cache.get(f.main.config.gangpot.infoChannelId).posted.first();
+  assert.ok(total.embeds[0].description.includes('$25.000')&&total.embeds[0].fields.some(field=>field.value.includes(`<@${OTHER}>`)));
+  assert.ok(!info.embeds[0].description.includes(`<@${OTHER}>`));assert.equal(info.embeds[0].fields,undefined);
   await syncGangpot(f.main,f.client,END);assert.equal(warns(f,OTHER).length,0);
+});
+
+test('zonder ledenrol hoeft een lid niet te betalen, kan het geen melding maken en krijgt het geen automatische warn',async t=>{
+  const f=fixture(t);t.mock.method(Date,'now',()=>SAT);
+  const id='100000000000000077',person=f.guild.addMember(id,'Geen gangrol',[f.main.config.staffRoleIds[0]],true);
+  await syncGangpot(f.main,f.client,SAT);
+  assert.ok(!gangpotMembers(f.main,period(f),SAT).some(item=>item.user_id===id));
+  assert.throws(()=>claim(f,id),/betaaloverzicht/);
+  await assert.rejects(handleGangpotCommand(f.main,{id:'100000000000999997',createdTimestamp:SAT,guild:f.guild,client:f.client,user:person.user,member:person,options:{getSubcommand:()=> 'betaling',getString:()=>null,getInteger:()=>null},deferReply:async()=>{},editReply:async()=>{}}),/Alleen leden met rol/);
+  // Een oude versie kan deze persoon wel hebben ingeschreven; de nieuwe deadlinecontrole sluit hem alsnog uit.
+  f.main.store.db.prepare('INSERT INTO gangpot_dues(period_id,user_id,enrolled_at) VALUES(?,?,?)').run(period(f).id,id,SAT);
+  f.guild.members.cache.get(OTHER).roles.cache.delete(f.main.config.gangpot.memberRoleId);
+  await syncGangpot(f.main,f.client,END);
+  assert.equal(warns(f,id).length,0);assert.equal(warns(f,OTHER).length,0);
+  assert.equal(f.main.store.db.prepare('SELECT active FROM gangpot_dues WHERE period_id=? AND user_id=?').get(period(f).id,id).active,0);
+});
+
+test('een ontvangen ledenrol schrijft het lid in, ook als het later in de week lid wordt',async t=>{
+  const f=fixture(t),id='100000000000000078',member=f.guild.addMember(id,'Nieuw lid',[]);
+  await syncGangpot(f.main,f.client,SAT);assert.ok(!gangpotMembers(f.main,period(f),SAT).some(item=>item.user_id===id));
+  member.roles.cache.set(f.main.config.gangpot.memberRoleId,f.guild.roles.cache.get(f.main.config.gangpot.memberRoleId));
+  await syncGangpot(f.main,f.client,SAT+86400000);assert.ok(gangpotMembers(f.main,period(f),SAT).some(item=>item.user_id===id&&item.active));
+  await syncGangpot(f.main,f.client,END);assert.equal(warns(f,id).length,1);
+});
+
+test('migratie bewaart oude zondagbetalingen en meldingen, hergebruikt de oude gangpot-embed als informatie en verplaatst het totaal',async t=>{
+  const f=fixture(t),old='2026-10-11';
+  f.main.store.db.prepare('INSERT INTO gangpot_periods(id,starts_at,ends_at,weekly_amount) VALUES(?,?,?,?)').run(old,Date.parse('2026-10-09T22:00:00Z'),Date.parse('2026-10-11T22:00:00Z'),25000);
+  for(const id of [OTHER,ACTOR])f.main.store.db.prepare('INSERT INTO gangpot_dues(period_id,user_id,enrolled_at) VALUES(?,?,?)').run(old,id,SAT);
+  const reported=reportGangpotPayment(f.main,{userId:OTHER,amount:25000,periodId:old,requestId:'legacy-paid-request'},SAT);
+  await reviewGangpotPayment(f.main,f.guild,f.lead,reported.id,'approve',()=>SAT+1000);
+  const pending=reportGangpotPayment(f.main,{userId:ACTOR,amount:25000,periodId:old,requestId:'legacy-pending-request'},SAT);
+  const information=f.guild.channels.cache.get(f.main.config.gangpot.infoChannelId),payments=f.guild.channels.cache.get(f.main.config.gangpot.paymentsChannelId);
+  const oldTotal=await information.send({embeds:[{title:'Oud totaal',description:'$25.000',footer:{text:'Legion • Totaal gangpot'}}]}),oldPanel=await payments.send({embeds:[{footer:{text:'Legion • Gangpotbetalingen'}}]});
+  const someoneElse=await payments.send({embeds:[{footer:{text:'Legion • Gangpotbetalingen'}}]});someoneElse.author={id:OTHER};
+  f.main.store.setSetting('gangpot:total:message',oldTotal.id);f.main.store.setSetting('gangpot:payments:message',oldPanel.id);
+  await syncGangpot(f.main,f.client,SAT+2000);
+  assert.equal(f.main.store.db.prepare('SELECT * FROM gangpot_periods WHERE id=?').get(old),undefined);
+  assert.equal(f.main.store.db.prepare('SELECT period_id FROM gangpot_claims WHERE id=?').get(pending.id).period_id,'2026-10-17');
+  assert.equal(gangpotPaid(f.main,period(f),OTHER).on_time,25000);assert.equal(gangpotBalance(f.main),25000);
+  assert.equal(information.posted.size,1);assert.equal(information.posted.first().id,oldTotal.id);assert.equal(information.posted.first().embeds[0].footer.text,'Legion • Gangpotinformatie');
+  assert.equal(payments.posted.has(oldPanel.id),false);assert.equal(payments.posted.has(someoneElse.id),true);
+  const total=f.guild.channels.cache.get('1558420548000813126').posted.first();assert.ok(total.embeds[0].fields[0].value.includes(`<@${OTHER}>`));
+  await syncGangpot(f.main,f.client,Date.parse('2026-10-12T10:00:00Z'));assert.equal(warns(f,ACTOR).length,0);
+  await syncGangpot(f.main,f.client,END);assert.equal(warns(f,ACTOR).length,1);assert.equal(warns(f,OTHER).length,0);
 });
 
 test('geen commando, pending zonder vinkje, afkeuring en gedeeltelijke goedkeuring geven elk één automatische warn',async t=>{
   const f=fixture(t);await syncGangpot(f.main,f.client,SAT);
   const pending=claim(f),rejected=claim(f,ACTOR),partialUser='100000000000000020',partial=claim(f,partialUser,10000);
-  await reviewGangpotPayment(f.main,f.guild,f.lead,rejected.id,'reject',()=>SUNDAY);
-  await reviewGangpotPayment(f.main,f.guild,f.lead,partial.id,'approve',()=>SUNDAY);
-  await syncGangpot(f.main,f.client,SUNDAY);assert.equal(warns(f,OTHER).length,0);
+  await reviewGangpotPayment(f.main,f.guild,f.lead,rejected.id,'reject',()=>DEADLINE);
+  await reviewGangpotPayment(f.main,f.guild,f.lead,partial.id,'approve',()=>DEADLINE);
+  await syncGangpot(f.main,f.client,DEADLINE);assert.equal(warns(f,OTHER).length,0);
   await syncGangpot(f.main,f.client,END);await syncGangpot(f.main,f.client,END+60000);
   for(const user of [OTHER,ACTOR,partialUser,'100000000000000021'])assert.equal(warns(f,user).length,1);
   assert.equal(f.main.store.db.prepare('SELECT status FROM gangpot_claims WHERE id=?').get(pending.id).status,'pending');
@@ -104,7 +156,7 @@ test('goedkeuring na de deadline verwijdert geen warn en kan niet worden terugge
 
 test('betalingscorrecties na de deadline geven één warn en verloren Discord-bezorging wordt herhaald zonder nieuwe warns',async t=>{
   const f=fixture(t);await syncGangpot(f.main,f.client,SAT);const item=claim(f);
-  const approved=await reviewGangpotPayment(f.main,f.guild,f.lead,item.id,'approve',()=>SUNDAY);
+  const approved=await reviewGangpotPayment(f.main,f.guild,f.lead,item.id,'approve',()=>DEADLINE);
   await syncGangpot(f.main,f.client,END);assert.equal(warns(f,OTHER).length,0);
   voidGangpotEntry(f.main,approved.payment_id,ACTOR,'Betaling was verkeerd bevestigd',END+1000);
   const id=warns(f,OTHER)[0].id;
@@ -121,7 +173,7 @@ test('afkeuring geeft geen saldo; lid kan opnieuw melden en Lead kan vóór de d
   const f=fixture(t);await syncGangpot(f.main,f.client,SAT);const first=claim(f);
   await reviewGangpotPayment(f.main,f.guild,f.lead,first.id,'reject',()=>SAT+1000);
   assert.equal(gangpotBalance(f.main),0);
-  const second=claim(f,OTHER,25000,'claim-second-request');await reviewGangpotPayment(f.main,f.guild,f.lead,second.id,'approve',()=>SUNDAY);
+  const second=claim(f,OTHER,25000,'claim-second-request');await reviewGangpotPayment(f.main,f.guild,f.lead,second.id,'approve',()=>DEADLINE);
   await syncGangpot(f.main,f.client,END);assert.equal(warns(f,OTHER).length,0);assert.equal(gangpotBalance(f.main),25000);
 });
 
