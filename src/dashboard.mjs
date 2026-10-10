@@ -2,7 +2,7 @@ import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { PermissionFlagsBits as P, Routes } from 'discord.js';
 import { UserError, assertUser } from './errors.mjs';
-import { saveDashboardSettings, validateDashboardSettings } from './dashboard-settings.mjs';
+import { saveDashboardSettings, validateDashboardSettings,applyDashboardSettings } from './dashboard-settings.mjs';
 import { commands } from './commands.mjs';
 import { decideCase, startInterview, publishPanel, writeWarnLog, warnLogChannel } from './service.mjs';
 import { safeText } from './ui.mjs';
@@ -17,6 +17,13 @@ import { cancelActivity } from './activities.mjs';
 import { decidePromotion,promotionVotes,promotionVoteReply,PROMOTION_LEAD_ROLE_ID } from './promotions.mjs';
 import { missions,missionDay } from './mission-definitions.mjs';
 import {gangpotSummary,syncGangpot,recordGangpotEntry,voidGangpotEntry,reviewGangpotPayment,GANGPOT_LEAD_ROLE_ID,gangpotMoney,requireGangPot} from './gangpot.mjs';
+import {operationSettings} from './feature-settings.mjs';
+import {decideAbsence,setExemption,createAbsence,syncAbsences,activityAbsences} from './absence.mjs';
+import {auditedAction,cleanAudit} from './audit-log.mjs';
+import {botHealth} from './bot-status.mjs';
+import {createActivity,planningTime} from './activities.mjs';
+import {communityChannel} from './community-posts.mjs';
+import {catches} from './fishing.mjs';
 
 const secret = () => randomBytes(32).toString('base64url');
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -119,7 +126,7 @@ export class Dashboard {
         rankOrder: roleId ? ranked.indexOf(roleId) : 999, legion: Boolean(config.memberRoleId && member.roles.cache.has(config.memberRoleId)), coins: wallets.get(member.id) ?? null };
     }).sort((a,b) => a.rankOrder-b.rankOrder || a.name.localeCompare(b.name,'nl'));
     const invitations = store.db.prepare('SELECT case_id,owner_id,target_guild_id,status,expires_at,last_error FROM acceptance_notifications ORDER BY rowid DESC LIMIT 100').all().map(item => ({ ...item, owner_name: name(item.owner_id) }));
-    const activity = store.db.prepare('SELECT * FROM audit ORDER BY id DESC LIMIT 80').all().map(item => ({ ...item, actor_name: name(item.actor_id), details: JSON.parse(item.details) }));
+    const activity = store.db.prepare('SELECT * FROM audit ORDER BY id DESC LIMIT 80').all().map(item => ({ ...item, actor_name: name(item.actor_id), details: cleanAudit(JSON.parse(item.details)) }));
     const totals = store.db.prepare("SELECT COALESCE(SUM(kind='ticket' AND status='open'),0) AS tickets,COALESCE(SUM(kind='application' AND status='open'),0) AS applications,COALESCE(SUM(status='accepted'),0) AS accepted FROM cases").get();
     return { guild: { id: guild.id, name: guild.name, ticketsEnabled: config.ticketsEnabled, warningsEnabled: Boolean(config.warnLogChannelId), memberRoleId: config.memberRoleId, staffRoleNames: config.staffRoleIds.map(id => guild.roles.cache.get(id)?.name || id) },
       overview: { members: members.length, legionMembers: members.filter(member => member.legion).length, openTickets: totals.tickets,
@@ -137,9 +144,15 @@ export class Dashboard {
       admission: config.admission ? { targetGuildId: config.admission.targetGuildId, maxAge: config.admission.inviteMaxAgeSeconds, restricted: true, maxUses: 1 } : null,
       roster: config.roster || null,
       gangpot:gangpotSummary(ctx,guild),
+      health:botHealth(ctx,this.client),operations:operationSettings(ctx),
+      channelSettings:{logChannelId:config.logChannelId,botLogChannelId:config.botLogChannelId||config.logChannelId,updateChannelId:config.updateChannelId||'',absencePanelChannelId:config.absencePanelChannelId||'',planningChannelId:config.planningChannelId,warnLogChannelId:config.warnLogChannelId,panelChannelId:config.panelChannelId,...(config.gangpot?{gangpotInfo:config.gangpot.infoChannelId,gangpotPayments:config.gangpot.paymentsChannelId,gangpotTotal:config.gangpot.totalChannelId}:{})},
+      embedColor:'#'+config.color.toString(16).padStart(6,'0'),canConfigureChannels:viewer?.permissions.has(P.Administrator)??false,
+      absences:store.db.prepare('SELECT * FROM absence_requests ORDER BY created_at DESC LIMIT 100').all().map(item=>({...item,weeks:JSON.parse(item.weeks),userName:name(item.user_id),reviewerName:name(item.reviewer_id)})),
+      exemptions:store.db.prepare('SELECT * FROM gangpot_exemptions ORDER BY period_id DESC LIMIT 100').all().map(item=>({...item,userName:name(item.user_id)})),
+      fishCollections:store.db.prepare('SELECT * FROM fish_collection ORDER BY last_at DESC LIMIT 200').all().map(item=>({...item,catch_name:catches.find(catchItem=>catchItem.id===item.catch_id)?.title||item.catch_id,userName:name(item.user_id)})),
       canReviewGangpot:viewer?.roles.cache.has(GANGPOT_LEAD_ROLE_ID)??false,
       planningChannelId:config.planningChannelId,
-      plannings:store.db.prepare('SELECT * FROM activities ORDER BY starts_at DESC LIMIT 100').all().map(item=>({...item,url:item.message_id?`https://discord.com/channels/${guild.id}/${item.channel_id}/${item.message_id}`:null,participants:store.db.prepare('SELECT user_id,response FROM activity_rsvps WHERE activity_id=? ORDER BY updated_at').all(item.id).map(person=>({...person,name:name(person.user_id)}))})),
+      plannings:store.db.prepare('SELECT * FROM activities ORDER BY starts_at DESC LIMIT 100').all().map(item=>({...item,absences:activityAbsences(ctx,item).map(person=>({...person,name:name(person.user_id)})),url:item.message_id?`https://discord.com/channels/${guild.id}/${item.channel_id}/${item.message_id}`:null,participants:store.db.prepare('SELECT user_id,response FROM activity_rsvps WHERE activity_id=? ORDER BY updated_at').all(item.id).map(person=>({...person,name:name(person.user_id)}))})),
       canVotePromotions:viewer?.roles.cache.has(PROMOTION_LEAD_ROLE_ID)??false,
       promotions:store.db.prepare('SELECT * FROM promotions ORDER BY created_at DESC LIMIT 100').all().map(item=>({...item,voting:promotionVotes(ctx,item.id),member_name:name(item.member_id),role_name:guild.roles.cache.get(item.role_id)?.name||item.role_id,url:item.message_id?`https://discord.com/channels/${guild.id}/${item.channel_id}/${item.message_id}`:null})),
       missions:{day:missionDay(),definitions:missions,claimedToday:store.db.prepare('SELECT COUNT(*) AS total FROM mission_claims WHERE day=?').get(missionDay()).total} };
@@ -155,8 +168,16 @@ export class Dashboard {
       result:() => result };
   }
   async action(ctx, guild, member, value) {
+    return auditedAction(ctx,member.id,String(value.action||'').slice(0,80),()=>this.performAction(ctx,guild,member,value));
+  }
+  async performAction(ctx,guild,member,value){
     const { store, config } = ctx;
     const actor = member.id;
+    if(['absence.approve','absence.reject'].includes(value.action)){assertUser(value.confirm===true,'Bevestig de afmelding.');await decideAbsence(ctx,guild,member,value.id,value.action.split('.')[1]);await syncAbsences(ctx,guild);await syncGangpot(ctx,this.client);return{message:'Afmelding beoordeeld.'};}
+    if(['absence.exempt','absence.revoke'].includes(value.action)){await setExemption(ctx,guild,member,value.userId,value.week,value.reason,value.action==='absence.revoke');await syncGangpot(ctx,this.client);return{message:'Vrijstelling bijgewerkt.'};}
+    if(value.action==='planning.create'){const interaction={guild,user:member.user,member,memberPermissions:member.permissions};const result=await createActivity(ctx,interaction,{date:value.date,time:value.time,location:value.location,title:value.title,description:value.description,duration:value.duration});return{message:result.posted?'Planning geplaatst.':'Planning opgeslagen; de bot probeert opnieuw.'};}
+    if(value.action==='absence.request'){const item=await createAbsence(ctx,guild,member.id,{start:value.start,end:value.end,reason:value.reason,activityId:value.activityId});await syncAbsences(ctx,guild);return{message:`Aanvraag ${item.id} opgeslagen.`};}
+    if(value.action==='gangpot.refresh'){await syncGangpot(ctx,this.client);return{message:'Gangpot bijgewerkt.'};}
     if(['gangpot.approve','gangpot.reject','gangpot.donation','gangpot.expense','gangpot.void'].includes(value.action)){
       requireGangPot(ctx);assertUser(value.confirm===true,'Bevestig eerst dat deze in-game transactie werkelijk is ontvangen of uitgevoerd.');
       const submittedAt=Date.now();await syncGangpot(ctx,this.client,submittedAt);
@@ -206,11 +227,17 @@ export class Dashboard {
     }
     if (value.action === 'settings.save') {
       const checked = validateDashboardSettings(value.settings);
+      const candidate={config:{...config,gangpot:config.gangpot?{...config.gangpot}:null,recruitment:config.recruitment?{...config.recruitment}:null,admission:config.admission?{...config.admission}:null}};applyDashboardSettings(candidate,checked);
+      let currentUpdate;
+      if(config.gangpot&&value.applyCurrent===true){assertUser(value.confirm===true,'Bevestig wijzigen van de lopende gangpotweek.');const period=store.db.prepare('SELECT * FROM gangpot_periods WHERE starts_at<=? AND ends_at>? ORDER BY starts_at DESC LIMIT 1').get(Date.now(),Date.now());if(period){const end=planningTime(period.id,checked.operations?.gangpot?.deadlineTime||config.gangpot.deadlineTime||'23:59')+60000;assertUser(end>Date.now(),'De nieuwe deadline moet nog in de toekomst liggen.');currentUpdate={id:period.id,end};}}
+      if(checked.channels){assertUser(member.permissions.has(P.Administrator),'Alleen een administrator mag bestemmingskanalen veranderen.');for(const [key,id] of Object.entries(checked.channels)){await communityChannel(guild,id);if(key==='logChannelId')await staffLogChannel(guild,{...config,logChannelId:id});if(key.startsWith('gangpot')||['absencePanelChannelId','planningChannelId'].includes(key))requireGangPot(ctx);}}
       assertUser(!checked.gamesMembersOnly || config.memberRoleId,'Stel eerst een ledenrol in.');
       const desiredMax = checked.maxBet;
       if (desiredMax !== undefined) assertUser(Number.isSafeInteger(desiredMax) && desiredMax>=2 && desiredMax<=100000,'Kies een maximale inzet tussen 2 en 100000.');
       if (desiredMax !== undefined && desiredMax!==config.maxBet) await this.client.rest.put(Routes.applicationGuildCommands(config.clientId,guild.id),{body:commands(desiredMax,config.ticketsEnabled)});
       saveDashboardSettings(ctx,checked,actor);
+      if(config.recruitment)await refreshRecruitment(ctx,guild);
+      if(currentUpdate){store.db.prepare('UPDATE gangpot_periods SET weekly_amount=?,ends_at=? WHERE id=?').run(config.gangpot.weeklyAmount,currentUpdate.end,currentUpdate.id);store.audit('gangpot.period.settings',actor,{period:currentUpdate.id,amount:config.gangpot.weeklyAmount});}
       for (const item of store.db.prepare("SELECT key FROM settings WHERE key LIKE 'panel:%'").all()) { const [,type,id]=item.key.split(':'); await publishPanel(ctx,guild,id,type); }
       return { message:'Instellingen opgeslagen en Discord-panelen bijgewerkt.' };
     }
@@ -268,9 +295,10 @@ export class Dashboard {
         send(200,{ok:true},{'Set-Cookie':this.cookie('',0)});return true;
       }
       if(path==='/api/dashboard/session'){ failure(request.method==='GET',405,'Gebruik GET.');send(200,await this.sessionInfo(session));return true; }
-      const match=/^\/api\/dashboard\/guilds\/(\d{17,20})\/(summary|actions|cases\/([a-f0-9]{12})\/messages)$/.exec(path);
+      const match=/^\/api\/dashboard\/guilds\/(\d{17,20})\/(summary|actions|audit|cases\/([a-f0-9]{12})\/messages)$/.exec(path);
       failure(match,404,'Pagina niet gevonden.');
       const {ctx,guild,member}=await this.authorized(session,match[1]);
+      if(match[2]==='audit'){failure(request.method==='GET',405,'Gebruik GET.');const before=Number(new URL(request.url,'http://localhost').searchParams.get('before')||Number.MAX_SAFE_INTEGER);failure(Number.isSafeInteger(before)&&before>0,400,'Ongeldige logpagina.');const items=ctx.store.db.prepare('SELECT * FROM audit WHERE id<? ORDER BY id DESC LIMIT 100').all(before).map(item=>({...item,actor_name:guild.members.cache.get(item.actor_id)?.displayName||item.actor_id,details:cleanAudit(JSON.parse(item.details))}));send(200,{items});return true;}
       if(match[2]==='summary'){ failure(request.method==='GET',405,'Gebruik GET.');send(200,this.summary(ctx,guild,member));return true; }
       if(match[2]==='actions'){
         failure(request.method==='POST',405,'Gebruik POST.'); const value=await bodyJSON(request);

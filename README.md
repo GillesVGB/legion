@@ -6,10 +6,10 @@ Een Nederlandstalige bot met gangwarns, gangpotbetalingen, sollicitatietickets, 
 
 | Guild | Functies |
 | --- | --- |
-| `1555685630640652338` | Sollicitaties, gangwarns, informatie en games. Tickets staan uit. |
+| `1555685630640652338` | Gangpot, planning, afmeldingen, rangen, gangwarns en games. Solliciteren en tickets openen staan uit. |
 | `1555726440933363753` | Sollicitaties, gangwarns, informatie, games en tickets. |
 
-Het gecombineerde ticket- en sollicitatiepaneel staat ingesteld op **`1555726441759375398`**, bij de tweede guild. De bot controleert of het kanaal werkelijk bij die guild hoort. Dit paneel wordt bij starten geplaatst of ververst; opnieuw starten maakt geen duplicaat van hetzelfde paneel. In de eerste guild kun je met `/setup paneel:alles` een sollicitatie- en informatiepaneel plaatsen.
+Het gecombineerde ticket- en sollicitatiepaneel staat ingesteld op **`1555726441759375398`**, bij de tweede guild. De bot controleert of het kanaal werkelijk bij die guild hoort. Dit paneel wordt bij starten geplaatst of ververst; opnieuw starten maakt geen duplicaat. De hoofdserver heeft uitsluitend een informatiepaneel en gangfuncties.
 
 Rollen, kanaalinstellingen, warns, coins, spellen en dossiers zijn **per guild gescheiden**. Dezelfde speler kan dus in beide guilds een ander saldo en andere warns hebben. De bestaande rollen en categorieen zijn inmiddels ingevuld in `guilds.json`; de onderstaande installatie-instructies zijn bedoeld voor opnieuw installeren of verhuizen.
 
@@ -42,13 +42,21 @@ Rollen, kanaalinstellingen, warns, coins, spellen en dossiers zijn **per guild g
 
 Botrechten: **Kanalen bekijken, Berichten versturen, Berichtgeschiedenis lezen, Links insluiten, Bestanden bijvoegen, Kanalen beheren en Rollen beheren**. Plaats de botrol boven de rollen die hij moet beheren, zeker boven de ledenrol. Administrator is niet nodig voor de bot. Je eigen account moet administrator zijn om `/inrichten` en `/setup` te gebruiken.
 
-Nieuwe commands worden bij het starten automatisch geregistreerd: 27 in de hoofdserver en 23 in de community. `npm run deploy` kan dit ook handmatig doen; het vervangt de bestaande guild-commands van deze bot-applicatie.
+Nieuwe commands worden bij het starten automatisch geregistreerd: 29 in de hoofdserver en 25 in de community. `npm run deploy` kan dit ook handmatig doen; het vervangt de bestaande guild-commands van deze bot-applicatie.
 
 ## Commands
 
 | Command | Gebruik |
 | --- | --- |
 | `/help` | Overzicht van de functies in de huidige guild. |
+| `/dashboard` | Open het privé dashboard als leiding. |
+| `/botstatus` | Leiding bekijkt verbinding, uptime, foutcodes en wachtende acties. |
+| `/afwezig aanvragen van tot reden` | Vraag langere afwezigheid aan; Lead beoordeelt de periode en genoemde gangpotweken. |
+| `/afwezig status` | Bekijk eigen aanvragen en vrijgestelde weken. |
+| `/afwezig vrijstellen gebruiker termijn reden` | Lead geeft vrijstelling voor één specifieke gangpotweek. |
+| `/afwezig vrijstelling-intrekken gebruiker termijn reden` | Lead trekt de weekvrijstelling in met behoud van historie. |
+| `/afmelden planning reden` | Vraag goedkeuring voor afwezigheid op een specifieke planning. |
+| `/vangstenboek` | Bekijk goede/zeldzame vangsten en claim wekelijkse fictieve coinbeloningen. |
 | `/info`, `/regels`, `/rangen` | Informatie, eigen gangregels en rangvolgorde. |
 | `/gangwarn geven lid:@lid reden:...` | Leiding geeft een warn; log en DM worden geprobeerd. |
 | `/gangwarn bekijken lid:@lid` | Leiding bekijkt de meest recente 15 warns en totaal actieve warns. |
@@ -84,6 +92,18 @@ Nieuwe commands worden bij het starten automatisch geregistreerd: 27 in de hoofd
 | `/setup paneel:alles` | Plaatst/ververst het gecombineerde paneel van deze guild. |
 
 ## Hoe de systemen werken
+
+**Afmeldpaneel.** In hoofdserverkanaal `1555685636017758248` verschijnt automatisch één embed met twee knoppen: **Afmelden voor planning** en **Afwezigheid melden**. Beide workflows werken volledig via die embed met privé keuzelijsten. Voor planning kies je een open activiteit. Voor langere afwezigheid kies je begin- en einddatum en een reden. De bot bewaart je datumkeuzes maximaal 30 minuten, controleert dat ze bij jouw account horen en biedt opnieuw kiezen aan. Lead beoordeelt de aanvraag in het bestaande privé leidinglog. Een rode planningreactie maakt een afmeldingsaanvraag; zij is pas geldig na Lead-goedkeuring. De planning blijft een gewoon tekstbericht met vier emoji-reacties. Met `/afmelden` kun je je reden uitgebreider toelichten. Goedgekeurde vakantie verschijnt automatisch op planningen binnen de gekozen datums.
+
+**Vrijstellingen.** Een goedgekeurde vakantieaanvraag geeft gangpotvrijstelling voor de in de aanvraag genoemde weken. De bot toont die weken vooraf aan Lead. Lead kan ook afzonderlijke weken vrijstellen of intrekken via Discord of het dashboard. Vrijstelling boekt geen geld bij of af. Een later toegekende vrijstelling kan de automatische gangpotwarn voor die specifieke week intrekken; intrekken van de vrijstelling herstelt zo nodig dezelfde warn. Andere gangwarns blijven intact. Een losse afmelding voor een planning geeft geen gangpotvrijstelling.
+
+**Herinneringen.** Standaard vrijdag en zaterdag om **18:00 Belgische tijd** krijgen nog niet volledig goedgekeurde leden een DM. Betaalde en vrijgestelde leden worden overgeslagen. Lead krijgt zaterdag om **20:00** één privé-overzicht van open betaalmeldingen. Tijden en aan/uit zijn instelbaar in het dashboard. Per lid, week en herinneringsmoment wordt slechts één bericht verzonden. DM-blokkades worden geregistreerd en niet continu opnieuw geprobeerd; tijdelijke storingen worden herhaald zolang de herinnering nog relevant is.
+
+**Vangstenboek.** Goede vangsten uit `/fish` komen in de verzameling. Slechte vangsten voegen geen verzamelitem toe. Twee weekchallenges belonen standaard 25 goede vangsten met 750 coins en 3 zeldzame/legendarische vangsten met 400 coins. Een beloning wordt één keer per week uitbetaald en werkt uitsluitend voor de eigenaar van de kaart. Nieuwe weken beginnen maandag om 00:00 Belgische tijd. Challengewaarden worden bij het beginnen van de week vastgelegd; gewijzigde instellingen gelden vanaf een nieuwe challengeweek. Coins en verzamelingen blijven per guild gescheiden.
+
+**Dashboardinstellingen.** Bij **Modules instellen** kun je het gangpotbedrag, zaterdagdeadline, herinneringstijden, Lead-overzicht, planningsduur, voorbereiding, afmeldingsgoedkeuring, maximale afwezigheid, vischallenges, sollicitatiecapaciteit, minimumleeftijd, invitegeldigheid, loginstellingen en embedkleur aanpassen. De bestaande pagina's blijven informatie, regels en gewone game-instellingen beheren. Bedrag en deadline gelden standaard vanaf de volgende gangpotweek; wijzigen van de lopende week vraagt een expliciete bevestiging. Alleen administrators mogen bestemmingskanalen aanpassen; het leidinglog moet privé blijven. Instellingen blijven in `data/` bewaard bij restarts.
+
+**Botlogs en changelog.** Hoofdserverbotlogs komen in `1555685637129109586`: commands, knoppen, keuzelijsten, dashboardacties en belangrijke leden-, rollen-, kanalen- en berichtgebeurtenissen. De inhoud van berichten, privé-antwoorden, tokens en inloglinks wordt niet gekopieerd naar deze logs. De volledige loghistorie blijft lokaal bewaard en is in het dashboard pagineerbaar. Nieuwe versies worden automatisch één keer aangekondigd in `1558496003726774432`, met wijzigingen uit `src/release-notes.json`. Voeg bij elke code-release een nieuw versienummer en de bijbehorende changelog toe; `npm run check` controleert dit. Een gewone herstart maakt geen dubbel updatebericht.
 
 **Gangpot.** Alleen in de hoofdserver `1555685630640652338`. Alleen menselijke leden met rol `1555685630640652347` betalen **$25.000 in-game per week**. De termijn loopt zaterdag–zaterdag. De eerste deadline is **zaterdag 17 oktober 2026 om 23:59 Belgische tijd**; daarna iedere zaterdag. Betaal in-game en doe zelf `/gangpot betaling` (optioneel `bedrag`, `termijn` en `notitie`). Een melding wordt in `1558238040932225034` geplaatst met **✅ Goedkeuren / ❌ Afkeuren**. Alleen de exacte Lead-rol `1555685630707769382` mag beslissen. In `1555685634515927050` staat uitsluitend uitleg. Het totaal en de lijst met wie deze week betaald heeft staan in `1558420548000813126`. Het saldo telt uitsluitend goedgekeurde betalingen en extra donaties, min uitgaven; dit heeft geen invloed op fun-coins.
 

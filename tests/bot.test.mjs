@@ -26,9 +26,10 @@ test('beide guilds hebben commands, tickets uitsluitend in de tweede guild', () 
     assert.equal(definitions.some(cmd => cmd.name === 'ticket'), guild.ticketsEnabled);
     assert.equal(new Set(definitions.map(cmd => cmd.name)).size, definitions.length);
     assert.ok(definitions.every(cmd => cmd.dm_permission === false));
-    const buttons = panel({ ...base, ...guild }).components[0].toJSON().components;
+    const buttons = panel({ ...base, ...guild }).components[0]?.toJSON().components||[];
     assert.equal(buttons.some(b => b.custom_id === 'ticket:new'), guild.ticketsEnabled);
-    assert.ok(buttons.some(b => b.custom_id === 'application:new'));
+    assert.equal(buttons.some(b => b.custom_id === 'application:new'),guild.ticketsEnabled);
+    assert.equal(definitions.some(cmd=>cmd.name==='solliciteren'),guild.ticketsEnabled);
   }
   assert.equal(base.guilds[1].panelChannelId, '1555726441759375398');
 });

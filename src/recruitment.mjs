@@ -22,6 +22,7 @@ export async function refreshRecruitment(ctx, guild) {
 }
 
 export function requireApplicationsOpen(ctx) {
+  assertUser(ctx.config.guildId!=='1555685630640652338','Solliciteren kan alleen in de Legion-communityserver.');
   if (!ctx.config.recruitment) return;
   assertUser(ctx.recruitment?.count !== null && ctx.recruitment?.count !== undefined, 'De ledenstand wordt nog gecontroleerd. Probeer zo opnieuw.');
 }

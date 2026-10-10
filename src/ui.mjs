@@ -12,6 +12,7 @@ export function embed(config, title, description) {
 }
 export function panel(config, type = 'alles', recruitment) {
   const content = config.content;
+  if(config.guildId==='1555685630640652338')return{embeds:[embed(config,`${content.gangName} | Informatie`,`${content.tagline}\n\nSollicitaties en tickets worden in de Legion-communityserver geopend. Gebruik hier /gangpot, /planning en /afwezig voor gangzaken.`)],components:[]};
   if (type === 'info') return { embeds: [embed(config, `${content.gangName} | Informatie`, `${content.tagline}\n\n${content.information}`)], components: [] };
   const combined = type === 'alles';
   const title = combined ? `${content.gangName} | Welkom bij de familie` : type === 'tickets' ? `${content.gangName} | Tickets` : `${content.gangName} | Solliciteren`;
@@ -20,7 +21,7 @@ export function panel(config, type = 'alles', recruitment) {
   const state = config.recruitment ? recruitment ?? recruitmentState(null, config.recruitment) : null;
   const buttons = [];
   if (config.ticketsEnabled && (combined || type === 'tickets')) buttons.push(button('ticket:new', '📩 Ticket openen', ButtonStyle.Primary));
-  if (combined || type === 'sollicitaties') buttons.push(button('application:new', '🛡️ Solliciteren', ButtonStyle.Success).setDisabled(state?.closed ?? false));
+  if ((combined || type === 'sollicitaties')&&config.guildId!=='1555685630640652338') buttons.push(button('application:new', '🛡️ Solliciteren', ButtonStyle.Success).setDisabled(state?.closed ?? false));
   if (combined) buttons.push(button('info:show', '📜 Informatie'));
   const card = embed(config, title, description);
   card.setColor(state?.color ?? 0x22C55E);

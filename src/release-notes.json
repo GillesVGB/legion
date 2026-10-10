@@ -1,0 +1,15 @@
+{
+  "1.7.0": [
+    "Afwezigheid aanvragen en afmelden voor een planning; Lead keurt de aanvraag goed of wijst deze af.",
+    "Een afmeldpaneel met twee knoppen: afmelden voor een planning en langere afwezigheid melden, allebei volledig via de embed.",
+    "Goedgekeurde afwezigheid is zichtbaar op planningen. Een rode reactie alleen is nog geen goedgekeurde afmelding.",
+    "Gangpotvrijstellingen per week, met intrekken en behoud van historie.",
+    "Gangpotherinneringen op vrijdag en zaterdag, plus een overzicht voor Lead vóór de deadline.",
+    "Gangpotbedrag, deadline, herinneringstijden, planning en vischallenges instellen via het dashboard.",
+    "Vangstenboek met zeldzame vangsten en wekelijkse challenges voor fictieve coins.",
+    "Botstatus voor de leiding, met verbinding en acties die nog op verwerking wachten.",
+    "Logs van commands, knoppen, dashboardacties en belangrijke server- en botgebeurtenissen.",
+    "Automatische changelog bij elke nieuwe botversie, zonder dubbele updateberichten bij een herstart.",
+    "Sollicitaties en tickets openen uitsluitend in de communityserver."
+  ]
+}

@@ -69,6 +69,7 @@ export function loadConfig(env = process.env, requireDiscord = true) {
       for (const key of ['panelChannelId', 'planningChannelId', 'memberRoleId', 'ticketCategoryId', 'applicationCategoryId', 'logChannelId', 'gameChannelId', 'warnLogChannelId', 'applicationTranscriptChannelId', 'ticketTranscriptChannelId']) {
         if (typeof guild[key] !== 'string' || (guild[key] && !snowflake.test(guild[key]))) errors.push(`Guild ${guild.guildId}: ${key} moet leeg of een geldig Discord-ID zijn.`);
       }
+      for(const key of ['botLogChannelId','updateChannelId','absencePanelChannelId'])if(guild[key]!==undefined&&(typeof guild[key]!=='string'||!snowflake.test(guild[key])))errors.push(`Guild ${guild.guildId}: ${key} moet een geldig kanaal-ID zijn.`);
       if (!Array.isArray(guild.staffRoleIds) || guild.staffRoleIds.some(x => typeof x !== 'string' || !snowflake.test(x) || x === guild.guildId)) errors.push(`Guild ${guild.guildId}: staffRoleIds moet een lijst met staffrol-ID's zijn; @everyone is niet toegestaan.`);
       if (guild.staffRoleIds?.includes(guild.memberRoleId) && guild.memberRoleId) errors.push(`Guild ${guild.guildId}: de ledenrol mag geen staffrol zijn.`);
       if (config.gamesMembersOnly && !guild.memberRoleId) errors.push(`Guild ${guild.guildId}: GAMES_MEMBERS_ONLY vereist memberRoleId.`);

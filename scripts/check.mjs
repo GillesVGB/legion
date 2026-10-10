@@ -2,9 +2,11 @@ import { loadConfig } from '../src/config.mjs';
 import { commands } from '../src/commands.mjs';
 import { panel, applicationModal, ticketModal } from '../src/ui.mjs';
 import { applicationSteps } from '../src/application.mjs';
+import {releaseVersion,releaseNotes} from '../src/release-announcements.mjs';
 
 try {
   const config = loadConfig(process.env, false);
+  if(!Array.isArray(releaseNotes[releaseVersion])||!releaseNotes[releaseVersion].length)throw new Error('Voeg een changelog toe voor de huidige botversie.');
   for (const guild of config.guilds) {
     const definitions = commands(config.maxBet, guild.ticketsEnabled);
     if (definitions.some(cmd => cmd.name === 'ticket') !== guild.ticketsEnabled) throw new Error('Ticket-commands komen niet overeen met guild-configuratie.');

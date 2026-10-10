@@ -1,6 +1,9 @@
 [
   {
     "guildId": "1555685630640652338",
+    "botLogChannelId": "1555685637129109586",
+    "updateChannelId": "1558496003726774432",
+    "absencePanelChannelId": "1555685636017758248",
     "planningChannelId": "1555685633266163793",
     "gangpot": { "infoChannelId": "1555685634515927050", "paymentsChannelId": "1558238040932225034", "totalChannelId": "1558420548000813126", "memberRoleId": "1555685630640652347", "weeklyAmount": 25000, "startsOn": "2026-10-10" },
     "admission": { "targetGuildId": "1555685630640652338", "inviteChannelId": "1555685632704249927", "targetRoleId": "1555685630640652347", "inviteMaxAgeSeconds": 86400 },

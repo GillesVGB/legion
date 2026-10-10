@@ -4,6 +4,8 @@ import { assertUser } from './errors.mjs';
 import { safeText } from './ui.mjs';
 import { quiet,requireStaff } from './service.mjs';
 import { communityChannel,serializeCommunity,updateCommunityPost } from './community-posts.mjs';
+import {createAbsence,activityAbsences,approvedAway} from './absence.mjs';
+import {operationSettings} from './feature-settings.mjs';
 const latestReactions=new Map();
 
 export const attendanceChoices=[
@@ -69,8 +71,13 @@ export function activityMessage(ctx,activity,now=Date.now()) {
   const timeText=date.toLocaleTimeString('nl-BE',{timeZone:'Europe/Brussels',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
   let content=`## Legion — Planning\n**Activiteit:** ${safeText(activity.title)}\n**Datum:** ${displayDate}\n**Tijd:** ${timeText} (Belgische tijd) · <t:${Math.floor(activity.starts_at/1000)}:R>\n**Afspreekpunt:** ${safeText(activity.location)}\n`;
   if(activity.description)content+=`\n${safeText(activity.description)}\n`;
-  content+=`\n${planningPreparation}\n\n### Laat weten of je erbij bent\n`;
+  content+=`\n### Kom voorbereid\n${safeText(operationSettings(ctx).planning.preparation)}\n\n### Laat weten of je erbij bent\n`;
   content+=attendanceChoices.map(choice=>`${choice.emoji}: ${choice.label} — **${responses.filter(item=>item.response===choice.id).length}**`).join('\n');
+  if(operationSettings(ctx).planning.requireApproval){
+    content+='\n\nEen rode reactie is een afmeldingsaanvraag. Alleen een goedgekeurde afmelding telt als toestemming om afwezig te zijn. Gebruik /afmelden planning reden voor je toelichting.';
+    const absences=activityAbsences(ctx,activity);let remaining=1700-content.length;
+    for(const item of absences){const line=`\n${item.status==='approved'?'✅ Afwezig (goedgekeurd)':item.status==='pending'?'⏳ Afmelding wacht op Lead':'❌ Afmelding afgewezen'}: <@${item.user_id}>`;if(remaining<line.length)break;content+=line;remaining-=line.length;}
+  }
   content+=open?'\n\nReageer op dit bericht met één van de vier emoji’s. Je kunt je keuze later aanpassen.':`\n\n**${activity.status==='cancelled'?'Deze activiteit is geannuleerd.':'Deze activiteit is afgelopen.'}**`;
   content+=`\n-# Planning-ID: \`${activity.id}\``;
   assertUser(content.length<=2000,'Deze planning is te lang. Gebruik een kortere titel, locatie of toelichting.');
@@ -96,10 +103,11 @@ export async function publishActivity(ctx,guild,id) {
 export async function createActivity(ctx,interaction,input,now=Date.now()) {
   requirePlanningGuild(ctx);
   requireStaff(interaction,ctx.config);
-  const starts=planningTime(input.date,input.time,now),duration=input.duration??120;
+  const defaults=operationSettings(ctx).planning;
+  const starts=planningTime(input.date,input.time,now),duration=input.duration??defaults.duration;
   assertUser(starts>=now+60000&&starts<=now+366*86400000,'Kies een tijdstip vanaf één minuut in de toekomst, binnen een jaar.');
   assertUser(Number.isInteger(duration)&&duration>=15&&duration<=720,'Kies een duur van 15 tot 720 minuten.');
-  const title=(input.title||'Gangactiviteit').trim(),location=input.location?.trim(),description=(input.description||'').trim();
+  const title=(input.title||defaults.title).trim(),location=input.location?.trim(),description=(input.description||'').trim();
   assertUser(title.length>0&&title.length<=80&&location&&location.length<=160&&description.length<=250,'Gebruik een titel tot 80 tekens, een afspreekpunt tot 160 tekens en een toelichting tot 250 tekens.');
   const channel=await communityChannel(interaction.guild,ctx.config.planningChannelId);
   assertUser(channel.permissionsFor(interaction.guild.members.me)?.has([P.AddReactions,P.ManageMessages]),'Geef de bot Reacties toevoegen en Berichten beheren, zodat ieder lid één aanwezigheidskeuze kan maken.');
@@ -141,6 +149,11 @@ export async function handlePlanningReaction(ctx,reaction,user,added) {
       if(changed)ctx.store.db.prepare('UPDATE activities SET dirty=1,next_attempt=0 WHERE id=?').run(id);
     });
     if(!changed)return;
+    ctx.store.audit('planning.rsvp',user.id,{activity:id,response:choice.id,added});
+    if(operationSettings(ctx).planning.requireApproval){
+      if(added&&choice.id==='no'&&!approvedAway(ctx,activity,user.id))await createAbsence(ctx,reaction.message.guild,user.id,{activityId:id,automatic:true,reason:'Afmelding via de rode reactie. Het lid kan toelichten met /afmelden.'});
+      else if((added&&choice.id!=='no')||(!added&&choice.id==='no'))ctx.store.db.prepare("UPDATE absence_requests SET status='cancelled',dirty=1,next_attempt=0 WHERE activity_id=? AND user_id=? AND status IN ('pending','approved')").run(id,user.id);
+    }
     if(added)for(const other of attendanceChoices)if(other.id!==choice.id&&latestReactions.get(key)===token){const old=reaction.message.reactions.cache.get(other.emoji);if(old)await old.users.remove(user.id);}
     await writeActivity(ctx,reaction.message.guild,activityById(ctx,id));
   }).finally(()=>{if(added&&latestReactions.get(key)===token)latestReactions.delete(key);});
@@ -199,6 +212,7 @@ export async function syncPlanningReactions(ctx,guild,id) {
       for(const [user,choice] of choices)ctx.store.db.prepare('INSERT INTO activity_rsvps(activity_id,user_id,response,updated_at) VALUES(?,?,?,?)').run(id,user,choice,Date.now());
       ctx.store.db.prepare('UPDATE activities SET dirty=1,next_attempt=0 WHERE id=?').run(id);
     });
+    if(operationSettings(ctx).planning.requireApproval)for(const [user,choice] of choices)if(choice==='no'&&!approvedAway(ctx,activity,user))await createAbsence(ctx,guild,user,{activityId:id,automatic:true,reason:'Afmelding via een rode reactie tijdens een offline periode.'});
     for(const [user,responses] of votes)for(const response of responses)if(response!==choices.get(user))await message.reactions.cache.get(attendanceChoices.find(choice=>choice.id===response).emoji)?.users.remove(user);
     await writeActivity(ctx,guild,activityById(ctx,id));
   });

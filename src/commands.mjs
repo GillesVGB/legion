@@ -12,6 +12,22 @@ export function commands(maxBet, ticketsEnabled = true) {
     cmd('regels', 'Lees de door Legion ingestelde regels'),
     cmd('rangen', 'Bekijk de rangvolgorde van Legion'),
     cmd('dashboard', 'Open het privé Legion-dashboard (alleen leiding)'),
+    cmd('botstatus','Bekijk verbinding, uptime en acties die op herhaling wachten (leiding)'),
+    cmd('vangstenboek','Bekijk je visverzameling en wekelijkse challenges'),
+    cmd('afmelden','Vraag Lead-goedkeuring voor afwezigheid op een planning')
+      .addStringOption(o=>o.setName('planning').setDescription('Planning-ID onderaan het bericht').setRequired(true).setMinLength(12).setMaxLength(12))
+      .addStringOption(reasonOption),
+    cmd('afwezig','Afwezigheid aanvragen en gangpotvrijstellingen beheren')
+      .addSubcommand(s=>s.setName('aanvragen').setDescription('Vraag goedgekeurde afwezigheid voor een periode aan')
+        .addStringOption(o=>o.setName('van').setDescription('Begindatum DD-MM-JJJJ').setRequired(true).setMaxLength(10))
+        .addStringOption(o=>o.setName('tot').setDescription('Einddatum DD-MM-JJJJ').setRequired(true).setMaxLength(10)).addStringOption(reasonOption))
+      .addSubcommand(s=>s.setName('status').setDescription('Bekijk je eigen aanvragen en vrijgestelde weken'))
+      .addSubcommand(s=>s.setName('vrijstellen').setDescription('Geef een gebruiker vrijstelling voor één gangpotweek (Lead)')
+        .addUserOption(o=>o.setName('gebruiker').setDescription('Legion-lid').setRequired(true))
+        .addStringOption(o=>o.setName('termijn').setDescription('Zaterdag van de week: DD-MM-JJJJ').setRequired(true).setMaxLength(10)).addStringOption(reasonOption))
+      .addSubcommand(s=>s.setName('vrijstelling-intrekken').setDescription('Trek een specifieke weekvrijstelling in (Lead)')
+        .addUserOption(o=>o.setName('gebruiker').setDescription('Legion-lid').setRequired(true))
+        .addStringOption(o=>o.setName('termijn').setDescription('Zaterdag van de week: DD-MM-JJJJ').setRequired(true).setMaxLength(10)).addStringOption(reasonOption)),
     cmd('uitnodiging', 'Bekijk je persoonlijke uitnodiging na een aangenomen sollicitatie'),
     cmd('inrichten', 'Maak privecategorieen en een logkanaal voor deze guild')
       .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
@@ -82,6 +98,6 @@ export function commands(maxBet, ticketsEnabled = true) {
     cmd('steenpapier', 'Steen, papier, schaar tegen de bot').addStringOption(o => o.setName('keuze').setDescription('Jouw keuze').setRequired(true)
       .addChoices({ name: 'Steen', value: 'steen' }, { name: 'Papier', value: 'papier' }, { name: 'Schaar', value: 'schaar' }))
   ];
-  return result.filter(command => (ticketsEnabled || command.name !== 'ticket') &&
-    (!ticketsEnabled || !['planning','planning-overzicht','planning-annuleren','promotie','gangpot'].includes(command.name))).map(command => command.toJSON());
+  return result.filter(command => (ticketsEnabled || !['ticket','solliciteren','sollicitatiestatus'].includes(command.name)) &&
+    (!ticketsEnabled || !['planning','planning-overzicht','planning-annuleren','promotie','gangpot','afwezig','afmelden'].includes(command.name))).map(command => command.toJSON());
 }

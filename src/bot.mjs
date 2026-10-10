@@ -21,6 +21,12 @@ import { handlePlanningCommand,handlePlanningAutocomplete,handlePlanningReaction
 import { handlePromotionCommand,handlePromotionButton,syncPromotions } from './promotions.mjs';
 import { syncCommands } from './command-sync.mjs';
 import {handleGangpotCommand,handleGangpotStatus,handleGangpotReview,syncGangpot} from './gangpot.mjs';
+import {handleAbsenceCommand,handleAbsenceButton,syncAbsences} from './absence.mjs';
+import {fishBookMessage,handleFishBookButton} from './fish-book.mjs';
+import {handleBotStatus} from './bot-status.mjs';
+import {recordInteraction,flushAuditLogs} from './audit-log.mjs';
+import {announceRelease} from './release-announcements.mjs';
+import {publishAbsencePanel,handleAbsencePanel,handleAbsenceSelection} from './absence-panel.mjs';
 import { quiet, isStaff, requireStaff, requireAdmin, requireTickets, configureGuild, publishPanel,
   createCase, requestCaseDecision, decideCase, startInterview, cleanupInterviews, cleanupClosedCases, warningMessage, staffLogChannel, warnLogChannel, writeWarnLog, reconcileCases } from './service.mjs';
 
@@ -30,7 +36,7 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBit
 const locks = new Locks();
 const contexts = new Map();
 const cooldowns = new Map();
-const gameCommands = new Set(['saldo', 'daily', 'leaderboard', 'blackjack', 'coinflip', 'dobbel', '8ball', 'steenpapier', 'fish', 'missies']);
+const gameCommands = new Set(['saldo', 'daily', 'leaderboard', 'blackjack', 'coinflip', 'dobbel', '8ball', 'steenpapier', 'fish', 'missies','vangstenboek']);
 const privateReply = { flags: MessageFlags.Ephemeral, allowedMentions: quiet };
 let shuttingDown = false;
 let stopViewer;
@@ -120,6 +126,7 @@ async function games(ctx, interaction) {
   const name = interaction.commandName;
   const coins = config.content.coinName;
   if (name === 'missies') return interaction.reply(missionMessage(ctx,user));
+  if (name === 'vangstenboek') return interaction.reply(fishBookMessage(ctx,user));
   if (name === 'saldo') return interaction.reply({ allowedMentions: quiet, content: `<@${user}> heeft **${store.wallet(user).balance} ${coins}**. Dit zijn alleen fictieve Discord-punten.` });
   if (name === 'daily') {
     const result = store.daily(user);
@@ -174,12 +181,12 @@ async function handleCommand(ctx, interaction) {
   const name = interaction.commandName;
   if (name === 'help') {
     return interaction.reply({ ...privateReply, embeds: [embed(config, 'Legion | Commands', [
-      '**Algemeen:** /info, /regels, /rangen, /solliciteren, /sollicitatiestatus, /mijnwarns',
-      ...(!config.ticketsEnabled ? ['**Gang:** /planning, /planning-overzicht, /planning-annuleren, /promotie, /gangpot'] : []),
+      `**Algemeen:** /info, /regels, /rangen, /mijnwarns${config.ticketsEnabled?', /solliciteren, /sollicitatiestatus':''}`,
+      ...(!config.ticketsEnabled ? ['**Gang:** /planning, /planning-overzicht, /planning-annuleren, /promotie, /gangpot, /afwezig, /afmelden'] : []),
       ...(config.ticketsEnabled ? ['**Tickets:** /ticket openen, /ticket sluiten'] : []),
-      '**Games:** /blackjack, /coinflip, /dobbel, /8ball, /steenpapier, /fish',
+      '**Games:** /blackjack, /coinflip, /dobbel, /8ball, /steenpapier, /fish, /vangstenboek',
       '**Coins:** /saldo, /daily, /leaderboard, /missies',
-      '**Leiding:** /dashboard, /gangwarn geven, /gangwarn bekijken, /gangwarn intrekken',
+      '**Leiding:** /dashboard, /botstatus, /gangwarn geven, /gangwarn bekijken, /gangwarn intrekken',
       '**Aangenomen:** /uitnodiging voor je persoonlijke ganginvite',
       '**Administrators:** /inrichten, /setup',
       '\nCoins zijn fictief, per guild gescheiden en hebben geen geldwaarde of FiveM-koppeling.'
@@ -190,6 +197,8 @@ async function handleCommand(ctx, interaction) {
   if (['planning','planning-overzicht','planning-annuleren'].includes(name)) return handlePlanningCommand(ctx,interaction);
   if (name === 'promotie') return handlePromotionCommand(ctx,interaction);
   if (name === 'gangpot') return handleGangpotCommand(ctx,interaction);
+  if (['afwezig','afmelden'].includes(name)) return handleAbsenceCommand(ctx,interaction);
+  if (name === 'botstatus') return handleBotStatus(ctx,interaction);
   if (name === 'dashboard') {
     requireStaff(interaction, config);
     await interaction.deferReply(privateReply);
@@ -245,6 +254,10 @@ async function handleCommand(ctx, interaction) {
 
 async function handleButton(ctx, interaction) {
   const [type, action, id, extra, confirmer] = interaction.customId.split(':');
+  if(type==='absencepanel')return handleAbsencePanel(ctx,interaction);
+  if(type==='absflow')return handleAbsenceSelection(ctx,interaction);
+  if (type === 'absence') return handleAbsenceButton(ctx,interaction);
+  if (type === 'fishbook') {requireGames(ctx,interaction);return handleFishBookButton(ctx,interaction);}
   if (type === 'gangpot'&&action==='status') return handleGangpotStatus(ctx,interaction);
   if (type === 'gangpot') return handleGangpotReview(ctx,interaction);
   if (type === 'mission') { requireGames(ctx,interaction); return handleMissionButton(ctx,interaction); }
@@ -339,21 +352,27 @@ client.on(Events.InteractionCreate, async interaction => {
     catch{if(!interaction.responded)await interaction.respond([]).catch(()=>{});}
     return;
   }
+  const activeContext=contexts.get(interaction.guildId);let interactionError;
+  if(activeContext)recordInteraction(activeContext,interaction,'started');
   try {
     assertUser(interaction.inGuild(), 'Gebruik deze bot in een Legion-guild.');
     const ctx = contexts.get(interaction.guildId);
     assertUser(ctx, 'Deze guild is niet ingesteld voor Legion.');
-    assertUser(ctx.ready, 'De bot start nog op. Probeer over een paar seconden opnieuw.');
+    assertUser(ctx.ready||interaction.commandName==='botstatus', 'De bot start nog op. Probeer over een paar seconden opnieuw.');
     if (interaction.isChatInputCommand()) await handleCommand(ctx, interaction);
     else if (interaction.isButton()) await handleButton(ctx, interaction);
+    else if(interaction.isStringSelectMenu())await handleAbsenceSelection(ctx,interaction);
     else if (interaction.isModalSubmit()) await handleModal(ctx, interaction);
   } catch (error) {
+    interactionError=error;
     const content = error instanceof UserError ? error.message : 'De actie kon niet worden afgerond. Controleer de botrechten of vraag de leiding. Een bestaand blackjackspel kun je hervatten met /blackjack zonder inzet.';
     if (!(error instanceof UserError)) console.error(`Guild ${interaction.guildId}: interactie mislukt (${error.code ?? error.name}).`);
     const payload = { content, flags: MessageFlags.Ephemeral, allowedMentions: quiet };
     if (interaction.deferred && !interaction.replied) await interaction.editReply({ content, allowedMentions: quiet }).catch(() => {});
     else if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => {});
     else await interaction.reply(payload).catch(() => {});
+  } finally {
+    if(activeContext)recordInteraction(activeContext,interaction,interactionError?'failed':'succeeded',interactionError);
   }
 });
 
@@ -422,6 +441,15 @@ function membershipChanged(guild) {
   recruitmentDebounce.set(guild.id, task);
 }
 client.on(Events.GuildMemberAdd, member => { membershipChanged(member.guild); rosterChanged(member.guild); admissionJoined(member, contexts).catch(() => {}); });
+function logGuildEvent(guild,event,details){const ctx=contexts.get(guild.id);if(ctx&&!shuttingDown)ctx.store.audit(event,'',details);}
+client.on(Events.GuildMemberAdd,member=>logGuildEvent(member.guild,'member.join',{user:member.id}));
+client.on(Events.GuildMemberRemove,member=>logGuildEvent(member.guild,'member.leave',{user:member.id}));
+client.on(Events.GuildMemberUpdate,(before,after)=>{const added=[...after.roles.cache.keys()].filter(id=>!before.roles.cache.has(id)),removed=[...before.roles.cache.keys()].filter(id=>!after.roles.cache.has(id));if(added.length||removed.length||before.displayName!==after.displayName)logGuildEvent(after.guild,'member.update',{user:after.id,added,removed,nicknameChanged:before.displayName!==after.displayName});});
+for(const [event,label] of [[Events.ChannelCreate,'channel.create'],[Events.ChannelDelete,'channel.delete'],[Events.GuildRoleCreate,'role.create'],[Events.GuildRoleDelete,'role.delete']])client.on(event,item=>{if(item.guild)logGuildEvent(item.guild,label,{id:item.id});});
+client.on(Events.ChannelUpdate,(before,after)=>{if(after.guild)logGuildEvent(after.guild,'channel.update',{id:after.id});});
+client.on(Events.GuildRoleUpdate,(before,after)=>logGuildEvent(after.guild,'role.update',{id:after.id,nameChanged:before.name!==after.name,permissionsChanged:before.permissions.bitfield!==after.permissions.bitfield}));
+client.on(Events.MessageDelete,message=>{if(message.guild&&!message.author?.bot)logGuildEvent(message.guild,'message.delete',{message:message.id,channel:message.channelId,user:message.author?.id});});
+client.on(Events.MessageUpdate,(before,after)=>{if(after.guild&&!after.author?.bot&&before.content!==after.content)logGuildEvent(after.guild,'message.edit',{message:after.id,channel:after.channelId,user:after.author?.id});});
 client.on(Events.GuildMemberRemove, member => {
   membershipChanged(member.guild); rosterChanged(member.guild);
   const ctx = contexts.get(member.guild.id); if (ctx) revokeAcceptances(ctx, client, member.id).catch(() => {});
@@ -471,6 +499,7 @@ async function drainTranscripts() {
       if (!ctx.ready) continue;
       const guild = client.guilds.cache.get(ctx.config.guildId);
       if (guild&&ctx.config.gangpot) await syncGangpot(ctx,client).catch(error=>console.error(`Gangpotcontrole wacht op herhaling (${error.code??error.name}).`));
+      if(guild){await syncAbsences(ctx,guild).catch(error=>console.error(`Afmeldingen wachten (${error.code??error.name}).`));if(ctx.config.absencePanelChannelId)await publishAbsencePanel(ctx,guild).catch(error=>ctx.store.setSetting('absence:panel:error',String(error.code||error.name)));await announceRelease(ctx,guild);}
       if (guild) await cleanupInterviews(ctx, guild);
       if (guild) { await syncActivities(ctx,guild); await syncPromotions(ctx,guild); }
       for (const notice of ctx.store.pendingAcceptances()) await locks.run(`${ctx.config.guildId}:admission:${notice.case_id}`, () => deliverAcceptance(ctx, client, notice.case_id));
@@ -479,6 +508,7 @@ async function drainTranscripts() {
         await locks.run(`${ctx.config.guildId}:transcript:${delivery.case_id}`, () => archiveTranscript(ctx, client, delivery.case_id, staffLogChannel)).catch(() => {});
       }
       await cleanupClosedCases(ctx, client);
+      if(guild)await flushAuditLogs(ctx,guild).catch(error=>console.error(`Botlogs wachten (${error.code??error.name}).`));
     }
   } finally { transcriptBusy = false; }
 }

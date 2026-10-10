@@ -5,7 +5,9 @@ import { randomBytes } from 'node:crypto';
 import { assertUser, UserError } from './errors.mjs';
 import { makeDeck, natural, resultOf, finishDealer, handValue } from './cards.mjs';
 import { applicationSteps, validateApplicationStep } from './application.mjs';
-import { fishCatch } from './fishing.mjs';
+import { fishCatch,fishWeek } from './fishing.mjs';
+import {operationSettings} from './feature-settings.mjs';
+import {cleanAudit} from './audit-sanitize.mjs';
 import { missions, missionDay } from './mission-definitions.mjs';
 
 const newId = () => randomBytes(6).toString('hex');
@@ -144,6 +146,50 @@ export class Store {
         actor_id TEXT NOT NULL, amount INTEGER NOT NULL, claim_count INTEGER NOT NULL,
         reason TEXT NOT NULL, created_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS absence_requests (
+        id TEXT PRIMARY KEY, user_id TEXT NOT NULL, kind TEXT NOT NULL, activity_id TEXT,
+        start_date TEXT, end_date TEXT, weeks TEXT NOT NULL DEFAULT '[]', reason TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending', created_at INTEGER NOT NULL, reviewer_id TEXT, reviewed_at INTEGER,
+        channel_id TEXT NOT NULL, message_id TEXT, dirty INTEGER NOT NULL DEFAULT 1,
+        next_attempt INTEGER NOT NULL DEFAULT 0,last_error TEXT,dm_id TEXT,dm_blocked INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS absence_pending_planning ON absence_requests(activity_id,user_id) WHERE kind='planning' AND status='pending';
+      CREATE TABLE IF NOT EXISTS absence_drafts (
+        id TEXT PRIMARY KEY,user_id TEXT NOT NULL UNIQUE,stage TEXT NOT NULL,revision INTEGER NOT NULL DEFAULT 0,
+        month TEXT,start_date TEXT,end_date TEXT,page INTEGER NOT NULL DEFAULT 0,expires INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS gangpot_exemptions (
+        id TEXT PRIMARY KEY, user_id TEXT NOT NULL,period_id TEXT NOT NULL,request_id TEXT,
+        actor_id TEXT NOT NULL,reason TEXT NOT NULL,created_at INTEGER NOT NULL,
+        revoked_at INTEGER,revoked_by TEXT,revoke_reason TEXT
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS exemption_active ON gangpot_exemptions(period_id,user_id) WHERE revoked_at IS NULL;
+      CREATE TABLE IF NOT EXISTS feature_notices (
+        id TEXT PRIMARY KEY,notice_key TEXT NOT NULL UNIQUE,kind TEXT NOT NULL,user_id TEXT,period_id TEXT,
+        payload TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'pending',message_id TEXT,
+        created_at INTEGER NOT NULL,next_attempt INTEGER NOT NULL DEFAULT 0,last_error TEXT
+      );
+      CREATE TABLE IF NOT EXISTS audit_deliveries (
+        id TEXT PRIMARY KEY,first_id INTEGER NOT NULL,last_id INTEGER NOT NULL,channel_id TEXT NOT NULL,
+        message_id TEXT,next_attempt INTEGER NOT NULL DEFAULT 0,last_error TEXT
+      );
+      CREATE TABLE IF NOT EXISTS release_announcements (version TEXT PRIMARY KEY,message_id TEXT,last_error TEXT);
+      CREATE TABLE IF NOT EXISTS fish_collection (
+        user_id TEXT NOT NULL,catch_id TEXT NOT NULL,amount INTEGER NOT NULL DEFAULT 1,
+        first_at INTEGER NOT NULL,last_at INTEGER NOT NULL,PRIMARY KEY(user_id,catch_id)
+      );
+      CREATE TABLE IF NOT EXISTS fish_week_settings (
+        week TEXT PRIMARY KEY,target INTEGER NOT NULL,rare_target INTEGER NOT NULL,
+        reward INTEGER NOT NULL,rare_reward INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS fish_week_progress (
+        user_id TEXT NOT NULL,week TEXT NOT NULL,total INTEGER NOT NULL DEFAULT 0,rare INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY(user_id,week)
+      );
+      CREATE TABLE IF NOT EXISTS fish_week_claims (
+        user_id TEXT NOT NULL,week TEXT NOT NULL,kind TEXT NOT NULL,reward INTEGER NOT NULL,
+        PRIMARY KEY(user_id,week,kind)
+      );
     `);
     const gangpotColumns=new Set(this.db.prepare('PRAGMA table_info(gangpot_claims)').all().map(column=>column.name));
     for(const [name,type] of [['withdrawn_at','INTEGER'],['withdrawn_by','TEXT'],['withdraw_reason','TEXT']])if(!gangpotColumns.has(name))this.db.exec(`ALTER TABLE gangpot_claims ADD COLUMN ${name} ${type};`);
@@ -157,7 +203,8 @@ export class Store {
       this.db.exec("UPDATE promotions SET status='pending',approver_id=NULL,dirty=1,next_attempt=0 WHERE status='approving' AND (SELECT COUNT(*) FROM promotion_votes WHERE proposal_id=promotions.id)<3;");
       this.db.exec("UPDATE promotions SET dirty=1,next_attempt=0 WHERE status='pending';");
     }
-    this.db.exec('PRAGMA user_version = 10;');
+    if(previousSchema<11&&!this.setting('audit:cursor'))this.setSetting('audit:cursor',String(this.db.prepare('SELECT COALESCE(MAX(id),0) AS n FROM audit').get().n));
+    this.db.exec('PRAGMA user_version = 11;');
   }
 
   close() { this.db.close(); }
@@ -302,7 +349,7 @@ export class Store {
   }
   audit(event, actor, details) {
     this.db.prepare('INSERT INTO audit(event,actor_id,details,created_at) VALUES(?,?,?,?)')
-      .run(event, actor, JSON.stringify(details), Date.now());
+      .run(event, actor, JSON.stringify(cleanAudit(details)), Date.now());
   }
   addWarn(user, actor, reason) {
     return this.transaction(() => this.addWarnInside(user,actor,reason));
@@ -370,7 +417,27 @@ export class Store {
       const change = Math.max(-wallet.balance, caught.coins) || 0;
       this.db.prepare('UPDATE wallets SET balance=balance+? WHERE user_id=?').run(change, user);
       this.missionProgress(user, 'fish', now);
+      const settings=operationSettings({config:this.config}).fishing;
+      if(caught.kind==='good'){
+        if(settings.collectionEnabled)this.db.prepare('INSERT INTO fish_collection(user_id,catch_id,first_at,last_at) VALUES(?,?,?,?) ON CONFLICT(user_id,catch_id) DO UPDATE SET amount=amount+1,last_at=excluded.last_at').run(user,caught.id,now,now);
+        if(settings.weeklyEnabled){const week=fishWeek(now);this.ensureFishWeek(week);this.db.prepare('INSERT INTO fish_week_progress(user_id,week,total,rare) VALUES(?,?,1,?) ON CONFLICT(user_id,week) DO UPDATE SET total=total+1,rare=rare+excluded.rare').run(user,week,['Zeldzaam','Legendarisch'].includes(caught.rarity)?1:0);}
+      }
       return { caught, change, balance: wallet.balance + change };
+    });
+  }
+  ensureFishWeek(week){const settings=operationSettings({config:this.config}).fishing;this.db.prepare('INSERT OR IGNORE INTO fish_week_settings(week,target,rare_target,reward,rare_reward) VALUES(?,?,?,?,?)').run(week,settings.target,settings.rareTarget,settings.reward,settings.rareReward);return this.db.prepare('SELECT * FROM fish_week_settings WHERE week=?').get(week);}
+  fishBook(user,now=Date.now()){
+    const week=fishWeek(now),settings=this.ensureFishWeek(week),progress=this.db.prepare('SELECT * FROM fish_week_progress WHERE user_id=? AND week=?').get(user,week)||{total:0,rare:0};
+    return{week,settings,progress,collection:this.db.prepare('SELECT * FROM fish_collection WHERE user_id=? ORDER BY first_at').all(user),claimed:this.db.prepare('SELECT kind FROM fish_week_claims WHERE user_id=? AND week=?').all(user,week).map(item=>item.kind)};
+  }
+  claimFishWeek(user,week,now=Date.now()){
+    assertUser(operationSettings({config:this.config}).fishing.weeklyEnabled,'De vischallenges staan uit.');
+    return this.transaction(()=>{
+      assertUser(week===fishWeek(now),'Deze challenge is van een andere week. Gebruik /vangstenboek.');const book=this.fishBook(user,now);
+      const completed=[['total',book.progress.total,book.settings.target,book.settings.reward],['rare',book.progress.rare,book.settings.rare_target,book.settings.rare_reward]].filter(([kind,progress,target])=>progress>=target&&!book.claimed.includes(kind));
+      assertUser(completed.length,'Je hebt nog geen nieuwe visbeloning klaarstaan.');const reward=completed.reduce((sum,item)=>sum+item[3],0),wallet=this.wallet(user);assertUser(wallet.balance+reward<=1000000000,'Je saldo is te hoog.');
+      for(const [kind,,,amount] of completed)this.db.prepare('INSERT INTO fish_week_claims(user_id,week,kind,reward) VALUES(?,?,?,?)').run(user,week,kind,amount);
+      this.db.prepare('UPDATE wallets SET balance=balance+? WHERE user_id=?').run(reward,user);this.audit('fish.week.claim',user,{week,reward});return{reward,balance:wallet.balance+reward};
     });
   }
   decodeGame(row) {
@@ -461,6 +528,7 @@ export class Store {
   reserveCase(kind, owner, payload, now = Date.now()) {
     assertUser(['ticket', 'application'].includes(kind), 'Onbekend dossiertype.');
     assertUser(kind !== 'ticket' || this.config.ticketsEnabled, 'Tickets zijn uitgeschakeld in deze guild.');
+    assertUser(kind!=='application'||this.config.guildId!=='1555685630640652338','Sollicitaties worden alleen in de communityserver aangemaakt.');
     return this.transaction(() => {
       const existing = this.db.prepare("SELECT * FROM cases WHERE kind=? AND owner_id=? AND status IN ('creating','open')").get(kind, owner);
       if (existing) throw new UserError(existing.channel_id ? `Je hebt al een open dossier: <#${existing.channel_id}>.` : 'Je vorige dossier wordt nog aangemaakt. Probeer later opnieuw.');

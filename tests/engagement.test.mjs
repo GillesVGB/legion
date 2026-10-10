@@ -207,11 +207,11 @@ test('een tijdelijke Discord-storing houdt de goedgekeurde promotie in verwerkin
 test('migratie van schema 5 bewaart coins, gangwarns en open sollicitaties',t=>{
   const f=fixture(t),folder=mkdtempSync(join(tmpdir(),'legion-migration-')),config={...f.main.config,dataDir:folder};
   const old=new Store(config);old.adjustCoins(OTHER,500,ACTOR,'Oude fixturecoins');old.addWarn(OTHER,ACTOR,'Oude fixturewarn');
-  const dossier=old.reserveCase('application',OTHER,{template:true});old.bindCase(dossier.id,'fixture-channel');old.openCase(dossier.id,'fixture-message');
+  old.db.prepare("INSERT INTO cases(id,kind,owner_id,status,payload,created_at) VALUES('legacy-app','application',?,'open','{\"template\":true}',?)").run(OTHER,Date.now());const dossier=old.caseById('legacy-app');old.bindCase(dossier.id,'fixture-channel');
   old.db.exec('DROP TABLE activities; DROP TABLE activity_rsvps; DROP TABLE promotions; DROP TABLE promotion_votes; DROP TABLE mission_progress; DROP TABLE mission_claims; PRAGMA user_version=5;');old.close();
   const upgraded=new Store(config);t.after(()=>{upgraded.close();assert.ok(folder.startsWith(join(tmpdir(),'legion-migration-')));rmSync(folder,{recursive:true,force:true});});
   assert.equal(upgraded.wallet(OTHER).balance,config.startingCoins+500);assert.equal(upgraded.warnCount(OTHER),1);assert.equal(upgraded.caseById(dossier.id).status,'open');
-  assert.equal(upgraded.db.prepare('PRAGMA user_version').get().user_version,10);assert.equal(upgraded.missionStatus(OTHER).missions.length,3);
+  assert.equal(upgraded.db.prepare('PRAGMA user_version').get().user_version,11);assert.equal(upgraded.missionStatus(OTHER).missions.length,3);
 });
 test('missies tellen echte gameacties, betalen eenmaal en resetten op Belgische middernacht',t=>{
   const f=fixture(t),store=f.main.store,now=Date.parse('2026-10-08T12:00:00Z');

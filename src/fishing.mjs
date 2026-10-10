@@ -1,3 +1,5 @@
+import {missionDay} from './mission-definitions.mjs';
+export function fishWeek(now=Date.now()){const day=missionDay(now),date=new Date(day+'T12:00:00Z'),offset=(date.getUTCDay()+6)%7;return missionDay(date.getTime()-offset*86400000);}
 export const catches = [
   { weight: 25, kind: 'good', icon: '🐟', title: 'Een mooie vangst!', text: 'Je haalt een dikke zalm uit het water. De barbecue van Legion is geregeld!' },
   { weight: 15, kind: 'good', icon: '🦞', title: 'Kreeft gevangen!', text: 'Je vangt een kreeft en houdt hem nét ver genoeg van je vingers. Lekker voor het avondeten.' },
@@ -12,7 +14,7 @@ export const catches = [
 ];
 const rewards = [25, 55, 150, 500, 100, -40, -20, -100, -50, 0];
 const rarities = ['Gewoon', 'Ongewoon', 'Zeldzaam', 'Legendarisch', 'Zeldzaam', 'Slecht', 'Slecht', 'Slecht', 'Slecht', 'Geen vangst'];
-catches.forEach((item, index) => { item.coins = rewards[index]; item.rarity = rarities[index]; });
+catches.forEach((item, index) => { item.coins = rewards[index]; item.rarity = rarities[index];item.id=['salmon','lobster','ring','trophy','colorfish','bite','boot','shark','jellyfish','empty'][index]; });
 export function fishCatch(roll) {
   if (!Number.isInteger(roll) || roll < 0 || roll >= 100) throw new RangeError('Kies een vangstworp van 0 tot 99.');
   let boundary = 0;

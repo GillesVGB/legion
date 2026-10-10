@@ -27,6 +27,19 @@ test('nieuwe dashboardpagina’s tonen de gangmodules, weigeren de community-pla
   }finally{f.close();}
 });
 
+test('dashboard toont module-instellingen, botstatus, afmeldingen en visverzamelingen met veilige tekst',()=>{
+  const f=dashboardFixture();try{
+    const ctx=f.contexts.values().next().value,guild=f.guilds.get(ctx.config.guildId),data=new Dashboard({...f,locks:new Locks()}).summary(ctx,guild,guild.members.cache.get('100000000000000001'));
+    data.absences=[{id:'0123456789ab',userName:'<script>lid</script>',reason:'<img onerror=x>',weeks:['2026-10-17'],start_date:'2026-10-10',end_date:'2026-10-17',status:'pending'}];
+    data.fishCollections=[{userName:'<script>lid</script>',catch_id:'ring',amount:3}];
+    const source=readFileSync(new URL('../src/dashboard-assets/app.js',import.meta.url),'utf8'),context=vm.createContext({data,Intl,Date,Number,String,Math,URL,console});vm.runInContext(source.slice(0,source.indexOf("document.addEventListener('click'"))+`\nstate.data=data;`,context);
+    const modules=vm.runInContext('modulesPage()',context),absence=vm.runInContext('absencesPage()',context),health=vm.runInContext('healthPage()',context),collection=vm.runInContext('collectionPage()',context);
+    for(const name of ['gangpot.weeklyAmount','gangpot.deadlineTime','gangpot.fridayTime','gangpot.leadTime','fishing.reward','planning.preparation'])assert.ok(modules.includes(name));
+    assert.ok(absence.includes('Goedkeuren')&&absence.includes('&lt;img')&&!absence.includes('<img onerror'));
+    assert.ok(health.includes('Wachtrijen')&&collection.includes('&lt;script&gt;'));
+  }finally{f.close();}
+});
+
 test('gangpotdashboard toont betaalmeldingen met Lead-vinkjes, escapt tekst en houdt de community gescheiden',async()=>{
   const f=dashboardFixture();
   try{

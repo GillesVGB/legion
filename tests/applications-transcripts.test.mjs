@@ -66,7 +66,10 @@ test('volledige antwoorden blijven zichtbaar en passen ook bij markdown binnen e
 test('transcripts worden alleen in de community-guild naar de juiste kanalen ingepland', t => {
   const a = memory(base.guilds[0]); const b = memory();
   t.after(() => { a.close(); b.close(); });
-  const first = a.reserveCase('application', 'member', {});
+  assert.throws(()=>a.reserveCase('application','member',{}),/communityserver/);
+  // Historische dossiers blijven afhandelbaar, ook al mag deze guild geen nieuwe meer aanmaken.
+  a.db.prepare("INSERT INTO cases(id,kind,owner_id,status,payload,created_at) VALUES('legacy-main','application','member','open','{}',?)").run(Date.now());
+  const first = a.caseById('legacy-main');
   a.closeCase(first.id, 'accepted', 'staff');
   assert.equal(a.pendingTranscripts().length, 0);
   for (const [kind, target, status] of [['application', '1555746237582409789', 'rejected'], ['ticket', '1555747964461260861', 'closed']]) {

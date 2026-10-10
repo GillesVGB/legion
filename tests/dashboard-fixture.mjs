@@ -72,7 +72,7 @@ export function dashboardFixture() {
       channels.set(id,channel);return channel;
     };
     guild.makeChannel=makeChannel;
-    for(const id of [config.logChannelId,config.warnLogChannelId,config.applicationTranscriptChannelId,config.ticketTranscriptChannelId,config.panelChannelId,config.planningChannelId,config.admission.inviteChannelId].filter(Boolean))makeChannel(id,'legion-beheer');
+    for(const id of [config.logChannelId,config.botLogChannelId,config.updateChannelId,config.absencePanelChannelId,config.warnLogChannelId,config.applicationTranscriptChannelId,config.ticketTranscriptChannelId,config.panelChannelId,config.planningChannelId,config.admission.inviteChannelId].filter(Boolean))makeChannel(id,'legion-beheer');
     if(config.roster)makeChannel(config.roster.channelId,'ledenlijst');
     if(config.gangpot){makeChannel(config.gangpot.infoChannelId,'gangpot');makeChannel(config.gangpot.paymentsChannelId,'gangpot-betalingen');makeChannel(config.gangpot.totalChannelId,'gangpot-overzicht');}
     ctx.store.wallet('100000000000000020');ctx.store.adjustCoins('100000000000000020',2500,ACTOR,'Voorbeeldsaldo');

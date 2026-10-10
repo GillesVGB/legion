@@ -142,7 +142,7 @@ test('geen commando, pending zonder vinkje, afkeuring en gedeeltelijke goedkeuri
   for(const user of [OTHER,ACTOR,partialUser,'100000000000000021'])assert.equal(warns(f,user).length,1);
   assert.equal(f.main.store.db.prepare('SELECT status FROM gangpot_claims WHERE id=?').get(pending.id).status,'pending');
   const warnId=warns(f,OTHER)[0].id;
-  assert.equal(f.calls.filter(call=>call.method==='dm'&&call.user===OTHER&&call.payload.embeds[0].data.description.includes(warnId)).length,1);
+  assert.equal(f.calls.filter(call=>call.method==='dm'&&call.user===OTHER&&(call.payload.embeds[0].data||call.payload.embeds[0]).description.includes(warnId)).length,1);
   assert.equal(f.guild.channels.cache.get(f.main.config.warnLogChannelId).posted.size,f.main.store.db.prepare("SELECT COUNT(*) AS n FROM gangpot_notifications WHERE kind='issue'").get().n);
 });
 
@@ -300,7 +300,7 @@ test('schema 9 migreert eerdere correcties naar ingetrokken betaalmeldingen en b
   const newClaim=claim(f,OTHER,25000,'new-payment-after-migration');
   const removalResult=removeGangpotPayment(f.main,removal(f),SAT+3000);
   f.main.store.close();f.main.store=new Store(f.main.config,path);
-  assert.equal(f.main.store.db.prepare('PRAGMA user_version').get().user_version,10);
+  assert.equal(f.main.store.db.prepare('PRAGMA user_version').get().user_version,11);
   assert.equal(f.main.store.db.prepare('SELECT id FROM gangpot_removals').get().id,removalResult.id);
   assert.ok(f.main.store.db.prepare('SELECT withdrawn_at FROM gangpot_claims WHERE id=?').get(newClaim.id).withdrawn_at);
 });
