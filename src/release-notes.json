@@ -1,4 +1,10 @@
 {
+  "1.7.1": [
+    "Nieuw: /activiteitencheck planning voor de leiding in de hoofdserver, vanaf de geplande datum en starttijd.",
+    "Legion-leden zonder een van de vier emoji-reacties en zonder goedgekeurde afmelding krijgen één gangwarn per activiteit.",
+    "De check haalt reacties en leden opnieuw op, slaat nieuwe leden die na de start zijn gejoind over en geeft nooit dubbele warns bij opnieuw controleren of herstarten.",
+    "Gangwarns verschijnen in het gangwarnkanaal en worden per DM verstuurd; mislukte meldingen worden automatisch opnieuw geprobeerd."
+  ],
   "1.7.0": [
     "Afwezigheid aanvragen en afmelden voor een planning; Lead keurt de aanvraag goed of wijst deze af.",
     "Een afmeldpaneel met twee knoppen: afmelden voor een planning en langere afwezigheid melden, allebei volledig via de embed.",

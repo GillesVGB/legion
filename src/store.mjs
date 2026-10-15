@@ -88,6 +88,11 @@ export class Store {
         response TEXT NOT NULL CHECK(response IN ('yes','late','no','maybe')),
         updated_at INTEGER NOT NULL, PRIMARY KEY(activity_id,user_id)
       );
+      CREATE TABLE IF NOT EXISTS activity_check_warnings (
+        activity_id TEXT NOT NULL, user_id TEXT NOT NULL, warn_id TEXT NOT NULL UNIQUE,
+        created_at INTEGER NOT NULL, log_id TEXT, next_attempt INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT, PRIMARY KEY(activity_id,user_id)
+      );
       CREATE TABLE IF NOT EXISTS promotions (
         id TEXT PRIMARY KEY, member_id TEXT NOT NULL, role_id TEXT NOT NULL,
         proposer_id TEXT NOT NULL, reason TEXT NOT NULL, created_at INTEGER NOT NULL,
@@ -204,7 +209,7 @@ export class Store {
       this.db.exec("UPDATE promotions SET dirty=1,next_attempt=0 WHERE status='pending';");
     }
     if(previousSchema<11&&!this.setting('audit:cursor'))this.setSetting('audit:cursor',String(this.db.prepare('SELECT COALESCE(MAX(id),0) AS n FROM audit').get().n));
-    this.db.exec('PRAGMA user_version = 11;');
+    this.db.exec('PRAGMA user_version = 12;');
   }
 
   close() { this.db.close(); }

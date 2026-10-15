@@ -117,7 +117,7 @@ test('changelog wordt één keer per versie geplaatst en herstelt een verstuurd 
   const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.updateChannelId);assert.ok(releaseNotes[releaseVersion].length>0);
   await announceRelease(f.ctx,f.guild);await announceRelease(f.ctx,f.guild);assert.equal(channel.posted.size,1);
   f.ctx.store.db.prepare('UPDATE release_announcements SET message_id=NULL WHERE version=?').run(releaseVersion);await announceRelease(f.ctx,f.guild);assert.equal(channel.posted.size,1);
-  await announceRelease(f.ctx,f.guild,'1.7.1',['Een nieuwe verbetering.']);assert.equal(channel.posted.size,2);
+  await announceRelease(f.ctx,f.guild,'9.9.9',['Een nieuwe verbetering.']);assert.equal(channel.posted.size,2);
 });
 
 test('botstatus toont wachtende acties; sollicitatie- en ticketcreatie blijven uitsluitend in de community',t=>{

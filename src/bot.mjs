@@ -182,7 +182,7 @@ async function handleCommand(ctx, interaction) {
   if (name === 'help') {
     return interaction.reply({ ...privateReply, embeds: [embed(config, 'Legion | Commands', [
       `**Algemeen:** /info, /regels, /rangen, /mijnwarns${config.ticketsEnabled?', /solliciteren, /sollicitatiestatus':''}`,
-      ...(!config.ticketsEnabled ? ['**Gang:** /planning, /planning-overzicht, /planning-annuleren, /promotie, /gangpot, /afwezig, /afmelden'] : []),
+      ...(!config.ticketsEnabled ? ['**Gang:** /planning, /planning-overzicht, /planning-annuleren, /activiteitencheck, /promotie, /gangpot, /afwezig, /afmelden'] : []),
       ...(config.ticketsEnabled ? ['**Tickets:** /ticket openen, /ticket sluiten'] : []),
       '**Games:** /blackjack, /coinflip, /dobbel, /8ball, /steenpapier, /fish, /vangstenboek',
       '**Coins:** /saldo, /daily, /leaderboard, /missies',
@@ -194,7 +194,7 @@ async function handleCommand(ctx, interaction) {
   }
   if (['info', 'regels', 'rangen'].includes(name)) return info(ctx, interaction, name);
   if (name === 'sollicitatiestatus') return showApplicationStatus(ctx,interaction);
-  if (['planning','planning-overzicht','planning-annuleren'].includes(name)) return handlePlanningCommand(ctx,interaction);
+  if (['planning','planning-overzicht','planning-annuleren','activiteitencheck'].includes(name)) return handlePlanningCommand(ctx,interaction);
   if (name === 'promotie') return handlePromotionCommand(ctx,interaction);
   if (name === 'gangpot') return handleGangpotCommand(ctx,interaction);
   if (['afwezig','afmelden'].includes(name)) return handleAbsenceCommand(ctx,interaction);
@@ -348,7 +348,7 @@ async function openDirectCase(ctx, interaction, kind) {
 client.on(Events.InteractionCreate, async interaction => {
   if(interaction.isAutocomplete()){
     const ctx=contexts.get(interaction.guildId);
-    try{if(interaction.commandName==='planning')await handlePlanningAutocomplete(ctx,interaction);else await interaction.respond([]);}
+    try{if(['planning','activiteitencheck'].includes(interaction.commandName))await handlePlanningAutocomplete(ctx,interaction);else await interaction.respond([]);}
     catch{if(!interaction.responded)await interaction.respond([]).catch(()=>{});}
     return;
   }

@@ -42,7 +42,7 @@ Rollen, kanaalinstellingen, warns, coins, spellen en dossiers zijn **per guild g
 
 Botrechten: **Kanalen bekijken, Berichten versturen, Berichtgeschiedenis lezen, Links insluiten, Bestanden bijvoegen, Kanalen beheren en Rollen beheren**. Plaats de botrol boven de rollen die hij moet beheren, zeker boven de ledenrol. Administrator is niet nodig voor de bot. Je eigen account moet administrator zijn om `/inrichten` en `/setup` te gebruiken.
 
-Nieuwe commands worden bij het starten automatisch geregistreerd: 29 in de hoofdserver en 25 in de community. `npm run deploy` kan dit ook handmatig doen; het vervangt de bestaande guild-commands van deze bot-applicatie.
+Nieuwe commands worden bij het starten automatisch geregistreerd: 30 in de hoofdserver en 25 in de community. `npm run deploy` kan dit ook handmatig doen; het vervangt de bestaande guild-commands van deze bot-applicatie.
 
 ## Commands
 
@@ -66,6 +66,7 @@ Nieuwe commands worden bij het starten automatisch geregistreerd: 29 in de hoofd
 | `/sollicitatiestatus` | Bekijk privé je wachtlijstpositie, gesprekstatus of de beslissing. |
 | `/planning datum tijd afspreekpunt` | Leiding plaatst een tekstbericht met vier emoji-reacties in het vaste gangkanaal. |
 | `/planning-overzicht` | Bekijk privé de komende activiteiten in de gangserver. |
+| `/activiteitencheck planning` | Leiding kiest een planning vanaf de starttijd. Legion-leden zonder emoji-reactie en zonder goedgekeurde afmelding krijgen één gangwarn per activiteit, met log en DM. |
 | `/planning-annuleren id` | Leiding sluit een planning en stopt nieuwe aanwezigheidskeuzes. |
 | `/promotie lid rang motivatie` | Stel een hogere gangrang voor; vanaf drie unieke Lead-stemmen beslist de meerderheid. |
 | `/gangpot betaling` | Meld je eigen in-game betaling van standaard $25.000; Lead moet goedkeuren. |
@@ -88,6 +89,8 @@ Nieuwe commands worden bij het starten automatisch geregistreerd: 29 in de hoofd
 | `/8ball vraag:...` | Een willekeurig grappig antwoord. |
 | `/steenpapier keuze:steen` | Steen, papier, schaar tegen de bot. |
 | `/fish` | Vissen: zeldzame vangsten geven meer coins, slechte vangsten kosten coins. |
+
+`/activiteitencheck planning` controleert de actuele Discord-reacties wanneer de leiding het commando uitvoert, vanaf de starttijd in Belgische tijd. Kies de planning uit de suggesties of plak de Planning-ID onderaan het bericht. Alle vier de aanwezigheidsreacties tellen mee; een rode reactie blijft daarnaast een afmeldingsaanvraag die Lead moet beoordelen. Alleen mensen met de Legion-ledenrol worden gecontroleerd. Goedgekeurde planningafmeldingen en goedgekeurde langere afwezigheid voor die datum geven vrijstelling. Bots, bezoekers en leden die pas na de start zijn gejoind krijgen geen warn. Een geannuleerde planning kan niet worden gecontroleerd. Herhalen of opnieuw starten maakt geen dubbele warns, ook niet nadat de leiding zo'n warn handmatig heeft ingetrokken. Als Discord de leden of reacties niet volledig kan ophalen, stopt de controle zonder nieuwe warns.
 | `/inrichten` | Administrator kiest leiding- en ledenrol en maakt kanalen. |
 | `/setup paneel:alles` | Plaatst/ververst het gecombineerde paneel van deze guild. |
 

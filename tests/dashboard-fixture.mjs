@@ -51,7 +51,7 @@ export function dashboardFixture() {
         permissionOverwrites:{cache:new Collection(),edit:async()=>{}},
         permissionsFor:target=>new PermissionsBitField(target.id===base.clientId||config.staffRoleIds.includes(target.id)||target.permissions?.has(P.Administrator)?P.Administrator:0n),
         delete:async()=>{channels.delete(id);calls.push({method:'channel.delete',id});},
-        messages:{fetch:async options=>typeof options==='string'?posted.get(options)||null:new Collection([...posted].filter(([id,m])=>!options.before||BigInt(id)<BigInt(options.before)).slice(0,100))},
+        messages:{fetch:async options=>typeof options==='string'||options.message?posted.get(typeof options==='string'?options:options.message)||null:new Collection([...posted].filter(([id,m])=>!options.before||BigInt(id)<BigInt(options.before)).slice(0,100))},
         setName:async value=>{channel.name=value;},
         send:async payload=>{
           const id=String(BigInt('100000000000000500')+BigInt(++message));
