@@ -111,7 +111,7 @@ test('ledenlijst blijft bij restarts en gelijktijdige updates dezelfde embed; al
     message.delete = async () => { deleted++; channel.posted.delete(message.id); }; return message; };
   channel.send = async payload => { sent++; return decorate(await originalSend(payload)); };
   await Promise.all([publishRoster(ctx, guild), publishRoster(ctx, guild)]);
-  const id = JSON.parse(ctx.store.setting('roster:messages'))[0]; assert.equal(sent, 1); assert.equal(edited, 1);
+  const id = JSON.parse(ctx.store.setting('roster:messages'))[0]; assert.equal(sent, 1); assert.equal(edited, 0);
   await publishRoster({ ...ctx, rosterRecovered: false }, guild);
   assert.equal(sent, 1); assert.equal(JSON.parse(ctx.store.setting('roster:messages'))[0], id);
   const duplicate = decorate(await originalSend({ embeds: [{ toJSON: () => ({ title: 'Legion — Ledenlijst' }) }] }));

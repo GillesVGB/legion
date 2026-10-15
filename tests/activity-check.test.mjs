@@ -5,10 +5,12 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {dashboardFixture,ACTOR,OTHER} from './dashboard-fixture.mjs';
 import {Store} from '../src/store.mjs';
-import {createActivityCheck,respondActivityCheck,finishActivityCheck,cancelActivityCheck,syncActivityChecks,syncActivityWarnings,activityCheckMessage,handleActivitiesCheck,handleActivityCheckReaction,publishActivityCheck} from '../src/activity-check.mjs';
+import {createActivityCheck,respondActivityCheck,finishActivityCheck,cancelActivityCheck,syncActivityChecks,syncActivityWarnings,activityCheckMessage,handleActivitiesCheck,handleActivityCheckReaction,publishActivityCheck,syncCheckReminders} from '../src/activity-check.mjs';
 import {commands} from '../src/commands.mjs';
 import {Dashboard} from '../src/dashboard.mjs';
 import {Locks} from '../src/locks.mjs';
+import {PermissionFlagsBits as P,PermissionsBitField} from 'discord.js';
+import {saveDashboardSettings} from '../src/dashboard-settings.mjs';
 const NOW=Date.parse('2026-10-15T10:00:00Z'),DEADLINE=Date.parse('2026-10-16T18:00:00Z');
 function fixture(t,filename){
   t.mock.method(Date,'now',()=>NOW);
@@ -18,6 +20,8 @@ function fixture(t,filename){
   for(const member of guild.members.cache.values())member.roles.cache.delete(ctx.config.memberRoleId);
   const ids=[OTHER,...Array.from({length:5},(_,i)=>String(BigInt('100000000000000020')+BigInt(i)))];
   for(const id of ids)guild.members.cache.get(id).roles.cache.set(ctx.config.memberRoleId,guild.roles.cache.get(ctx.config.memberRoleId));
+  const channel=guild.channels.cache.get(ctx.config.planningChannelId),permissions=channel.permissionsFor;
+  channel.permissionsFor=target=>target?.roles?.cache?.has(ctx.config.memberRoleId)?new PermissionsBitField([P.ViewChannel,P.ReadMessageHistory]):permissions(target);
   const start=(input={},now=NOW)=>createActivityCheck(ctx,guild,lead,{date:'morgenavond',time:'20:00',channelId:ctx.config.planningChannelId,...input},now);
   const answer=(check,user=OTHER,now=NOW+1000,binding={channelId:check.channel_id,messageId:check.message_id})=>respondActivityCheck(ctx,guild,guild.members.cache.get(user),check.id,binding,now);
   const absence=(user,status='approved',kind='range')=>ctx.store.db.prepare('INSERT INTO absence_requests(id,user_id,kind,activity_id,start_date,end_date,weeks,reason,status,created_at,channel_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)').run(`absence-${user}-${kind}`,user,kind,kind==='planning'?'some-planning':null,'2026-10-16','2026-10-17','[]','Privéreden',status,NOW,ctx.config.logChannelId);
@@ -39,7 +43,7 @@ test('tijdige bevestiging telt eenmaal; niet reageren geeft automatisch precies 
   await syncActivityChecks(f.ctx,f.guild,DEADLINE);await syncActivityChecks(f.ctx,f.guild,DEADLINE+60000);
   assert.equal(f.ctx.store.warnCount(OTHER),0);assert.equal(f.ctx.store.warnCount(f.ids[1]),1);assert.equal(f.record(check.id).status,'closed');
   assert.equal(f.ctx.store.db.prepare('SELECT COUNT(*) AS n FROM activity_check_warnings').get().n,5);
-  assert.equal(f.calls.filter(item=>item.method==='dm').length,5);
+  assert.equal(f.calls.filter(item=>item.method==='dm'&&item.payload.embeds?.[0]?.title==='Legion — Gangwarn: activiteitencheck').length,5);
   assert.equal(f.guild.channels.cache.get(f.ctx.config.warnLogChannelId).posted.size,5);
   const post=f.guild.channels.cache.get(check.channel_id).posted.get(check.message_id);assert.equal(post.components.length,0);
 });
@@ -138,4 +142,23 @@ test('onvolledige reactieverversing stelt alle warns uit tot de vinkjes weer lee
   reaction.users.fetch=async()=>{throw Object.assign(new Error('Offline'),{code:503});};await syncActivityChecks(f.ctx,f.guild,DEADLINE);
   assert.equal(f.record(check.id).status,'open');assert.equal(f.ctx.store.db.prepare('SELECT COUNT(*) AS n FROM activity_check_warnings').get().n,0);
   reaction.users.fetch=fetch;reaction.users.cache.set(OTHER,f.guild.members.cache.get(OTHER).user);await syncActivityChecks(f.ctx,f.guild,DEADLINE+61000);assert.equal(f.ctx.store.warnCount(OTHER),0);assert.equal(f.ctx.store.warnCount(f.ids[1]),1);
+});
+test('check-in-herinnering respecteert ingestelde tijd en wordt één keer verstuurd, behalve bij vinkje of goedgekeurde afwezigheid',async t=>{
+  const f=fixture(t),{check}=await f.start();saveDashboardSettings(f.ctx,{operations:{activityCheck:{reminderMinutes:30}}},ACTOR);await f.answer(check);f.absence(f.ids[1]);
+  await syncCheckReminders(f.ctx,f.guild,DEADLINE-31*60000);assert.equal(f.ctx.store.db.prepare("SELECT COUNT(*) AS n FROM feature_notices WHERE kind='checkin.reminder'").get().n,0);
+  await syncCheckReminders(f.ctx,f.guild,DEADLINE-30*60000);await syncCheckReminders(f.ctx,f.guild,DEADLINE-29*60000);assert.equal(f.ctx.store.db.prepare("SELECT COUNT(*) AS n FROM feature_notices WHERE kind='checkin.reminder' AND status='sent'").get().n,4);
+  for(const id of [OTHER,f.ids[1]])assert.equal(f.ctx.store.db.prepare("SELECT COUNT(*) AS n FROM feature_notices WHERE kind='checkin.reminder' AND user_id=?").get(id).n,0);
+});
+test('een wachtende herinnering wordt na een vinkje overgeslagen en uitschakelen voorkomt nieuwe meldingen',async t=>{
+  const f=fixture(t),{check}=await f.start();for(const id of f.ids.slice(1))await f.answer(check,id);
+  const user=f.guild.members.cache.get(OTHER).user;user.send=async()=>{throw Object.assign(new Error('Offline'),{code:503});};await syncCheckReminders(f.ctx,f.guild,DEADLINE-3600000);
+  assert.equal(f.ctx.store.db.prepare("SELECT status FROM feature_notices WHERE kind='checkin.reminder'").get().status,'pending');
+  await f.answer(check,OTHER,DEADLINE-3500000);await syncCheckReminders(f.ctx,f.guild,DEADLINE-3400000);assert.equal(f.ctx.store.db.prepare("SELECT status FROM feature_notices WHERE kind='checkin.reminder'").get().status,'skipped');
+  saveDashboardSettings(f.ctx,{operations:{activityCheck:{remindersEnabled:false}}},ACTOR);await syncCheckReminders(f.ctx,f.guild,DEADLINE-1000);assert.equal(f.ctx.store.db.prepare("SELECT COUNT(*) AS n FROM feature_notices WHERE kind='checkin.reminder'").get().n,1);
+});
+test('een privékanaal kan geen automatische check voor onzichtbare leden starten en verloren leestoegang geeft geen warn',async t=>{
+  const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.planningChannelId),permissions=channel.permissionsFor;
+  channel.permissionsFor=target=>target.id===OTHER?new PermissionsBitField(0n):permissions(target);await assert.rejects(f.start(),/alle Legion-leden/);
+  channel.permissionsFor=permissions;const {check}=await f.start();channel.permissionsFor=target=>target.id===OTHER?new PermissionsBitField(0n):permissions(target);
+  await finishActivityCheck(f.ctx,f.guild,check.id,DEADLINE);assert.equal(f.ctx.store.warnCount(OTHER),0);assert.equal(f.ctx.store.warnCount(f.ids[1]),1);
 });

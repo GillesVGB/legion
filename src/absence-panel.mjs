@@ -8,6 +8,7 @@ import {createAbsence,syncAbsences} from './absence.mjs';
 import {requireGangPot} from './gangpot.mjs';
 import {operationSettings} from './feature-settings.mjs';
 import {missionDay} from './mission-definitions.mjs';
+import {editIfChanged} from './message-updates.mjs';
 const reasons={holiday:'Vakantie',work:'Werk of school',private:'Privéomstandigheden',illness:'Ziekte',other:'Andere verplichtingen'};
 const shift=(date,days)=>missionDay(Date.parse(date+'T12:00:00Z')+days*86400000);
 export async function publishAbsencePanel(ctx,guild){
@@ -18,7 +19,7 @@ export async function publishAbsencePanel(ctx,guild){
     if(!message){const history=await channel.messages.fetch({limit:100});message=[...history.values()].find(item=>item.author.id===guild.members.me.id&&item.embeds?.some(card=>card.footer?.text===marker));}
     assertUser(!message||message.author.id===guild.members.me.id,'Het afmeldpaneel hoort niet bij deze bot.');
     const payload={embeds:[embed(ctx.config,'Legion — Afmelden & afwezigheid','Kun je niet deelnemen? Kies hieronder wat je wilt melden.\n\n**📅 Afmelden voor planning**\nKies de activiteit waarvoor je afwezig bent. Een rode reactie is pas een geldige afmelding na goedkeuring van Lead.\n\n**🌴 Afwezigheid melden**\nKies een begin- en einddatum voor langere afwezigheid, zoals vakantie. Lead beoordeelt de aanvraag en eventuele gangpotvrijstelling voor de genoemde weken.\n\nJe maakt je keuzes privé via dit paneel. Een aanvraag geeft pas toestemming nadat Lead deze heeft goedgekeurd.').setFooter({text:marker})],components:[row(button('absencepanel:planning','📅 Afmelden voor planning',ButtonStyle.Primary),button('absencepanel:range','🌴 Afwezigheid melden',ButtonStyle.Secondary))],allowedMentions:quiet};
-    const posted=message?await message.edit(payload):await channel.send({...payload,nonce:`ap:${channel.id}`,enforceNonce:true});ctx.store.setSetting(key,posted.id);ctx.store.setSetting('absence:panel:error','');return posted;
+    const posted=message?await editIfChanged(message,payload):await channel.send({...payload,nonce:`ap:${channel.id}`,enforceNonce:true});ctx.store.setSetting(key,posted.id);ctx.store.setSetting('absence:panel:error','');return posted;
   });
 }
 function select(id,placeholder,options){return new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(id).setPlaceholder(placeholder).addOptions(options));}

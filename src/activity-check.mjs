@@ -1,6 +1,6 @@
 import {randomBytes} from 'node:crypto';
 import {MessageFlags,PermissionFlagsBits as P} from 'discord.js';
-import {assertUser} from './errors.mjs';
+import {assertUser,UserError} from './errors.mjs';
 import {embed,safeText} from './ui.mjs';
 import {quiet,requireStaff,warnLogChannel} from './service.mjs';
 import {serializeCommunity,communityChannel,updateCommunityPost} from './community-posts.mjs';
@@ -8,6 +8,7 @@ import {refreshMembers} from './members.mjs';
 import {planningTime,requirePlanningGuild} from './activities.mjs';
 import {missionDay} from './mission-definitions.mjs';
 import {queueFeatureNotice,deliverFeatureNotices} from './notices.mjs';
+import {operationSettings} from './feature-settings.mjs';
 
 const checkById=(ctx,id)=>ctx.store.db.prepare('SELECT * FROM activity_check_sessions WHERE id=?').get(id);
 const membersOf=(ctx,id)=>ctx.store.db.prepare('SELECT * FROM activity_check_members WHERE check_id=? ORDER BY user_id').all(id);
@@ -53,6 +54,7 @@ export async function createActivityCheck(ctx,guild,member,input,now=Date.now())
   assertUser(role&&(role.mentionable||channel.permissionsFor(guild.members.me)?.has(P.MentionEveryone)),'De bot kan Legion nog niet taggen. Maak de Legion-rol vermeldbaar of geef de bot Iedereen, @here en alle rollen vermelden in dit kanaal.');
   const members=await refreshMembers(guild),targets=[...members.values()].filter(member=>eligible(ctx,member));
   assertUser(targets.length,'Er zijn geen mensen met de Legion-ledenrol om te controleren.');
+  assertUser(targets.every(target=>channel.permissionsFor(target)?.has([P.ViewChannel,P.ReadMessageHistory])),'Kies een kanaal dat alle Legion-leden kunnen bekijken. Anders kunnen zij niet op de check reageren.');
   const id=randomBytes(6).toString('hex');
   ctx.store.transaction(()=>{
     assertUser(!ctx.store.db.prepare("SELECT 1 FROM activity_check_sessions WHERE status='open'").get(),'Er loopt al een activiteitencheck. Wacht tot deze is afgerond of annuleer die eerst.');
@@ -105,7 +107,7 @@ export async function finishActivityCheck(ctx,guild,id,now=Date.now()){
       for(const entry of membersOf(ctx,id)){
         if(entry.responded_at!==null)continue;
         const member=members.get(entry.user_id),away=ctx.store.db.prepare("SELECT 1 FROM absence_requests WHERE user_id=? AND kind='range' AND status='approved' AND start_date<=? AND end_date>=?").get(entry.user_id,date,date);
-        if(!eligible(ctx,member)||away){ctx.store.db.prepare('UPDATE activity_check_members SET status=? WHERE check_id=? AND user_id=?').run(away?'exempt':'left',id,entry.user_id);continue;}
+        if(!eligible(ctx,member)||!channel.permissionsFor(member)?.has([P.ViewChannel,P.ReadMessageHistory])||away){ctx.store.db.prepare('UPDATE activity_check_members SET status=? WHERE check_id=? AND user_id=?').run(away?'exempt':'left',id,entry.user_id);continue;}
         // Discord bewaart geen reactietijd. Herstelde vinkjes tellen mee, zodat een
         // gemist gateway-event of een botonderbreking geen onterechte warn geeft.
         if(reacted.has(entry.user_id)){ctx.store.db.prepare("UPDATE activity_check_members SET status='responded',responded_at=? WHERE check_id=? AND user_id=?").run(now,id,entry.user_id);continue;}
@@ -171,9 +173,8 @@ export async function handleActivityCheckReaction(ctx,reaction,user,added,now=Da
   const check=ctx.store.db.prepare('SELECT * FROM activity_check_sessions WHERE message_id=? AND channel_id=?').get(reaction.message.id,reaction.message.channelId);if(!check)return;
   if(check.status!=='open'||now>=check.deadline_at){await reaction.users.remove(user.id);return;}
   if(!ctx.store.db.prepare('SELECT 1 FROM activity_check_members WHERE check_id=? AND user_id=?').get(check.id,user.id))return;
-  const member=await reaction.message.guild.members.fetch({user:user.id,force:true}).catch(error=>{if(error.code===10007)return null;throw error;});if(!eligible(ctx,member))return;
-  try{await respondActivityCheck(ctx,reaction.message.guild,member,check.id,{channelId:reaction.message.channelId,messageId:reaction.message.id},now);}
-  catch(error){if(checkById(ctx,check.id)?.status!=='open')return;throw error;}
+  try{await respondActivityCheck(ctx,reaction.message.guild,{id:user.id},check.id,{channelId:reaction.message.channelId,messageId:reaction.message.id},now);}
+  catch(error){if(error instanceof UserError||error.code===10007||checkById(ctx,check.id)?.status!=='open')return;throw error;}
   await publishActivityCheck(ctx,reaction.message.guild,check.id).catch(()=>{});
 }
 export async function handleStopActivityCheck(ctx,interaction){
@@ -212,5 +213,19 @@ export async function syncActivityChecks(ctx,guild,now=Date.now()){
     try{if(await syncOpenCheckReactions(ctx,guild,item.id,now))await publishActivityCheck(ctx,guild,item.id);}
     catch(error){ctx.store.db.prepare('UPDATE activity_check_sessions SET last_error=?,next_attempt=? WHERE id=?').run(String(error.code||error.name),now+60000,item.id);}
   }
+  await syncCheckReminders(ctx,guild,now);
   await syncActivityWarnings(ctx,guild,now);
+}
+export async function syncCheckReminders(ctx,guild,now=Date.now()){
+  const settings=operationSettings(ctx).activityCheck;
+  const due=settings.remindersEnabled?ctx.store.db.prepare("SELECT * FROM activity_check_sessions WHERE status='open' AND published_at IS NOT NULL AND created_at+60000<=? AND deadline_at>? AND deadline_at<=?").all(now,now,now+settings.reminderMinutes*60000):[];
+  if(due.length)await refreshMembers(guild);
+  const canRemind=(check,user)=>{
+    if(!settings.remindersEnabled||!check||check.status!=='open'||now>=check.deadline_at||!eligible(ctx,guild.members.cache.get(user)))return false;
+    const entry=ctx.store.db.prepare('SELECT responded_at FROM activity_check_members WHERE check_id=? AND user_id=?').get(check.id,user);if(!entry||entry.responded_at!==null)return false;
+    const date=missionDay(check.deadline_at);
+    return !ctx.store.db.prepare("SELECT 1 FROM absence_requests WHERE user_id=? AND kind='range' AND status='approved' AND start_date<=? AND end_date>=?").get(user,date,date);
+  };
+  for(const check of due)for(const member of membersOf(ctx,check.id))if(canRemind(check,member.user_id))queueFeatureNotice(ctx,{key:`checkin.reminder:${check.id}:${member.user_id}`,kind:'checkin.reminder',user:member.user_id,period:check.id,now,payload:{embeds:[embed(ctx.config,'Legion — Check-in-herinnering',`Je hebt de activiteitencheck nog niet bevestigd.\n\nReageer vóór <t:${Math.floor(check.deadline_at/1000)}:F> met **✅** onder [het check-in-bericht](https://discord.com/channels/${guild.id}/${check.channel_id}/${check.message_id}).\n\nZonder bevestiging of goedgekeurde afwezigheid volgt na de deadline één gangwarn.`).setColor(0xF59E0B)]}});
+  await deliverFeatureNotices(ctx,guild,now,item=>canRemind(checkById(ctx,item.period_id),item.user_id),['checkin.reminder']);
 }

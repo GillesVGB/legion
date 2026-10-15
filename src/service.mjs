@@ -7,6 +7,7 @@ import { parseAge } from './application.mjs';
 import { refreshRecruitment, requireApplicationsOpen, requireRecruitmentSpace, applicationWaitingNotice } from './recruitment.mjs';
 import { deliverAcceptance } from './admissions.mjs';
 import { requireOpenCase, recoverGuildCases } from './case-recovery.mjs';
+import {editIfChanged} from './message-updates.mjs';
 
 export const quiet = { parse: [], repliedUser: false };
 export const isAdmin = interaction => interaction.memberPermissions?.has(P.Administrator) ?? false;
@@ -90,9 +91,9 @@ export async function publishPanel(ctx, guild, channelId, type = 'alles') {
   assertUser(channel.permissionsFor(guild.members.me)?.has([P.ViewChannel, P.SendMessages, P.EmbedLinks, P.ReadMessageHistory]), 'De bot mist rechten om dit paneel te plaatsen.');
   const key = `panel:${type}:${channelId}`;
   const previous = ctx.store.setting(key);
-  const message = previous ? await channel.messages.fetch(previous).catch(() => null) : null;
+  const message = previous ? await channel.messages.fetch(previous).catch(error=>{if(error.code===10008)return null;throw error;}) : null;
   const payload = { ...panel(ctx.config, type, ctx.recruitment), allowedMentions: quiet };
-  const posted = message?.author.id === guild.members.me.id ? await message.edit(payload) : await channel.send(payload);
+  const posted = message?.author.id === guild.members.me.id ? await editIfChanged(message,payload) : await channel.send(payload);
   ctx.store.setSetting(key, posted.id);
   return channel;
 }

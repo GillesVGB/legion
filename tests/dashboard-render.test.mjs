@@ -39,6 +39,8 @@ test('dashboard toont module-instellingen, botstatus, afmeldingen en visverzamel
     for(const name of ['gangpot.weeklyAmount','gangpot.deadlineTime','gangpot.fridayTime','gangpot.leadTime','fishing.reward','planning.preparation'])assert.ok(modules.includes(name));
     assert.ok(absence.includes('Goedkeuren')&&absence.includes('&lt;img')&&!absence.includes('<img onerror'));
     assert.ok(health.includes('Wachtrijen')&&collection.includes('&lt;script&gt;'));
+    const profile=vm.runInContext("memberOverviewHtml({user:{name:'<script>lid</script>'},activeWarnings:1,checks:[],absences:[],warnings:[{id:'123',created_at:1,reason:'<img onerror=x>'}]})",context);assert.ok(profile.includes('&lt;script&gt;')&&profile.includes('&lt;img')&&!profile.includes('<img onerror'));
+    assert.ok(modules.includes('activityCheck.reminderMinutes')&&modules.includes('backups.keep'));
   }finally{f.close();}
 });
 

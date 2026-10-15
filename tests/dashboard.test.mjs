@@ -31,6 +31,9 @@ test('dashboardlinks werken één keer, cookies zijn beveiligd en publieke bezoe
   assert.equal(response.status,200);const text=await response.text();assert.ok(!text.includes('NEVER-RETURN-THIS-TOKEN'));
   const data=JSON.parse(text);assert.equal(data.overview.openApplications,1);assert.equal(data.transcripts[0].status,'accepted');assert.ok(data.transcripts[0].url.includes('#k='));
   assert.equal((await f.request(`/api/dashboard/guilds/999999999999999999/summary`,null,account.cookie)).status,404);
+  const profilePath=`/api/dashboard/guilds/${f.source.config.guildId}/members/${OTHER}`;
+  assert.equal((await f.request(profilePath)).status,401);
+  f.source.store.addWarn(OTHER,ACTOR,'Profielcontrole');const profile=await f.request(profilePath,null,account.cookie);assert.equal(profile.status,200);const details=await profile.json();assert.equal(details.user.id,OTHER);assert.equal(details.activeWarnings,1);assert.equal(details.warnings[0].reason,'Profielcontrole');
 });
 
 test('niet-leiding, verloren rechten en vervallen inloglinks krijgen geen dashboardtoegang',async t=>{

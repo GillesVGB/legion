@@ -1,4 +1,13 @@
 {
+  "1.8.0": [
+    "Automatische privé-back-ups vóór een nieuwe botversie de gegevens bijwerkt; consistente SQLite-kopieën en instelbaar aantal bewaarde back-ups.",
+    "Eenmalige check-in-herinnering aan leden zonder vinkje of goedgekeurde afwezigheid. Aan en uit en het tijdstip zijn instelbaar via het dashboard.",
+    "Nieuw: /lidinfo lid, met recente check-ins, afmeldingen en gangwarns. Hetzelfde overzicht staat bij Leden in het dashboard.",
+    "Vaste Discord-berichten worden alleen bijgewerkt als de inhoud verandert. Onnodige edits en dubbele gebruikerscontroles verminderd.",
+    "Achtergrondtaken herstellen afzonderlijk na fouten; een storing in één module houdt andere modules en de andere server niet meer tegen.",
+    "Meldingen worden achter elkaar verwerkt om dubbele DMs bij gelijktijdige acties te voorkomen. De ledenlijst wordt pas na volledig ophalen vervangen.",
+    "Syntaxcontrole van alle botscripts en snellere databasezoekopdrachten voor ledenhistorie en wachtende meldingen."
+  ],
   "1.7.3": [
     "De lijst met leden die nog niet bevestigd hebben is uit het activiteitencheckbericht verwijderd.",
     "Bij een nieuwe activiteitencheck tagt de bot de Legion-ledenrol. Bij verversen of herstarten wordt deze niet opnieuw gepingd."

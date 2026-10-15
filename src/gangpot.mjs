@@ -10,6 +10,7 @@ import {planningTime} from './activities.mjs';
 import {missionDay} from './mission-definitions.mjs';
 import {exemptionFor} from './absence.mjs';
 import {syncGangpotReminders} from './gangpot-reminders.mjs';
+import {editIfChanged} from './message-updates.mjs';
 
 const uid=()=>randomBytes(6).toString('hex');
 export const GANGPOT_LEAD_ROLE_ID='1555685630707769382';
@@ -286,7 +287,7 @@ async function upsertGangpotPost(ctx,guild,channelId,key,payload,marker){
   const saved=ctx.store.setting(key);let message=saved?await channel.messages.fetch(saved).catch(error=>{if(error.code===10008)return null;throw error;}):null;
   const markers=marker==='Legion • Gangpotinformatie'?['Legion • Gangpotinformatie','Legion • Totaal gangpot']:[marker];
   if(!message||message.author.id!==guild.members.me.id){const history=await channel.messages.fetch({limit:100});message=[...history.values()].find(item=>item.author.id===guild.members.me.id&&item.embeds?.some(card=>markers.includes(card.footer?.text)));}
-  const posted=message?.author.id===guild.members.me.id?await message.edit(payload):await channel.send({...payload,nonce:`${marker==='Legion • Gangpotinformatie'?'gi':'gt'}:${channelId}`,enforceNonce:true});
+  const posted=message?.author.id===guild.members.me.id?await editIfChanged(message,payload):await channel.send({...payload,nonce:`${marker==='Legion • Gangpotinformatie'?'gi':'gt'}:${channelId}`,enforceNonce:true});
   ctx.store.setSetting(key,posted.id);
 }
 export async function publishGangpot(ctx,guild,now=Date.now()){

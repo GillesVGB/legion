@@ -13,6 +13,7 @@ export function commands(maxBet, ticketsEnabled = true) {
     cmd('rangen', 'Bekijk de rangvolgorde van Legion'),
     cmd('dashboard', 'Open het privé Legion-dashboard (alleen leiding)'),
     cmd('botstatus','Bekijk verbinding, uptime en acties die op herhaling wachten (leiding)'),
+    cmd('lidinfo','Bekijk check-ins, afmeldingen en gangwarns van een lid (leiding)').addUserOption(userOption),
     cmd('vangstenboek','Bekijk je visverzameling en wekelijkse challenges'),
     cmd('afmelden','Vraag Lead-goedkeuring voor afwezigheid op een planning')
       .addStringOption(o=>o.setName('planning').setDescription('Planning-ID onderaan het bericht').setRequired(true).setMinLength(12).setMaxLength(12))

@@ -25,6 +25,9 @@ import {createActivity,planningTime} from './activities.mjs';
 import {communityChannel} from './community-posts.mjs';
 import {catches} from './fishing.mjs';
 import {createActivityCheck,cancelActivityCheck} from './activity-check.mjs';
+import {memberOverview} from './member-overview.mjs';
+import {backupSummary,createDataBackup} from './backups.mjs';
+import {releaseVersion} from './release-announcements.mjs';
 
 const secret = () => randomBytes(32).toString('base64url');
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -146,6 +149,7 @@ export class Dashboard {
       roster: config.roster || null,
       gangpot:gangpotSummary(ctx,guild),
       health:botHealth(ctx,this.client),operations:operationSettings(ctx),
+      backups:config.gangpot?backupSummary(config.dataDir):[],
       channelSettings:{logChannelId:config.logChannelId,botLogChannelId:config.botLogChannelId||config.logChannelId,updateChannelId:config.updateChannelId||'',absencePanelChannelId:config.absencePanelChannelId||'',planningChannelId:config.planningChannelId,warnLogChannelId:config.warnLogChannelId,panelChannelId:config.panelChannelId,...(config.gangpot?{gangpotInfo:config.gangpot.infoChannelId,gangpotPayments:config.gangpot.paymentsChannelId,gangpotTotal:config.gangpot.totalChannelId}:{})},
       embedColor:'#'+config.color.toString(16).padStart(6,'0'),canConfigureChannels:viewer?.permissions.has(P.Administrator)??false,
       absences:store.db.prepare('SELECT * FROM absence_requests ORDER BY created_at DESC LIMIT 100').all().map(item=>({...item,weeks:JSON.parse(item.weeks),userName:name(item.user_id),reviewerName:name(item.reviewer_id)})),
@@ -175,6 +179,7 @@ export class Dashboard {
   async performAction(ctx,guild,member,value){
     const { store, config } = ctx;
     const actor = member.id;
+    if(value.action==='backup.create'){requireGangPot(ctx);assertUser(member.permissions.has(P.Administrator),'Alleen een administrator mag een back-up starten.');const result=createDataBackup(config.dataDir,releaseVersion);store.audit('backup.create',actor,{id:result.id||null,files:result.files||0});return{message:result.saved?'Privé-back-up opgeslagen in data/backups.':'Er zijn nog geen botgegevens om te bewaren.'};}
     if(value.action==='activitycheck.create'){const result=await createActivityCheck(ctx,guild,member,{date:value.date,time:value.time,channelId:value.channelId||config.planningChannelId});return{message:result.posted?'Activiteitencheck geplaatst. De controle na de deadline gebeurt automatisch.':'Check opgeslagen; het plaatsen wordt opnieuw geprobeerd.'};}
     if(value.action==='activitycheck.cancel'){assertUser(value.confirm===true,'Bevestig het annuleren van de activiteitencheck.');await cancelActivityCheck(ctx,guild,member,value.id);return{message:'Activiteitencheck geannuleerd.'};}
     if(['absence.approve','absence.reject'].includes(value.action)){assertUser(value.confirm===true,'Bevestig de afmelding.');await decideAbsence(ctx,guild,member,value.id,value.action.split('.')[1]);await syncAbsences(ctx,guild);await syncGangpot(ctx,this.client);return{message:'Afmelding beoordeeld.'};}
@@ -299,9 +304,10 @@ export class Dashboard {
         send(200,{ok:true},{'Set-Cookie':this.cookie('',0)});return true;
       }
       if(path==='/api/dashboard/session'){ failure(request.method==='GET',405,'Gebruik GET.');send(200,await this.sessionInfo(session));return true; }
-      const match=/^\/api\/dashboard\/guilds\/(\d{17,20})\/(summary|actions|audit|cases\/([a-f0-9]{12})\/messages)$/.exec(path);
+      const match=/^\/api\/dashboard\/guilds\/(\d{17,20})\/(summary|actions|audit|cases\/([a-f0-9]{12})\/messages|members\/(\d{17,20}))$/.exec(path);
       failure(match,404,'Pagina niet gevonden.');
       const {ctx,guild,member}=await this.authorized(session,match[1]);
+      if(match[4]){failure(request.method==='GET',405,'Gebruik GET.');send(200,memberOverview(ctx,guild,match[4]));return true;}
       if(match[2]==='audit'){failure(request.method==='GET',405,'Gebruik GET.');const before=Number(new URL(request.url,'http://localhost').searchParams.get('before')||Number.MAX_SAFE_INTEGER);failure(Number.isSafeInteger(before)&&before>0,400,'Ongeldige logpagina.');const items=ctx.store.db.prepare('SELECT * FROM audit WHERE id<? ORDER BY id DESC LIMIT 100').all(before).map(item=>({...item,actor_name:guild.members.cache.get(item.actor_id)?.displayName||item.actor_id,details:cleanAudit(JSON.parse(item.details))}));send(200,{items});return true;}
       if(match[2]==='summary'){ failure(request.method==='GET',405,'Gebruik GET.');send(200,this.summary(ctx,guild,member));return true; }
       if(match[2]==='actions'){

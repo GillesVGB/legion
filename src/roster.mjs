@@ -2,6 +2,7 @@ import { ChannelType, PermissionFlagsBits as P } from 'discord.js';
 import { assertUser } from './errors.mjs';
 import { embed, safeText } from './ui.mjs';
 import { refreshMembers } from './members.mjs';
+import {editIfChanged} from './message-updates.mjs';
 const writes = new WeakMap();
 const isRoster = (message, botId) => message?.author.id === botId && message.embeds?.length &&
   message.embeds.every(card => /^Legion — Ledenlijst(?: \(vervolg\))?$/.test(card.title));
@@ -84,7 +85,7 @@ async function updateRoster(ctx, guild, fetchMembers) {
   const ids = [];
   for (let part = 0; part < payloads.length; part++) {
     const old = oldIds[part] ? await channel.messages.fetch(oldIds[part]).catch(error => { if (error.code === 10008) return null; throw error; }) : null;
-    const message = isRoster(old, guild.members.me.id) ? await old.edit(payloads[part]) : await channel.send(payloads[part]);
+    const message = isRoster(old, guild.members.me.id) ? await editIfChanged(old,payloads[part]) : await channel.send(payloads[part]);
     ids.push(message.id);
     store.setSetting('roster:messages', JSON.stringify([...ids, ...oldIds.slice(part + 1)]));
   }

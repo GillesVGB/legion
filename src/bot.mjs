@@ -28,6 +28,8 @@ import {handleBotStatus} from './bot-status.mjs';
 import {recordInteraction,flushAuditLogs} from './audit-log.mjs';
 import {announceRelease} from './release-announcements.mjs';
 import {publishAbsencePanel,handleAbsencePanel,handleAbsenceSelection} from './absence-panel.mjs';
+import {handleMemberOverview} from './member-overview.mjs';
+import {runMaintenanceJobs} from './maintenance.mjs';
 import { quiet, isStaff, requireStaff, requireAdmin, requireTickets, configureGuild, publishPanel,
   createCase, requestCaseDecision, decideCase, startInterview, cleanupInterviews, cleanupClosedCases, warningMessage, staffLogChannel, warnLogChannel, writeWarnLog, reconcileCases } from './service.mjs';
 
@@ -187,7 +189,7 @@ async function handleCommand(ctx, interaction) {
       ...(config.ticketsEnabled ? ['**Tickets:** /ticket openen, /ticket sluiten'] : []),
       '**Games:** /blackjack, /coinflip, /dobbel, /8ball, /steenpapier, /fish, /vangstenboek',
       '**Coins:** /saldo, /daily, /leaderboard, /missies',
-      '**Leiding:** /dashboard, /botstatus, /gangwarn geven, /gangwarn bekijken, /gangwarn intrekken',
+      '**Leiding:** /dashboard, /botstatus, /lidinfo, /gangwarn geven, /gangwarn bekijken, /gangwarn intrekken',
       '**Aangenomen:** /uitnodiging voor je persoonlijke ganginvite',
       '**Administrators:** /inrichten, /setup',
       '\nCoins zijn fictief, per guild gescheiden en hebben geen geldwaarde of FiveM-koppeling.'
@@ -196,6 +198,7 @@ async function handleCommand(ctx, interaction) {
   if (['info', 'regels', 'rangen'].includes(name)) return info(ctx, interaction, name);
   if (name === 'sollicitatiestatus') return showApplicationStatus(ctx,interaction);
   if(name==='activiteitencheck')return handleActivitiesCheck(ctx,interaction);
+  if(name==='lidinfo')return handleMemberOverview(ctx,interaction);
   if(name==='activiteitencheck-stop')return handleStopActivityCheck(ctx,interaction);
   if (['planning','planning-overzicht','planning-annuleren'].includes(name)) return handlePlanningCommand(ctx,interaction);
   if (name === 'promotie') return handlePromotionCommand(ctx,interaction);
@@ -493,27 +496,32 @@ const timer = setInterval(async () => {
 }, 15000);
 timer.unref();
 
-let transcriptBusy = false;
-async function drainTranscripts() {
-  if (shuttingDown || transcriptBusy) return;
-  transcriptBusy = true;
-  try {
-    for (const ctx of contexts.values()) {
-      if (!ctx.ready) continue;
-      const guild = client.guilds.cache.get(ctx.config.guildId);
-      if (guild&&ctx.config.gangpot) await syncGangpot(ctx,client).catch(error=>console.error(`Gangpotcontrole wacht op herhaling (${error.code??error.name}).`));
-      if(guild){await syncAbsences(ctx,guild).catch(error=>console.error(`Afmeldingen wachten (${error.code??error.name}).`));if(ctx.config.absencePanelChannelId)await publishAbsencePanel(ctx,guild).catch(error=>ctx.store.setSetting('absence:panel:error',String(error.code||error.name)));await announceRelease(ctx,guild);}
-      if (guild) await cleanupInterviews(ctx, guild);
-      if (guild) { await syncActivityChecks(ctx,guild); await syncActivities(ctx,guild); await syncPromotions(ctx,guild); }
-      for (const notice of ctx.store.pendingAcceptances()) await locks.run(`${ctx.config.guildId}:admission:${notice.case_id}`, () => deliverAcceptance(ctx, client, notice.case_id));
-      await expireAcceptanceInvites(ctx, client);
-      for (const delivery of ctx.store.pendingTranscripts()) {
-        await locks.run(`${ctx.config.guildId}:transcript:${delivery.case_id}`, () => archiveTranscript(ctx, client, delivery.case_id, staffLogChannel)).catch(() => {});
-      }
-      await cleanupClosedCases(ctx, client);
-      if(guild)await flushAuditLogs(ctx,guild).catch(error=>console.error(`Botlogs wachten (${error.code??error.name}).`));
+let maintenanceRun=null;
+async function drainTranscripts(){
+  if(shuttingDown)return;
+  if(maintenanceRun)return maintenanceRun;
+  maintenanceRun=performMaintenance().finally(()=>{maintenanceRun=null;});
+  return maintenanceRun;
+}
+async function performMaintenance(){
+  for(const ctx of contexts.values()){
+    if(shuttingDown)break;
+    if(!ctx.ready)continue;
+    const guild=client.guilds.cache.get(ctx.config.guildId);
+    const jobs=[];
+    if(guild){
+      if(ctx.config.gangpot)jobs.push(['gangpot',()=>syncGangpot(ctx,client)]);
+      jobs.push(['afmeldingen',()=>syncAbsences(ctx,guild)]);
+      if(ctx.config.absencePanelChannelId)jobs.push(['afmeldpaneel',()=>publishAbsencePanel(ctx,guild)]);
+      jobs.push(['changelog',()=>announceRelease(ctx,guild)],['gesprekken',()=>cleanupInterviews(ctx,guild)],['check-ins',()=>syncActivityChecks(ctx,guild)],['planning',()=>syncActivities(ctx,guild)],['promoties',()=>syncPromotions(ctx,guild)]);
     }
-  } finally { transcriptBusy = false; }
+    jobs.push(['aannameberichten',async()=>{for(const notice of ctx.store.pendingAcceptances())await locks.run(`${ctx.config.guildId}:admission:${notice.case_id}`,()=>deliverAcceptance(ctx,client,notice.case_id)).catch(()=>{});}],
+      ['uitnodigingen',()=>expireAcceptanceInvites(ctx,client)],
+      ['transcripts',async()=>{for(const delivery of ctx.store.pendingTranscripts())await locks.run(`${ctx.config.guildId}:transcript:${delivery.case_id}`,()=>archiveTranscript(ctx,client,delivery.case_id,staffLogChannel)).catch(()=>{});}],
+      ['gesloten-dossiers',()=>cleanupClosedCases(ctx,client)]);
+    if(guild)jobs.push(['botlogs',()=>flushAuditLogs(ctx,guild)]);
+    await runMaintenanceJobs(ctx,jobs,{shouldStop:()=>shuttingDown});
+  }
 }
 const transcriptTimer = setInterval(() => drainTranscripts().catch(() => {}), 60000);
 transcriptTimer.unref();
@@ -534,6 +542,7 @@ async function shutdown() {
   clearInterval(rosterTimer);
   for (const task of recruitmentDebounce.values()) clearTimeout(task);
   for (const task of rosterDebounce.values()) clearTimeout(task);
+  await maintenanceRun?.catch(()=>{});
   await stopViewer?.();
   dashboard.close();
   await client.destroy();

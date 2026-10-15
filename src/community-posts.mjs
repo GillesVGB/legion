@@ -1,6 +1,7 @@
 import { ChannelType,PermissionFlagsBits as P } from 'discord.js';
 import { assertUser } from './errors.mjs';
 import { quiet } from './service.mjs';
+import {editIfChanged} from './message-updates.mjs';
 
 const jobs=new Map();
 export async function serializeCommunity(key,action) {
@@ -34,7 +35,7 @@ export async function updateCommunityPost(ctx,guild,table,item,payload,marker,se
     return null; // Een bewust verwijderd bericht wordt niet opnieuw geplaatst.
   }
   assertUser(!message||message.author.id===guild.members.me.id,'Dit bericht hoort niet bij de Legion-bot.');
-  const posted=message?await message.edit({...payload,allowedMentions:quiet}):await channel.send({...payload,nonce:`${table==='gangpot_claims'?'gp':table==='absence_requests'?'ab':table==='activity_check_sessions'?'acp':table}:${item.id}`,enforceNonce:true,allowedMentions:sendMentions});
+  const posted=message?await editIfChanged(message,{...payload,allowedMentions:quiet}):await channel.send({...payload,nonce:`${table==='gangpot_claims'?'gp':table==='absence_requests'?'ab':table==='activity_check_sessions'?'acp':table}:${item.id}`,enforceNonce:true,allowedMentions:sendMentions});
   ctx.store.db.prepare(`UPDATE ${table} SET message_id=?,dirty=0,next_attempt=0,last_error=NULL WHERE id=?`).run(posted.id,item.id);
   return posted;
 }

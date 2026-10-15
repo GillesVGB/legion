@@ -53,6 +53,20 @@ Ticket- en sollicitatie-embeds volgen de ledenstand: **groen** bij 0–19, **ora
 
 Ook bij **25/25** en de rode status blijft solliciteren mogelijk. Het paneel, de bevestiging en het sollicitatieticket melden dat het bekijken van de sollicitatie langer kan duren. Aannemen van een nieuw ganglid wacht op een vrije plaats; de sollicitatie blijft intussen open. De wachttijdmelding in bestaande open tickets verdwijnt automatisch zodra er weer plaats is.
 
+## Back-ups, herinneringen en ledenoverzicht
+
+Vanaf versie 1.8.0 maakt `index.js` bij een nieuwe versie een privé-back-up **voordat de bot de gegevens migreert**. Elke SQLite-database wordt consistent gekopieerd, inclusief gecommitteerde WAL-gegevens, en gecontroleerd. Bestaande back-ups worden niet opnieuw meegekopieerd. `.env`, tijdelijke SQLite-journals en symbolische links worden overgeslagen. De back-ups staan in **`data/backups/`** en gaan niet mee naar GitHub of de openbare codepakketten. Bij een gewone herstart van dezelfde versie volgt geen nieuwe automatische back-up.
+
+Standaard worden de vijf nieuwste back-ups bewaard. In het dashboard van de hoofdserver, bij **Modules instellen**, kun je automatische back-ups in- of uitschakelen en 1 tot 30 kopieën laten bewaren. Een administrator kan daar **Nu back-up maken** kiezen. Handmatig vóór een code-update: `npm run backup`. Bij een mislukte verplichte back-up stopt de opstart vóór de migratie; controleer vrije schijfruimte en schrijfrechten. Een kopie op dezelfde hosting is geen externe disaster recovery: download zo nodig een eigen kopie via je hostingpaneel.
+
+Herstellen: stop eerst de bot en bewaar de huidige data-map apart. Kopieer de bestanden uit de gekozen back-upmap, zonder `manifest.json`, naar een lege data-map. Start daarna de bot met de passende of nieuwere code. Bewaar je eigen `.env` apart. Wis of overschrijf geen gegevens terwijl de bot draait.
+
+De activiteitencheck stuurt standaard **één DM-herinnering, 60 minuten vóór de deadline**, aan opgenomen leden zonder vinkje en zonder goedgekeurde langere afwezigheid. Bij korte checks komt deze niet eerder dan één minuut na het plaatsen. Het tijdstip (1 tot 10.080 minuten vooraf) en aan/uit zijn instelbaar bij Modules instellen. Een reactie, goedgekeurde afwezigheid, annulering of verstreken deadline stopt een nog wachtende herinnering. Een geblokkeerde DM wordt niet eindeloos herhaald.
+
+**`/lidinfo lid:@lid`** toont uitsluitend aan de leiding de recente check-ins, afmeldingen en gangwarns van één lid. Hetzelfde overzicht open je met **Overzicht** bij Leden in het dashboard. Gegevens blijven per guild gescheiden.
+
+Vaste Discord-berichten worden voortaan alleen aangepast wanneer de inhoud verandert. Achtergrondtaken worden afzonderlijk herhaald bij fouten; een fout in planning of een dossier stopt de andere modules niet. `/botstatus` toont ook deze fouten. `npm run check` controleert naast de configuratie ook de syntax van alle JavaScript-bestanden.
+
 ## Planning, promoties, wachtlijst en fun-missies
 
 **Planning:** in de gangserver `1555685630640652338` gebruikt de leiding bijvoorbeeld `/planning datum:12-10-2026 tijd:20:30 afspreekpunt:Legion HQ`. De bot plaatst uitsluitend in kanaal `1555685633266163793` een gewoon tekstbericht, zonder embed of knoppen. Het bericht bevat datum, Belgische tijd, afspreekpunt en de voorbereiding: volledig geheald, voertuig afgetankt, repairkits en benodigde spullen mee, op tijd aanwezig en duidelijke communicatie.

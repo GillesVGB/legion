@@ -220,7 +220,14 @@ export class Store {
       this.db.exec("UPDATE promotions SET dirty=1,next_attempt=0 WHERE status='pending';");
     }
     if(previousSchema<11&&!this.setting('audit:cursor'))this.setSetting('audit:cursor',String(this.db.prepare('SELECT COALESCE(MAX(id),0) AS n FROM audit').get().n));
-    this.db.exec('PRAGMA user_version = 13;');
+    this.db.exec(`
+      CREATE INDEX IF NOT EXISTS warnings_user_history ON warnings(user_id,created_at DESC);
+      CREATE INDEX IF NOT EXISTS absence_user_history ON absence_requests(user_id,created_at DESC);
+      CREATE INDEX IF NOT EXISTS check_member_history ON activity_check_members(user_id,check_id);
+      CREATE INDEX IF NOT EXISTS notice_due_kind ON feature_notices(status,kind,next_attempt);
+      CREATE INDEX IF NOT EXISTS check_deadline_due ON activity_check_sessions(status,deadline_at,next_attempt);
+      PRAGMA user_version = 14;
+    `);
   }
 
   close() { this.db.close(); }

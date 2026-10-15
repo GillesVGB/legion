@@ -3,8 +3,10 @@ import { commands } from '../src/commands.mjs';
 import { panel, applicationModal, ticketModal } from '../src/ui.mjs';
 import { applicationSteps } from '../src/application.mjs';
 import {releaseVersion,releaseNotes} from '../src/release-announcements.mjs';
+import {checkSyntax} from './check-syntax.mjs';
 
 try {
+  console.log(`Syntaxcontrole: ${checkSyntax()} JavaScript-bestanden OK.`);
   const config = loadConfig(process.env, false);
   if(!Array.isArray(releaseNotes[releaseVersion])||!releaseNotes[releaseVersion].length)throw new Error('Voeg een changelog toe voor de huidige botversie.');
   for (const guild of config.guilds) {

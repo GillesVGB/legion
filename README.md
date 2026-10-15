@@ -42,7 +42,7 @@ Rollen, kanaalinstellingen, warns, coins, spellen en dossiers zijn **per guild g
 
 Botrechten: **Kanalen bekijken, Berichten versturen, Berichtgeschiedenis lezen, Links insluiten, Bestanden bijvoegen, Kanalen beheren en Rollen beheren**. Plaats de botrol boven de rollen die hij moet beheren, zeker boven de ledenrol. Administrator is niet nodig voor de bot. Je eigen account moet administrator zijn om `/inrichten` en `/setup` te gebruiken.
 
-Nieuwe commands worden bij het starten automatisch geregistreerd: 31 in de hoofdserver en 25 in de community. `npm run deploy` kan dit ook handmatig doen; het vervangt de bestaande guild-commands van deze bot-applicatie.
+Nieuwe commands worden bij het starten automatisch geregistreerd: 32 in de hoofdserver en 26 in de community. `npm run deploy` kan dit ook handmatig doen; het vervangt de bestaande guild-commands van deze bot-applicatie.
 
 ## Commands
 
@@ -51,6 +51,7 @@ Nieuwe commands worden bij het starten automatisch geregistreerd: 31 in de hoofd
 | `/help` | Overzicht van de functies in de huidige guild. |
 | `/dashboard` | Open het privé dashboard als leiding. |
 | `/botstatus` | Leiding bekijkt verbinding, uptime, foutcodes en wachtende acties. |
+| `/lidinfo lid:@lid` | Leiding bekijkt recente check-ins, afmeldingen en gangwarns bij elkaar. Hetzelfde overzicht staat onder Leden in het dashboard. |
 | `/afwezig aanvragen van tot reden` | Vraag langere afwezigheid aan; Lead beoordeelt de periode en genoemde gangpotweken. |
 | `/afwezig status` | Bekijk eigen aanvragen en vrijgestelde weken. |
 | `/afwezig vrijstellen gebruiker termijn reden` | Lead geeft vrijstelling voor één specifieke gangpotweek. |
