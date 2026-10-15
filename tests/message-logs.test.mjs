@@ -43,9 +43,14 @@ test('verzenden van meerdere logdelen herstelt na een storing en een crash zonde
   f.channel.send=send;await flushAuditLogs(f.ctx,f.guild,NOW+61000);job=f.ctx.store.db.prepare('SELECT * FROM audit_deliveries WHERE id=?').get(job.id);assert.equal(f.channel.posted.size,JSON.parse(job.payloads).length);
   const count=f.channel.posted.size;f.ctx.store.db.prepare("UPDATE audit_deliveries SET message_id=NULL,message_ids='[]' WHERE id=?").run(job.id);f.ctx.store.setSetting('audit:cursor','0');await flushAuditLogs(f.ctx,f.guild,NOW+62000);assert.equal(f.channel.posted.size,count);
 });
-test('berichtinhoud gaat naar het privé leidinglog wanneer het ingestelde botlogkanaal publiek is',async t=>{
+test('berichtinhoud gaat naar het expliciet ingestelde botlogkanaal',async t=>{
   const f=fixture(t);f.channel.permissionsFor=()=>new PermissionsBitField([P.ViewChannel,P.SendMessages,P.ReadMessageHistory,P.EmbedLinks]);recordMessageEvent(f.ctx,'message.delete',message(f,'Alleen voor de leiding'));await flushAuditLogs(f.ctx,f.guild,NOW);
-  assert.equal(f.channel.posted.size,0);const privateChannel=f.guild.channels.cache.get(f.ctx.config.logChannelId);assert.equal(privateChannel.posted.size,1);assert.ok(JSON.stringify([...privateChannel.posted.values()].flatMap(item=>item.embeds)).includes('Alleen voor de leiding'));
+  assert.equal(f.channel.id,'1555685637129109586');assert.equal(f.channel.posted.size,1);const privateChannel=f.guild.channels.cache.get(f.ctx.config.logChannelId);assert.equal(privateChannel.posted.size,0);assert.ok(JSON.stringify([...f.channel.posted.values()].flatMap(item=>item.embeds)).includes('Alleen voor de leiding'));
+});
+test('een wachtend log uit een eerdere versie volgt het huidige botlogkanaal',async t=>{
+  const f=fixture(t),id=recordMessageEvent(f.ctx,'message.delete',message(f,'Log op de gevraagde plek'));
+  f.ctx.store.db.prepare('INSERT INTO audit_deliveries(id,first_id,last_id,channel_id) VALUES(?,?,?,?)').run('previous-job',id,id,f.ctx.config.logChannelId);
+  await flushAuditLogs(f.ctx,f.guild,NOW);assert.equal(f.channel.posted.size,1);assert.equal(f.guild.channels.cache.get(f.ctx.config.logChannelId).posted.size,0);assert.equal(f.ctx.store.db.prepare("SELECT channel_id FROM audit_deliveries WHERE id='previous-job'").get().channel_id,f.channel.id);
 });
 test('tokens, wachtwoorden en toegangssleutels blijven verborgen, gewone tekst en normale links blijven leesbaar',t=>{
   const f=fixture(t),raw=`Tekst ${f.ctx.config.token}\nwachtwoord=geheim\nhttps://example.com/nieuws\nhttps://example.com/#login=privaat\nhttps://discord.gg/invite`,id=recordMessageEvent(f.ctx,'message.delete',message(f,raw)),saved=JSON.stringify(snapshot(f,id));

@@ -32,10 +32,10 @@ export async function flushAuditLogs(ctx,guild,now=Date.now()){
       try{
         const rows=ctx.store.db.prepare('SELECT * FROM audit WHERE id>=? AND id<=? ORDER BY id').all(job.first_id,job.last_id).filter(item=>!item.event.endsWith('.started'));
         if(!rows.length){ctx.store.transaction(()=>{ctx.store.db.prepare("UPDATE audit_deliveries SET message_id='skipped' WHERE id=?").run(job.id);ctx.store.setSetting('audit:cursor',String(job.last_id));});continue;}
-        let channel=job.channel_id===destination.id?destination:ctx.config.botLogChannelId?await communityChannel(guild,job.channel_id):await staffLogChannel(guild,{...ctx.config,logChannelId:job.channel_id});
-        if(rows.some(item=>item.event.startsWith('message.'))){
-          try{await staffLogChannel(guild,{...ctx.config,logChannelId:channel.id});}
-          catch{channel=await staffLogChannel(guild,ctx.config);ctx.store.db.prepare('UPDATE audit_deliveries SET channel_id=? WHERE id=?').run(channel.id,job.id);}
+        const channel=destination;
+        if(job.channel_id!==channel.id){
+          ctx.store.db.prepare("UPDATE audit_deliveries SET channel_id=?,message_ids='[]' WHERE id=?").run(channel.id,job.id);
+          job.message_ids='[]';
         }
         let payloads=job.payloads?JSON.parse(job.payloads):null;
         if(!payloads){payloads=auditPayloads(ctx,rows,job.id);ctx.store.db.prepare('UPDATE audit_deliveries SET payloads=? WHERE id=?').run(JSON.stringify(payloads),job.id);}
@@ -45,7 +45,7 @@ export async function flushAuditLogs(ctx,guild,now=Date.now()){
           if(delivered[part])continue;
           const marker=`Legion • Log ${job.id} • ${part+1}/${payloads.length}`,legacy=`Legion • Log ${job.id}`;
           let posted=[...(history?.values()||[])].find(item=>item.author.id===guild.members.me.id&&item.embeds?.some(card=>card.footer?.text===marker||(part===0&&card.footer?.text===legacy)));
-          if(!posted)posted=await channel.send({...payloads[part],nonce:`al:${job.id}:${part}`,enforceNonce:true,allowedMentions:quiet});
+          if(!posted)posted=await channel.send({...payloads[part],nonce:`al:${job.id}:${part}:${channel.id.slice(-4)}`,enforceNonce:true,allowedMentions:quiet});
           delivered[part]=posted.id;ctx.store.db.prepare('UPDATE audit_deliveries SET message_ids=?,last_error=NULL WHERE id=?').run(JSON.stringify(delivered),job.id);
         }
         ctx.store.transaction(()=>{ctx.store.db.prepare('UPDATE audit_deliveries SET message_id=?,last_error=NULL WHERE id=?').run(delivered[0],job.id);ctx.store.setSetting('audit:cursor',String(job.last_id));});

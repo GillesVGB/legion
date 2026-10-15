@@ -1,4 +1,8 @@
 {
+  "1.8.2": [
+    "Alle botlogs, inclusief verwijderde en bewerkte berichten, gaan in de hoofdserver naar botlogkanaal 1555685637129109586.",
+    "Wachtende logs volgen ook het ingestelde botlogkanaal."
+  ],
   "1.8.1": [
     "Botlogs zijn opnieuw opgemaakt met Nederlandse titels en duidelijke velden voor auteur, kanaal, acties en tijdstippen.",
     "Verwijderde berichten tonen de beschikbare tekst en bijlagen. Bij wijzigingen tonen de logs de oude en nieuwe tekst.",
