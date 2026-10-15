@@ -30,6 +30,7 @@ import {announceRelease} from './release-announcements.mjs';
 import {publishAbsencePanel,handleAbsencePanel,handleAbsenceSelection} from './absence-panel.mjs';
 import {handleMemberOverview} from './member-overview.mjs';
 import {runMaintenanceJobs} from './maintenance.mjs';
+import {recordMessageEvent} from './message-logs.mjs';
 import { quiet, isStaff, requireStaff, requireAdmin, requireTickets, configureGuild, publishPanel,
   createCase, requestCaseDecision, decideCase, startInterview, cleanupInterviews, cleanupClosedCases, warningMessage, staffLogChannel, warnLogChannel, writeWarnLog, reconcileCases } from './service.mjs';
 
@@ -451,11 +452,12 @@ function logGuildEvent(guild,event,details){const ctx=contexts.get(guild.id);if(
 client.on(Events.GuildMemberAdd,member=>logGuildEvent(member.guild,'member.join',{user:member.id}));
 client.on(Events.GuildMemberRemove,member=>logGuildEvent(member.guild,'member.leave',{user:member.id}));
 client.on(Events.GuildMemberUpdate,(before,after)=>{const added=[...after.roles.cache.keys()].filter(id=>!before.roles.cache.has(id)),removed=[...before.roles.cache.keys()].filter(id=>!after.roles.cache.has(id));if(added.length||removed.length||before.displayName!==after.displayName)logGuildEvent(after.guild,'member.update',{user:after.id,added,removed,nicknameChanged:before.displayName!==after.displayName});});
-for(const [event,label] of [[Events.ChannelCreate,'channel.create'],[Events.ChannelDelete,'channel.delete'],[Events.GuildRoleCreate,'role.create'],[Events.GuildRoleDelete,'role.delete']])client.on(event,item=>{if(item.guild)logGuildEvent(item.guild,label,{id:item.id});});
+for(const [event,label] of [[Events.ChannelCreate,'channel.create'],[Events.ChannelDelete,'channel.delete'],[Events.GuildRoleCreate,'role.create'],[Events.GuildRoleDelete,'role.delete']])client.on(event,item=>{if(item.guild)logGuildEvent(item.guild,label,{id:item.id,name:item.name});});
 client.on(Events.ChannelUpdate,(before,after)=>{if(after.guild)logGuildEvent(after.guild,'channel.update',{id:after.id});});
 client.on(Events.GuildRoleUpdate,(before,after)=>logGuildEvent(after.guild,'role.update',{id:after.id,nameChanged:before.name!==after.name,permissionsChanged:before.permissions.bitfield!==after.permissions.bitfield}));
-client.on(Events.MessageDelete,message=>{if(message.guild&&!message.author?.bot)logGuildEvent(message.guild,'message.delete',{message:message.id,channel:message.channelId,user:message.author?.id});});
-client.on(Events.MessageUpdate,(before,after)=>{if(after.guild&&!after.author?.bot&&before.content!==after.content)logGuildEvent(after.guild,'message.edit',{message:after.id,channel:after.channelId,user:after.author?.id});});
+client.on(Events.MessageDelete,message=>{const ctx=contexts.get(message.guildId||message.guild?.id);if(ctx&&!shuttingDown)recordMessageEvent(ctx,'message.delete',message);});
+client.on(Events.MessageBulkDelete,messages=>{if(shuttingDown)return;for(const message of messages.values()){const ctx=contexts.get(message.guildId||message.guild?.id);if(ctx)recordMessageEvent(ctx,'message.delete',message,null,{bulk:true});}});
+client.on(Events.MessageUpdate,(before,after)=>{const ctx=contexts.get(after.guildId||after.guild?.id);if(ctx&&!shuttingDown)recordMessageEvent(ctx,'message.edit',after,before);});
 client.on(Events.GuildMemberRemove, member => {
   membershipChanged(member.guild); rosterChanged(member.guild);
   const ctx = contexts.get(member.guild.id); if (ctx) revokeAcceptances(ctx, client, member.id).catch(() => {});

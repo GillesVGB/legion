@@ -120,3 +120,7 @@ Als je een tunnel gebruikt: de bot probeert standaard IPv4 met protocol `auto` (
 - Een FPS.ms Error Event zonder Node.js-stacktrace: controleer eerst de hostingserver; dit is een fout van het paneel/hostingsysteem.
 
 De meegeleverde binary is voor **Linux x64**. Voor Windows of ARM kies je de bijpassende officiële [cloudflared-download](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/downloads/) en stel je het executable-pad in `.env` in.
+
+## Leesbare botlogs
+
+Vanaf 1.8.1 hebben Discord-logs Nederlandse titels en duidelijke velden. Verwijderde berichten tonen de beschikbare tekst en bijlagen; wijzigingen tonen vóór en na. Dit werkt voor nieuwe gebeurtenissen. Eerder verwijderde berichten kunnen niet achteraf worden opgehaald. Niet-gecachete inhoud wordt als niet beschikbaar aangegeven. Berichtinhoud wordt alleen in een gecontroleerd privé leidingkanaal geplaatst. Is het botlogkanaal zichtbaar voor niet-leiding, dan gebruikt de bot het bestaande privé leidinglog. In het dashboard staan de details onder Activiteit. Lange logs worden verdeeld over meerdere berichten; de verzendvoortgang blijft bij herstarts bewaard.

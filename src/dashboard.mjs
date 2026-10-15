@@ -28,6 +28,7 @@ import {createActivityCheck,cancelActivityCheck} from './activity-check.mjs';
 import {memberOverview} from './member-overview.mjs';
 import {backupSummary,createDataBackup} from './backups.mjs';
 import {releaseVersion} from './release-announcements.mjs';
+import {dashboardAuditItem} from './audit-format.mjs';
 
 const secret = () => randomBytes(32).toString('base64url');
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -130,7 +131,7 @@ export class Dashboard {
         rankOrder: roleId ? ranked.indexOf(roleId) : 999, legion: Boolean(config.memberRoleId && member.roles.cache.has(config.memberRoleId)), coins: wallets.get(member.id) ?? null };
     }).sort((a,b) => a.rankOrder-b.rankOrder || a.name.localeCompare(b.name,'nl'));
     const invitations = store.db.prepare('SELECT case_id,owner_id,target_guild_id,status,expires_at,last_error FROM acceptance_notifications ORDER BY rowid DESC LIMIT 100').all().map(item => ({ ...item, owner_name: name(item.owner_id) }));
-    const activity = store.db.prepare('SELECT * FROM audit ORDER BY id DESC LIMIT 80').all().map(item => ({ ...item, actor_name: name(item.actor_id), details: cleanAudit(JSON.parse(item.details)) }));
+    const activity = store.db.prepare("SELECT * FROM audit WHERE event NOT LIKE '%.started' ORDER BY id DESC LIMIT 80").all().map(item=>dashboardAuditItem(ctx,guild,item));
     const totals = store.db.prepare("SELECT COALESCE(SUM(kind='ticket' AND status='open'),0) AS tickets,COALESCE(SUM(kind='application' AND status='open'),0) AS applications,COALESCE(SUM(status='accepted'),0) AS accepted FROM cases").get();
     return { guild: { id: guild.id, name: guild.name, ticketsEnabled: config.ticketsEnabled, warningsEnabled: Boolean(config.warnLogChannelId), memberRoleId: config.memberRoleId, staffRoleNames: config.staffRoleIds.map(id => guild.roles.cache.get(id)?.name || id) },
       overview: { members: members.length, legionMembers: members.filter(member => member.legion).length, openTickets: totals.tickets,
@@ -308,7 +309,7 @@ export class Dashboard {
       failure(match,404,'Pagina niet gevonden.');
       const {ctx,guild,member}=await this.authorized(session,match[1]);
       if(match[4]){failure(request.method==='GET',405,'Gebruik GET.');send(200,memberOverview(ctx,guild,match[4]));return true;}
-      if(match[2]==='audit'){failure(request.method==='GET',405,'Gebruik GET.');const before=Number(new URL(request.url,'http://localhost').searchParams.get('before')||Number.MAX_SAFE_INTEGER);failure(Number.isSafeInteger(before)&&before>0,400,'Ongeldige logpagina.');const items=ctx.store.db.prepare('SELECT * FROM audit WHERE id<? ORDER BY id DESC LIMIT 100').all(before).map(item=>({...item,actor_name:guild.members.cache.get(item.actor_id)?.displayName||item.actor_id,details:cleanAudit(JSON.parse(item.details))}));send(200,{items});return true;}
+      if(match[2]==='audit'){failure(request.method==='GET',405,'Gebruik GET.');const before=Number(new URL(request.url,'http://localhost').searchParams.get('before')||Number.MAX_SAFE_INTEGER);failure(Number.isSafeInteger(before)&&before>0,400,'Ongeldige logpagina.');const items=ctx.store.db.prepare("SELECT * FROM audit WHERE id<? AND event NOT LIKE '%.started' ORDER BY id DESC LIMIT 100").all(before).map(item=>dashboardAuditItem(ctx,guild,item));send(200,{items});return true;}
       if(match[2]==='summary'){ failure(request.method==='GET',405,'Gebruik GET.');send(200,this.summary(ctx,guild,member));return true; }
       if(match[2]==='actions'){
         failure(request.method==='POST',405,'Gebruik POST.'); const value=await bodyJSON(request);

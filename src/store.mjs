@@ -189,6 +189,7 @@ export class Store {
         id TEXT PRIMARY KEY,first_id INTEGER NOT NULL,last_id INTEGER NOT NULL,channel_id TEXT NOT NULL,
         message_id TEXT,next_attempt INTEGER NOT NULL DEFAULT 0,last_error TEXT
       );
+      CREATE TABLE IF NOT EXISTS message_audit (audit_id INTEGER PRIMARY KEY,snapshot TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS release_announcements (version TEXT PRIMARY KEY,message_id TEXT,last_error TEXT);
       CREATE TABLE IF NOT EXISTS fish_collection (
         user_id TEXT NOT NULL,catch_id TEXT NOT NULL,amount INTEGER NOT NULL DEFAULT 1,
@@ -220,13 +221,15 @@ export class Store {
       this.db.exec("UPDATE promotions SET dirty=1,next_attempt=0 WHERE status='pending';");
     }
     if(previousSchema<11&&!this.setting('audit:cursor'))this.setSetting('audit:cursor',String(this.db.prepare('SELECT COALESCE(MAX(id),0) AS n FROM audit').get().n));
+    const auditColumns=new Set(this.db.prepare('PRAGMA table_info(audit_deliveries)').all().map(column=>column.name));
+    for(const [name,type] of [['message_ids',"TEXT NOT NULL DEFAULT '[]'"],['payloads','TEXT']])if(!auditColumns.has(name))this.db.exec(`ALTER TABLE audit_deliveries ADD COLUMN ${name} ${type};`);
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS warnings_user_history ON warnings(user_id,created_at DESC);
       CREATE INDEX IF NOT EXISTS absence_user_history ON absence_requests(user_id,created_at DESC);
       CREATE INDEX IF NOT EXISTS check_member_history ON activity_check_members(user_id,check_id);
       CREATE INDEX IF NOT EXISTS notice_due_kind ON feature_notices(status,kind,next_attempt);
       CREATE INDEX IF NOT EXISTS check_deadline_due ON activity_check_sessions(status,deadline_at,next_attempt);
-      PRAGMA user_version = 14;
+      PRAGMA user_version = 15;
     `);
   }
 
@@ -371,8 +374,8 @@ export class Store {
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
   audit(event, actor, details) {
-    this.db.prepare('INSERT INTO audit(event,actor_id,details,created_at) VALUES(?,?,?,?)')
-      .run(event, actor, JSON.stringify(cleanAudit(details)), Date.now());
+    return Number(this.db.prepare('INSERT INTO audit(event,actor_id,details,created_at) VALUES(?,?,?,?)')
+      .run(event, actor, JSON.stringify(cleanAudit(details)), Date.now()).lastInsertRowid);
   }
   addWarn(user, actor, reason) {
     return this.transaction(() => this.addWarnInside(user,actor,reason));

@@ -1,4 +1,10 @@
 {
+  "1.8.1": [
+    "Botlogs zijn opnieuw opgemaakt met Nederlandse titels en duidelijke velden voor auteur, kanaal, acties en tijdstippen.",
+    "Verwijderde berichten tonen de beschikbare tekst en bijlagen. Bij wijzigingen tonen de logs de oude en nieuwe tekst.",
+    "Lange logs worden volledig verdeeld over meerdere berichten en hervatten na storingen zonder dezelfde delen dubbel te versturen.",
+    "Berichtinhoud gaat uitsluitend naar een gecontroleerd privé leidingkanaal. Tokens, wachtwoorden en toegangssleutels blijven afgeschermd."
+  ],
   "1.8.0": [
     "Automatische privé-back-ups vóór een nieuwe botversie de gegevens bijwerkt; consistente SQLite-kopieën en instelbaar aantal bewaarde back-ups.",
     "Eenmalige check-in-herinnering aan leden zonder vinkje of goedgekeurde afwezigheid. Aan en uit en het tijdstip zijn instelbaar via het dashboard.",
