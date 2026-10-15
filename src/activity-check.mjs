@@ -25,15 +25,15 @@ export function activityCheckMessage(ctx,check){
   const members=membersOf(ctx,check.id),count=status=>members.filter(item=>item.status===status).length;
   const open=check.status==='open';
   const card=embed(ctx.config,'Legion — Activiteitencheck',`Laat weten dat je nog actief bent binnen Legion. Reageer vóór de deadline met **✅** onder dit bericht. Een geregistreerde bevestiging blijft bewaard.\n\n**Deadline:** <t:${Math.floor(check.deadline_at/1000)}:F> · <t:${Math.floor(check.deadline_at/1000)}:R>\n**Bevestigd:** ${count('responded')}/${members.length}\n**Status:** ${open?'🟢 Open':check.status==='closed'?'🔒 Afgerond':'⚪ Geannuleerd'}\n\n${open?'Niet op tijd bevestigd en geen goedgekeurde afwezigheid? Dan geeft de bot na de deadline automatisch één gangwarn. Dit geldt voor de Legion-leden die bij het starten van deze check zijn opgenomen.':check.status==='closed'?`**Goedgekeurd afwezig:** ${count('exempt')}\n**Gangwarns:** ${count('warned')}\n**Niet meer verplicht:** ${count('left')}`:'Deze check is geannuleerd. Er volgen geen nieuwe gangwarns.'}\n\nDeze check-in bevestigt je activiteit binnen Legion. Je Discord-status bepaalt niet of je een gangwarn krijgt.`).setColor(open?0x22C55E:check.status==='closed'?0x64748B:0xF59E0B).setFooter({text:marker(check.id)});
-  for(const [status,label] of [['responded','✅ Actief bevestigd'],['pending','⏳ Nog niet bevestigd'],['exempt','Goedgekeurd afwezig'],['warned','Gangwarn gegeven']]){
+  for(const [status,label] of [['responded','✅ Actief bevestigd'],['exempt','Goedgekeurd afwezig'],['warned','Gangwarn gegeven']]){
     const list=members.filter(item=>item.status===status);if(list.length)card.addFields({name:label,value:list.slice(0,25).map(item=>`<@${item.user_id}>`).join(', ')+(list.length>25?`\n… en ${list.length-25} anderen. Zie het dashboard voor de volledige lijst.`:'')});
   }
-  return{embeds:[card],components:[],allowedMentions:quiet};
+  return{content:`<@&${ctx.config.memberRoleId}>`,embeds:[card],components:[],allowedMentions:quiet};
 }
 export async function publishActivityCheck(ctx,guild,id){
   return serializeCommunity(`${guild.id}:checkin:${id}`,async()=>{
     const check=checkById(ctx,id);assertUser(check,'Deze activiteitencheck bestaat niet.');
-    const posted=await updateCommunityPost(ctx,guild,'activity_check_sessions',check,activityCheckMessage(ctx,check),marker(id));
+    const posted=await updateCommunityPost(ctx,guild,'activity_check_sessions',check,activityCheckMessage(ctx,check),marker(id),{parse:[],roles:[ctx.config.memberRoleId],users:[],repliedUser:false});
     if(posted&&check.status==='open'&&Date.now()<check.deadline_at){
       try{if(!posted.reactions.cache.get('✅')?.me)await posted.react('✅');}
       catch(error){ctx.store.db.prepare('UPDATE activity_check_sessions SET dirty=1,last_error=? WHERE id=?').run(String(error.code||error.name),id);throw error;}
@@ -49,6 +49,8 @@ export async function createActivityCheck(ctx,guild,member,input,now=Date.now())
   const channel=await communityChannel(guild,input.channelId);
   assertUser(channel.permissionsFor(guild.members.me)?.has([P.EmbedLinks,P.AddReactions,P.ManageMessages]),'Geef de bot Links insluiten, Reacties toevoegen en Berichten beheren in het check-in-kanaal.');
   assertUser(ctx.config.memberRoleId,'Stel eerst de Legion-ledenrol in.');
+  const role=await guild.roles.fetch(ctx.config.memberRoleId);
+  assertUser(role&&(role.mentionable||channel.permissionsFor(guild.members.me)?.has(P.MentionEveryone)),'De bot kan Legion nog niet taggen. Maak de Legion-rol vermeldbaar of geef de bot Iedereen, @here en alle rollen vermelden in dit kanaal.');
   const members=await refreshMembers(guild),targets=[...members.values()].filter(member=>eligible(ctx,member));
   assertUser(targets.length,'Er zijn geen mensen met de Legion-ledenrol om te controleren.');
   const id=randomBytes(6).toString('hex');
@@ -196,6 +198,9 @@ async function syncOpenCheckReactions(ctx,guild,id,now){
 }
 export async function syncActivityChecks(ctx,guild,now=Date.now()){
   if(ctx.config.guildId!=='1555685630640652338')return;
+  if(ctx.store.setting('activitycheck:layout')!=='2'){
+    ctx.store.transaction(()=>{ctx.store.db.prepare("UPDATE activity_check_sessions SET dirty=1,next_attempt=0 WHERE status='open'").run();ctx.store.setSetting('activitycheck:layout','2');});
+  }
   for(const item of ctx.store.db.prepare("SELECT id FROM activity_check_sessions WHERE status='open' AND deadline_at<=? AND next_attempt<=?").all(now,now)){
     try{await finishActivityCheck(ctx,guild,item.id,now);}catch(error){ctx.store.db.prepare('UPDATE activity_check_sessions SET last_error=?,next_attempt=? WHERE id=?').run(String(error.code||error.name),now+60000,item.id);}
   }

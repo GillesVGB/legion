@@ -1,4 +1,8 @@
 {
+  "1.7.3": [
+    "De lijst met leden die nog niet bevestigd hebben is uit het activiteitencheckbericht verwijderd.",
+    "Bij een nieuwe activiteitencheck tagt de bot de Legion-ledenrol. Bij verversen of herstarten wordt deze niet opnieuw gepingd."
+  ],
   "1.7.2": [
     "Activiteitencheck is nu een aparte check-in voor actieve leden, los van de activiteitenplanning.",
     "Start met /activiteitencheck datum tijd en eventueel kanaal. Leden reageren vóór de deadline met ✅ onder het bericht.",

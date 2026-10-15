@@ -109,9 +109,14 @@ test('commando antwoordt privé, vinkje bevestigt activiteit en dashboard kan de
   await dashboard.action(f.ctx,f.guild,f.lead,{action:'activitycheck.create',date:'morgenavond',time:'20:00',channelId:check.channel_id});assert.equal(f.ctx.store.db.prepare("SELECT COUNT(*) AS n FROM activity_check_sessions WHERE status='open'").get().n,1);
 });
 test('publicatie herstelt een verstuurd check-in-bericht na een crash zonder duplicaat',async t=>{
-  const f=fixture(t),{check}=await f.start();f.ctx.store.db.prepare('UPDATE activity_check_sessions SET message_id=NULL,published_at=NULL,dirty=1 WHERE id=?').run(check.id);
+  const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.planningChannelId),send=channel.send,sent=[];
+  channel.send=async payload=>{sent.push(payload);return send(payload);};
+  const {check}=await f.start();assert.equal(sent[0].content,`<@&${f.ctx.config.memberRoleId}>`);assert.deepEqual(sent[0].allowedMentions.roles,[f.ctx.config.memberRoleId]);assert.deepEqual(sent[0].allowedMentions.parse,[]);
+  f.ctx.store.db.prepare('UPDATE activity_check_sessions SET message_id=NULL,published_at=NULL,dirty=1 WHERE id=?').run(check.id);
   await publishActivityCheck(f.ctx,f.guild,check.id);assert.equal(f.guild.channels.cache.get(check.channel_id).posted.size,1);assert.equal(f.record(check.id).message_id,check.message_id);
-  const card=activityCheckMessage(f.ctx,f.record(check.id));assert.equal(card.embeds[0].data.fields[0].name,'⏳ Nog niet bevestigd');
+  await syncActivityChecks(f.ctx,f.guild,NOW+1000);assert.equal(sent.length,1);
+  for(const edit of f.calls.filter(item=>item.method==='message.edit'&&item.id===check.message_id)){assert.deepEqual(edit.payload.allowedMentions.parse,[]);assert.equal(edit.payload.allowedMentions.roles,undefined);}
+  const card=activityCheckMessage(f.ctx,f.record(check.id));assert.ok(!(card.embeds[0].data.fields||[]).some(item=>item.name.includes('Nog niet bevestigd')));
 });
 test('vinkjes uit een offline periode worden hersteld vóór de deadline en bij afronding',async t=>{
   const f=fixture(t),{check,posted}=await f.start(),reaction=posted.reactions.cache.get('✅');

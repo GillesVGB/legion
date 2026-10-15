@@ -14,7 +14,7 @@ export async function communityChannel(guild,id) {
   assertUser(channel.permissionsFor(guild.members.me)?.has([P.ViewChannel,P.SendMessages,P.ReadMessageHistory]),'De bot heeft Kanaal bekijken, Berichten versturen en Berichtgeschiedenis lezen nodig.');
   return channel;
 }
-export async function updateCommunityPost(ctx,guild,table,item,payload,marker) {
+export async function updateCommunityPost(ctx,guild,table,item,payload,marker,sendMentions=quiet) {
   assertUser(['activities','promotions','gangpot_claims','absence_requests','activity_check_sessions'].includes(table),'Onbekend onderdeel.');
   const channel=await communityChannel(guild,item.channel_id);
   let message=item.message_id?await channel.messages.fetch(item.message_id).catch(error=>{if(error.code===10008)return null;throw error;}):null;
@@ -34,7 +34,7 @@ export async function updateCommunityPost(ctx,guild,table,item,payload,marker) {
     return null; // Een bewust verwijderd bericht wordt niet opnieuw geplaatst.
   }
   assertUser(!message||message.author.id===guild.members.me.id,'Dit bericht hoort niet bij de Legion-bot.');
-  const posted=message?await message.edit({...payload,allowedMentions:quiet}):await channel.send({...payload,nonce:`${table==='gangpot_claims'?'gp':table==='absence_requests'?'ab':table==='activity_check_sessions'?'acp':table}:${item.id}`,enforceNonce:true,allowedMentions:quiet});
+  const posted=message?await message.edit({...payload,allowedMentions:quiet}):await channel.send({...payload,nonce:`${table==='gangpot_claims'?'gp':table==='absence_requests'?'ab':table==='activity_check_sessions'?'acp':table}:${item.id}`,enforceNonce:true,allowedMentions:sendMentions});
   ctx.store.db.prepare(`UPDATE ${table} SET message_id=?,dirty=0,next_attempt=0,last_error=NULL WHERE id=?`).run(posted.id,item.id);
   return posted;
 }
