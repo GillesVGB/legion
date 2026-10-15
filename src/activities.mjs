@@ -6,7 +6,6 @@ import { quiet,requireStaff } from './service.mjs';
 import { communityChannel,serializeCommunity,updateCommunityPost } from './community-posts.mjs';
 import {createAbsence,activityAbsences,approvedAway} from './absence.mjs';
 import {operationSettings} from './feature-settings.mjs';
-import {handleActivitiesCheck,syncActivityWarnings} from './activity-check.mjs';
 const latestReactions=new Map();
 
 export const attendanceChoices=[
@@ -59,15 +58,6 @@ export function planningDateSuggestions(value,now=Date.now()){
 }
 export async function handlePlanningAutocomplete(ctx,interaction,now=Date.now()){
   const option=interaction.options.getFocused(true);
-  if(interaction.commandName==='activiteitencheck'){
-    if(!ctx||ctx.config.guildId!=='1555685630640652338')return interaction.respond([]);
-    requireStaff(interaction,ctx.config);
-    const value=String(option.value||'').toLowerCase();
-    const choices=ctx.store.db.prepare("SELECT * FROM activities WHERE status!='cancelled' AND starts_at<=? ORDER BY starts_at DESC").all(now)
-      .map(item=>({name:`${new Date(item.starts_at).toLocaleString('nl-BE',{timeZone:'Europe/Brussels'})} · ${item.title} · ${item.id}`.slice(0,100),value:item.id}))
-      .filter(item=>item.name.toLowerCase().includes(value)).slice(0,25);
-    return interaction.respond(choices);
-  }
   const choices=ctx?.config.guildId==='1555685630640652338'&&ctx.config.planningChannelId&&option.name==='datum'?planningDateSuggestions(option.value,now):[];
   await interaction.respond(choices);
 }
@@ -83,7 +73,6 @@ export function activityMessage(ctx,activity,now=Date.now()) {
   if(activity.description)content+=`\n${safeText(activity.description)}\n`;
   content+=`\n### Kom voorbereid\n${safeText(operationSettings(ctx).planning.preparation)}\n\n### Laat weten of je erbij bent\n`;
   content+=attendanceChoices.map(choice=>`${choice.emoji}: ${choice.label} — **${responses.filter(item=>item.response===choice.id).length}**`).join('\n');
-  content+='\n\nGeen reactie én geen goedgekeurde afmelding? Vanaf de starttijd kan de leiding via /activiteitencheck een gangwarn laten geven.';
   if(operationSettings(ctx).planning.requireApproval){
     content+='\n\nEen rode reactie is een afmeldingsaanvraag. Alleen een goedgekeurde afmelding telt als toestemming om afwezig te zijn. Gebruik /afmelden planning reden voor je toelichting.';
     const absences=activityAbsences(ctx,activity);let remaining=1700-content.length;
@@ -172,7 +161,6 @@ export async function handlePlanningReaction(ctx,reaction,user,added) {
 export async function handlePlanningCommand(ctx,interaction) {
   requirePlanningGuild(ctx);
   const name=interaction.commandName;
-  if(name==='activiteitencheck')return handleActivitiesCheck(ctx,interaction);
   if(name==='planning') {
     requireStaff(interaction,ctx.config);await interaction.deferReply({flags:MessageFlags.Ephemeral});
     const result=await createActivity(ctx,interaction,{date:interaction.options.getString('datum',true),time:interaction.options.getString('tijd',true),location:interaction.options.getString('afspreekpunt',true)});
@@ -190,7 +178,6 @@ export async function handlePlanningCommand(ctx,interaction) {
   return interaction.reply({content,flags:MessageFlags.Ephemeral,allowedMentions:quiet});
 }
 export async function syncActivities(ctx,guild,now=Date.now()) {
-  await syncActivityWarnings(ctx,guild,now);
   ctx.store.db.prepare("UPDATE activities SET status='ended',dirty=1,next_attempt=0 WHERE status='open' AND ends_at<=?").run(now);
   for(const item of ctx.store.db.prepare('SELECT id FROM activities WHERE dirty=1 AND next_attempt<=? LIMIT 10').all(now)){
     try{await publishActivity(ctx,guild,item.id);}catch(error){ctx.store.db.prepare('UPDATE activities SET last_error=?,next_attempt=? WHERE id=?').run(String(error.code||error.name),now+60000,item.id);}

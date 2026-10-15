@@ -24,6 +24,7 @@ import {botHealth} from './bot-status.mjs';
 import {createActivity,planningTime} from './activities.mjs';
 import {communityChannel} from './community-posts.mjs';
 import {catches} from './fishing.mjs';
+import {createActivityCheck,cancelActivityCheck} from './activity-check.mjs';
 
 const secret = () => randomBytes(32).toString('base64url');
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -152,6 +153,7 @@ export class Dashboard {
       fishCollections:store.db.prepare('SELECT * FROM fish_collection ORDER BY last_at DESC LIMIT 200').all().map(item=>({...item,catch_name:catches.find(catchItem=>catchItem.id===item.catch_id)?.title||item.catch_id,userName:name(item.user_id)})),
       canReviewGangpot:viewer?.roles.cache.has(GANGPOT_LEAD_ROLE_ID)??false,
       planningChannelId:config.planningChannelId,
+      activityChecks:store.db.prepare('SELECT * FROM activity_check_sessions ORDER BY created_at DESC LIMIT 50').all().map(item=>({...item,url:item.message_id?`https://discord.com/channels/${guild.id}/${item.channel_id}/${item.message_id}`:null,members:store.db.prepare('SELECT * FROM activity_check_members WHERE check_id=? ORDER BY user_id').all(item.id).map(person=>({...person,name:name(person.user_id)}))})),
       plannings:store.db.prepare('SELECT * FROM activities ORDER BY starts_at DESC LIMIT 100').all().map(item=>({...item,absences:activityAbsences(ctx,item).map(person=>({...person,name:name(person.user_id)})),url:item.message_id?`https://discord.com/channels/${guild.id}/${item.channel_id}/${item.message_id}`:null,participants:store.db.prepare('SELECT user_id,response FROM activity_rsvps WHERE activity_id=? ORDER BY updated_at').all(item.id).map(person=>({...person,name:name(person.user_id)}))})),
       canVotePromotions:viewer?.roles.cache.has(PROMOTION_LEAD_ROLE_ID)??false,
       promotions:store.db.prepare('SELECT * FROM promotions ORDER BY created_at DESC LIMIT 100').all().map(item=>({...item,voting:promotionVotes(ctx,item.id),member_name:name(item.member_id),role_name:guild.roles.cache.get(item.role_id)?.name||item.role_id,url:item.message_id?`https://discord.com/channels/${guild.id}/${item.channel_id}/${item.message_id}`:null})),
@@ -173,6 +175,8 @@ export class Dashboard {
   async performAction(ctx,guild,member,value){
     const { store, config } = ctx;
     const actor = member.id;
+    if(value.action==='activitycheck.create'){const result=await createActivityCheck(ctx,guild,member,{date:value.date,time:value.time,channelId:value.channelId||config.planningChannelId});return{message:result.posted?'Activiteitencheck geplaatst. De controle na de deadline gebeurt automatisch.':'Check opgeslagen; het plaatsen wordt opnieuw geprobeerd.'};}
+    if(value.action==='activitycheck.cancel'){assertUser(value.confirm===true,'Bevestig het annuleren van de activiteitencheck.');await cancelActivityCheck(ctx,guild,member,value.id);return{message:'Activiteitencheck geannuleerd.'};}
     if(['absence.approve','absence.reject'].includes(value.action)){assertUser(value.confirm===true,'Bevestig de afmelding.');await decideAbsence(ctx,guild,member,value.id,value.action.split('.')[1]);await syncAbsences(ctx,guild);await syncGangpot(ctx,this.client);return{message:'Afmelding beoordeeld.'};}
     if(['absence.exempt','absence.revoke'].includes(value.action)){await setExemption(ctx,guild,member,value.userId,value.week,value.reason,value.action==='absence.revoke');await syncGangpot(ctx,this.client);return{message:'Vrijstelling bijgewerkt.'};}
     if(value.action==='planning.create'){const interaction={guild,user:member.user,member,memberPermissions:member.permissions};const result=await createActivity(ctx,interaction,{date:value.date,time:value.time,location:value.location,title:value.title,description:value.description,duration:value.duration});return{message:result.posted?'Planning geplaatst.':'Planning opgeslagen; de bot probeert opnieuw.'};}

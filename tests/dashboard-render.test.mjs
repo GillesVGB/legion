@@ -17,10 +17,12 @@ test('nieuwe dashboardpagina’s tonen de gangmodules, weigeren de community-pla
     const source=readFileSync(new URL('../src/dashboard-assets/app.js',import.meta.url),'utf8');
     const context=vm.createContext({data,Intl,Date,Number,String,Math,URL,console});
     vm.runInContext(source.slice(0,source.indexOf("document.addEventListener('click'"))+`\nstate.data=data;`,context);
-    const planning=vm.runInContext('planningPage()',context),promotions=vm.runInContext('promotionsPage()',context),games=vm.runInContext('gamesPage()',context);
+    data.activityChecks=[{id:'0123456789ab',deadline_at:Date.now(),status:'open',url:null,members:[{name:'<script>Naam</script>',status:'pending'}]}];
+    const planning=vm.runInContext('planningPage()',context),checks=vm.runInContext('activityChecksPage()',context),promotions=vm.runInContext('promotionsPage()',context),games=vm.runInContext('gamesPage()',context);
     assert.ok(planning.includes('emoji-reacties')&&planning.includes('🟢 1'));
     assert.ok(!planning.includes('<script>')&&!planning.includes('<img onerror='));
     assert.ok(planning.includes('&lt;script&gt;')&&promotions.includes('&lt;script&gt;'));
+    assert.ok(checks.includes('Nieuwe check-in')&&checks.includes('Nog niet bevestigd')&&checks.includes('&lt;script&gt;')&&!checks.includes('<script>'));
     assert.ok(promotions.includes('Goedkeuren')&&games.includes('Dagelijkse fun-missies'));
     vm.runInContext('state.data.planningChannelId="";',context);
     assert.ok(vm.runInContext('planningPage()',context).includes('Alleen in de gangserver'));

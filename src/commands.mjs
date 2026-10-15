@@ -54,8 +54,11 @@ export function commands(maxBet, ticketsEnabled = true) {
       .addStringOption(o=>o.setName('tijd').setDescription('Belgische tijd: UU:MM, bijvoorbeeld 20:30').setRequired(true).setMaxLength(5))
       .addStringOption(o=>o.setName('afspreekpunt').setDescription('Waar verzamelen we?').setRequired(true).setMaxLength(160)),
     cmd('planning-overzicht','Bekijk de komende Legion-activiteiten'),
-    cmd('activiteitencheck','Controleer reacties na de starttijd en geef ontbrekende leden een gangwarn (leiding)')
-      .addStringOption(o=>o.setName('planning').setDescription('Kies de planning die je wilt controleren').setRequired(true).setMinLength(12).setMaxLength(12).setAutocomplete(true)),
+    cmd('activiteitencheck','Start een check-in; niet op tijd bevestigen geeft automatisch een gangwarn (leiding)')
+      .addStringOption(o=>o.setName('datum').setDescription('Deadline: DD-MM-JJJJ, deze avond of morgenavond').setRequired(true).setMaxLength(32).setAutocomplete(true))
+      .addStringOption(o=>o.setName('tijd').setDescription('Deadline in Belgische tijd: UU:MM').setRequired(true).setMaxLength(5))
+      .addChannelOption(o=>o.setName('kanaal').setDescription('Standaard: het kanaal waarin je het commando gebruikt').addChannelTypes(ChannelType.GuildText)),
+    cmd('activiteitencheck-stop','Annuleer de lopende activiteitencheck zonder nieuwe gangwarns (leiding)'),
     cmd('planning-annuleren','Annuleer een planning (alleen leiding)')
       .addStringOption(o=>o.setName('id').setDescription('Planning-ID onderaan het bericht').setRequired(true).setMinLength(12).setMaxLength(12)),
     cmd('promotie','Stel een hogere gangrang voor; de leiding beoordeelt het voorstel')
@@ -101,5 +104,5 @@ export function commands(maxBet, ticketsEnabled = true) {
       .addChoices({ name: 'Steen', value: 'steen' }, { name: 'Papier', value: 'papier' }, { name: 'Schaar', value: 'schaar' }))
   ];
   return result.filter(command => (ticketsEnabled || !['ticket','solliciteren','sollicitatiestatus'].includes(command.name)) &&
-    (!ticketsEnabled || !['planning','planning-overzicht','planning-annuleren','activiteitencheck','promotie','gangpot','afwezig','afmelden'].includes(command.name))).map(command => command.toJSON());
+    (!ticketsEnabled || !['planning','planning-overzicht','planning-annuleren','activiteitencheck','activiteitencheck-stop','promotie','gangpot','afwezig','afmelden'].includes(command.name))).map(command => command.toJSON());
 }

@@ -18,6 +18,7 @@ import { fishCatch } from './fishing.mjs';
 import { missionMessage, handleMissionButton } from './missions.mjs';
 import { showApplicationStatus } from './application-status.mjs';
 import { handlePlanningCommand,handlePlanningAutocomplete,handlePlanningReaction,clearPlanningReactions,syncActivities } from './activities.mjs';
+import {handleActivitiesCheck,handleStopActivityCheck,handleActivityCheckReaction,syncActivityChecks} from './activity-check.mjs';
 import { handlePromotionCommand,handlePromotionButton,syncPromotions } from './promotions.mjs';
 import { syncCommands } from './command-sync.mjs';
 import {handleGangpotCommand,handleGangpotStatus,handleGangpotReview,syncGangpot} from './gangpot.mjs';
@@ -182,7 +183,7 @@ async function handleCommand(ctx, interaction) {
   if (name === 'help') {
     return interaction.reply({ ...privateReply, embeds: [embed(config, 'Legion | Commands', [
       `**Algemeen:** /info, /regels, /rangen, /mijnwarns${config.ticketsEnabled?', /solliciteren, /sollicitatiestatus':''}`,
-      ...(!config.ticketsEnabled ? ['**Gang:** /planning, /planning-overzicht, /planning-annuleren, /activiteitencheck, /promotie, /gangpot, /afwezig, /afmelden'] : []),
+      ...(!config.ticketsEnabled ? ['**Gang:** /planning, /planning-overzicht, /planning-annuleren, /activiteitencheck, /activiteitencheck-stop, /promotie, /gangpot, /afwezig, /afmelden'] : []),
       ...(config.ticketsEnabled ? ['**Tickets:** /ticket openen, /ticket sluiten'] : []),
       '**Games:** /blackjack, /coinflip, /dobbel, /8ball, /steenpapier, /fish, /vangstenboek',
       '**Coins:** /saldo, /daily, /leaderboard, /missies',
@@ -194,7 +195,9 @@ async function handleCommand(ctx, interaction) {
   }
   if (['info', 'regels', 'rangen'].includes(name)) return info(ctx, interaction, name);
   if (name === 'sollicitatiestatus') return showApplicationStatus(ctx,interaction);
-  if (['planning','planning-overzicht','planning-annuleren','activiteitencheck'].includes(name)) return handlePlanningCommand(ctx,interaction);
+  if(name==='activiteitencheck')return handleActivitiesCheck(ctx,interaction);
+  if(name==='activiteitencheck-stop')return handleStopActivityCheck(ctx,interaction);
+  if (['planning','planning-overzicht','planning-annuleren'].includes(name)) return handlePlanningCommand(ctx,interaction);
   if (name === 'promotie') return handlePromotionCommand(ctx,interaction);
   if (name === 'gangpot') return handleGangpotCommand(ctx,interaction);
   if (['afwezig','afmelden'].includes(name)) return handleAbsenceCommand(ctx,interaction);
@@ -501,7 +504,7 @@ async function drainTranscripts() {
       if (guild&&ctx.config.gangpot) await syncGangpot(ctx,client).catch(error=>console.error(`Gangpotcontrole wacht op herhaling (${error.code??error.name}).`));
       if(guild){await syncAbsences(ctx,guild).catch(error=>console.error(`Afmeldingen wachten (${error.code??error.name}).`));if(ctx.config.absencePanelChannelId)await publishAbsencePanel(ctx,guild).catch(error=>ctx.store.setSetting('absence:panel:error',String(error.code||error.name)));await announceRelease(ctx,guild);}
       if (guild) await cleanupInterviews(ctx, guild);
-      if (guild) { await syncActivities(ctx,guild); await syncPromotions(ctx,guild); }
+      if (guild) { await syncActivityChecks(ctx,guild); await syncActivities(ctx,guild); await syncPromotions(ctx,guild); }
       for (const notice of ctx.store.pendingAcceptances()) await locks.run(`${ctx.config.guildId}:admission:${notice.case_id}`, () => deliverAcceptance(ctx, client, notice.case_id));
       await expireAcceptanceInvites(ctx, client);
       for (const delivery of ctx.store.pendingTranscripts()) {
@@ -519,6 +522,7 @@ client.on(Events.Error, error => console.error(`Discord-verbinding: ${error.code
 for(const [event,added] of [[Events.MessageReactionAdd,true],[Events.MessageReactionRemove,false]])client.on(event,(reaction,user)=>{
   const ctx=contexts.get(reaction.message.guildId);if(!ctx?.ready||user.id===client.user?.id)return;
   handlePlanningReaction(ctx,reaction,user,added).catch(error=>console.error(`Planningreactie wordt opnieuw gesynchroniseerd (${error.code??error.name}).`));
+  handleActivityCheckReaction(ctx,reaction,user,added).catch(error=>console.error(`Check-in-reactie wacht op herstel (${error.code??error.name}).`));
 });
 client.on(Events.MessageReactionRemoveAll,message=>{const ctx=contexts.get(message.guildId);if(ctx?.ready)clearPlanningReactions(ctx,message).catch(()=>{});});
 client.on(Events.MessageReactionRemoveEmoji,reaction=>{const ctx=contexts.get(reaction.message.guildId);if(ctx?.ready)clearPlanningReactions(ctx,reaction.message,reaction.emoji.name).catch(()=>{});});

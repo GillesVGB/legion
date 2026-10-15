@@ -42,7 +42,7 @@ Rollen, kanaalinstellingen, warns, coins, spellen en dossiers zijn **per guild g
 
 Botrechten: **Kanalen bekijken, Berichten versturen, Berichtgeschiedenis lezen, Links insluiten, Bestanden bijvoegen, Kanalen beheren en Rollen beheren**. Plaats de botrol boven de rollen die hij moet beheren, zeker boven de ledenrol. Administrator is niet nodig voor de bot. Je eigen account moet administrator zijn om `/inrichten` en `/setup` te gebruiken.
 
-Nieuwe commands worden bij het starten automatisch geregistreerd: 30 in de hoofdserver en 25 in de community. `npm run deploy` kan dit ook handmatig doen; het vervangt de bestaande guild-commands van deze bot-applicatie.
+Nieuwe commands worden bij het starten automatisch geregistreerd: 31 in de hoofdserver en 25 in de community. `npm run deploy` kan dit ook handmatig doen; het vervangt de bestaande guild-commands van deze bot-applicatie.
 
 ## Commands
 
@@ -66,7 +66,8 @@ Nieuwe commands worden bij het starten automatisch geregistreerd: 30 in de hoofd
 | `/sollicitatiestatus` | Bekijk privé je wachtlijstpositie, gesprekstatus of de beslissing. |
 | `/planning datum tijd afspreekpunt` | Leiding plaatst een tekstbericht met vier emoji-reacties in het vaste gangkanaal. |
 | `/planning-overzicht` | Bekijk privé de komende activiteiten in de gangserver. |
-| `/activiteitencheck planning` | Leiding kiest een planning vanaf de starttijd. Legion-leden zonder emoji-reactie en zonder goedgekeurde afmelding krijgen één gangwarn per activiteit, met log en DM. |
+| `/activiteitencheck-stop` | Annuleer de lopende check-in zonder nieuwe gangwarns. |
+| `/activiteitencheck datum tijd [kanaal]` | Start een aparte check-in. Leden reageren vóór de deadline met **✅**; zonder bevestiging of goedgekeurde afwezigheid volgt automatisch één gangwarn. |
 | `/planning-annuleren id` | Leiding sluit een planning en stopt nieuwe aanwezigheidskeuzes. |
 | `/promotie lid rang motivatie` | Stel een hogere gangrang voor; vanaf drie unieke Lead-stemmen beslist de meerderheid. |
 | `/gangpot betaling` | Meld je eigen in-game betaling van standaard $25.000; Lead moet goedkeuren. |
@@ -90,7 +91,7 @@ Nieuwe commands worden bij het starten automatisch geregistreerd: 30 in de hoofd
 | `/steenpapier keuze:steen` | Steen, papier, schaar tegen de bot. |
 | `/fish` | Vissen: zeldzame vangsten geven meer coins, slechte vangsten kosten coins. |
 
-`/activiteitencheck planning` controleert de actuele Discord-reacties wanneer de leiding het commando uitvoert, vanaf de starttijd in Belgische tijd. Kies de planning uit de suggesties of plak de Planning-ID onderaan het bericht. Alle vier de aanwezigheidsreacties tellen mee; een rode reactie blijft daarnaast een afmeldingsaanvraag die Lead moet beoordelen. Alleen mensen met de Legion-ledenrol worden gecontroleerd. Goedgekeurde planningafmeldingen en goedgekeurde langere afwezigheid voor die datum geven vrijstelling. Bots, bezoekers en leden die pas na de start zijn gejoind krijgen geen warn. Een geannuleerde planning kan niet worden gecontroleerd. Herhalen of opnieuw starten maakt geen dubbele warns, ook niet nadat de leiding zo'n warn handmatig heeft ingetrokken. Als Discord de leden of reacties niet volledig kan ophalen, stopt de controle zonder nieuwe warns.
+`/activiteitencheck datum:morgenavond tijd:20:00` start een aparte check-in in het huidige kanaal. Met het optionele `kanaal` kies je een ander tekstkanaal in de hoofdserver. De deadline is in Belgische tijd en moet binnen 31 dagen liggen. Leden bevestigen met een **✅-reactie** onder het bericht; dit werkt ook wanneer hun Discord-status onzichtbaar is. De bot controleert automatisch binnen ongeveer één minuut na de deadline en geeft maximaal één gangwarn per lid en check, met log en DM. Hiervoor is geen planning nodig. Alleen mensen met de Legion-ledenrol bij het starten worden opgenomen. Goedgekeurde langere afwezigheid die de deadlinedatum omvat geeft vrijstelling; een losse afmelding voor een planning geldt uitsluitend voor die planning. Nieuwe leden na het starten, bots, bezoekers, vertrokken leden en leden die hun ledenrol verloren zijn krijgen geen warn. De leiding kan een lopende check annuleren via /activiteitencheck-stop of het dashboard. Check-ins, bevestigingen en afhandeling blijven bewaard bij herstarts. Een verwijderde of niet tijdig gepubliceerde check geeft geen nieuwe warns; bij verbindingsproblemen wacht de controle op herstel. Discord geeft geen tijdstip van een losse emoji-reactie mee. Bij herstel tellen bestaande vinkjes daarom mee om onterechte waarschuwingen te voorkomen.
 | `/inrichten` | Administrator kiest leiding- en ledenrol en maakt kanalen. |
 | `/setup paneel:alles` | Plaatst/ververst het gecombineerde paneel van deze guild. |
 
