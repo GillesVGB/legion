@@ -1,3 +1,4 @@
+import {warnAppealRow} from './warn-appeal-ui.mjs';
 import {canonicalBrandText} from './branding.mjs';
 import {randomBytes} from 'node:crypto';
 import {MessageFlags,PermissionFlagsBits as P} from 'discord.js';
@@ -116,7 +117,7 @@ export async function finishActivityCheck(ctx,guild,id,now=Date.now()){
         const warning=ctx.store.addWarnInside(entry.user_id,guild.members.me.id,reason,now);
         ctx.store.db.prepare('INSERT INTO activity_check_warnings(activity_id,user_id,warn_id,created_at) VALUES(?,?,?,?)').run(id,entry.user_id,warning.id,now);
         ctx.store.db.prepare("UPDATE activity_check_members SET status='warned',warn_id=? WHERE check_id=? AND user_id=?").run(warning.id,id,entry.user_id);
-        queueFeatureNotice(ctx,{key:`activity.warn:${id}:${entry.user_id}`,kind:'activity.warn',user:entry.user_id,now,payload:{embeds:[embed(ctx.config,'Bakarov — Gangwarn: activiteitencheck',`${safeText(reason)}\n\nJe had vóór de deadline niet met **✅** gereageerd en geen goedgekeurde afwezigheid.\n**Actieve gangwarns:** ${warning.count}\n**Warn-ID:** \`${warning.id}\`\n[Check-in bekijken](https://discord.com/channels/${guild.id}/${check.channel_id}/${check.message_id})\nNeem contact op met de leiding als deze waarschuwing niet klopt.`).setColor(0xEF4444)]}});
+        queueFeatureNotice(ctx,{key:`activity.warn:${id}:${entry.user_id}`,kind:'activity.warn',user:entry.user_id,now,payload:{components:[warnAppealRow(ctx.config.guildId,warning.id)],embeds:[embed(ctx.config,'Bakarov — Gangwarn: activiteitencheck',`${safeText(reason)}\n\nJe had vóór de deadline niet met **✅** gereageerd en geen goedgekeurde afwezigheid.\n**Actieve gangwarns:** ${warning.count}\n**Warn-ID:** \`${warning.id}\`\n[Check-in bekijken](https://discord.com/channels/${guild.id}/${check.channel_id}/${check.message_id})\nNeem contact op met de leiding als deze waarschuwing niet klopt.`).setColor(0xEF4444)]}});
       }
       ctx.store.db.prepare("UPDATE activity_check_sessions SET status='closed',checked_at=?,dirty=1,next_attempt=0,last_error=NULL WHERE id=?").run(now,id);
       ctx.store.audit('activitycheck.finish',guild.members.me.id,{id,results:membersOf(ctx,id)});
@@ -139,7 +140,7 @@ export async function syncActivityWarnings(ctx,guild,now=Date.now()){
           message=[...history.values()].find(value=>value.author.id===guild.members.me.id&&value.embeds?.some(card=>canonicalBrandText(card.footer?.text)===marker));
         }
         const count=ctx.store.warnCount(item.user_id),threshold=count>=ctx.config.warnThreshold?`\n⚠️ Drempel bereikt: ${count}/${ctx.config.warnThreshold}. De leiding moet dit beoordelen.`:'';
-        message??=await channel.send({embeds:[embed(ctx.config,'Bakarov — Gangwarn: activiteitencheck',`**Lid:** <@${item.user_id}>\n**Reden:** ${safeText(item.reason)}\n**Warn-ID:** \`${item.warn_id}\`\n**Actieve warns:** ${count}${threshold}`).setColor(0xEF4444).setFooter({text:marker})],nonce:`ac:${item.warn_id}`,enforceNonce:true,allowedMentions:quiet});
+        message??=await channel.send({components:[warnAppealRow(ctx.config.guildId,item.warn_id)],embeds:[embed(ctx.config,'Bakarov — Gangwarn: activiteitencheck',`**Lid:** <@${item.user_id}>\n**Reden:** ${safeText(item.reason)}\n**Warn-ID:** \`${item.warn_id}\`\n**Actieve warns:** ${count}${threshold}`).setColor(0xEF4444).setFooter({text:marker})],nonce:`ac:${item.warn_id}`,enforceNonce:true,allowedMentions:quiet});
         db.prepare('UPDATE activity_check_warnings SET log_id=?,last_error=NULL WHERE warn_id=?').run(message.id,item.warn_id);
       }catch(error){db.prepare('UPDATE activity_check_warnings SET next_attempt=?,last_error=? WHERE warn_id=?').run(now+60000,String(error.code||error.name),item.warn_id);}
     }

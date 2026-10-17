@@ -17,7 +17,7 @@ export async function communityChannel(guild,id) {
   return channel;
 }
 export async function updateCommunityPost(ctx,guild,table,item,payload,marker,sendMentions=quiet) {
-  assertUser(['activities','promotions','gangpot_claims','absence_requests','activity_check_sessions'].includes(table),'Onbekend onderdeel.');
+  assertUser(['activities','promotions','gangpot_claims','absence_requests','activity_check_sessions','warn_appeals'].includes(table),'Onbekend onderdeel.');
   const channel=await communityChannel(guild,item.channel_id);
   let message=item.message_id?await channel.messages.fetch(item.message_id).catch(error=>{if(error.code===10008)return null;throw error;}):null;
   if(!message&&!item.message_id) {

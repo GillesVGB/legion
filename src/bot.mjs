@@ -32,6 +32,10 @@ import {handleMemberOverview} from './member-overview.mjs';
 import {runMaintenanceJobs} from './maintenance.mjs';
 import {recordMessageEvent} from './message-logs.mjs';
 import {syncBotBranding} from './branding.mjs';
+import {syncMonthlyReports,handleMonthlyReport} from './monthly-reports.mjs';
+import {syncAbsenceCorrections} from './absence-corrections.mjs';
+import {handleWarnAppealButton,handleWarnAppealCommand,syncWarnAppeals} from './warn-appeals.mjs';
+import {warnAppealRow,warnAppealRows} from './warn-appeal-ui.mjs';
 import { quiet, isStaff, requireStaff, requireAdmin, requireTickets, configureGuild, publishPanel,
   createCase, requestCaseDecision, decideCase, startInterview, cleanupInterviews, cleanupClosedCases, warningMessage, staffLogChannel, warnLogChannel, writeWarnLog, reconcileCases } from './service.mjs';
 
@@ -86,7 +90,7 @@ async function info(ctx, interaction, name = 'info') {
 async function handleWarn(ctx, interaction) {
   const { config, store } = ctx;
   if (interaction.commandName === 'mijnwarns') {
-    await interaction.reply({ ...privateReply, embeds: [warningMessage(config, store, interaction.user.id)] });
+    await interaction.reply({ ...privateReply, embeds: [warningMessage(config, store, interaction.user.id)],components:warnAppealRows(config.guildId,store.warnings(interaction.user.id)) });
     return;
   }
   requireStaff(interaction, config);
@@ -113,8 +117,8 @@ async function handleWarn(ctx, interaction) {
     }
     const { id, count } = store.addWarn(user.id, interaction.user.id, reason);
     const threshold = count >= config.warnThreshold ? `\n⚠️ **Drempel bereikt: ${count}/${config.warnThreshold} actieve warns. De leiding moet dit beoordelen.**` : '';
-    const logged = await writeWarnLog(ctx, interaction.guild, 'Bakarov | Gangwarn gegeven', `Lid: <@${user.id}>\nDoor: <@${interaction.user.id}>\nID: \`${id}\`\nReden: ${safeText(reason)}\nActieve warns: **${count}**${threshold}`);
-    const dm = await user.send({ embeds: [embed(config, 'Bakarov | Gangwarn', `Guild: **${safeText(interaction.guild.name)}**\nReden: ${safeText(reason)}\nActieve warns: **${count}**\nID: \`${id}\`\nNeem contact op met de leiding als je hierover vragen hebt.`)], allowedMentions: quiet }).then(() => true).catch(() => false);
+    const logged = await writeWarnLog(ctx, interaction.guild, 'Bakarov | Gangwarn gegeven', `Lid: <@${user.id}>\nDoor: <@${interaction.user.id}>\nID: \`${id}\`\nReden: ${safeText(reason)}\nActieve warns: **${count}**${threshold}`, [warnAppealRow(config.guildId,id)]);
+    const dm = await user.send({ embeds: [embed(config, 'Bakarov | Gangwarn', `Guild: **${safeText(interaction.guild.name)}**\nReden: ${safeText(reason)}\nActieve warns: **${count}**\nID: \`${id}\`\nNeem contact op met de leiding als je hierover vragen hebt.`)], components:[warnAppealRow(config.guildId,id)],allowedMentions: quiet }).then(() => true).catch(() => false);
     await interaction.editReply({ content: `Gangwarn \`${id}\` opgeslagen voor <@${user.id}>. Actieve warns: **${count}**.${threshold}${dm ? '' : '\nDM niet afgeleverd; het lid kan /mijnwarns gebruiken.'}${logged ? '' : '\nDiscord-log mislukt; de gebeurtenis is lokaal opgeslagen.'}`, allowedMentions: quiet });
   } else {
     const id = interaction.options.getString('id', true).trim().toLowerCase();
@@ -187,7 +191,7 @@ async function handleCommand(ctx, interaction) {
   if (name === 'help') {
     return interaction.reply({ ...privateReply, embeds: [embed(config, 'Bakarov | Commands', [
       `**Algemeen:** /info, /regels, /rangen, /mijnwarns${config.ticketsEnabled?', /solliciteren, /sollicitatiestatus':''}`,
-      ...(!config.ticketsEnabled ? ['**Gang:** /planning, /planning-overzicht, /planning-annuleren, /activiteitencheck, /activiteitencheck-stop, /promotie, /gangpot, /afwezig, /afmelden'] : []),
+      ...(!config.ticketsEnabled ? ['**Gang:** /planning, /planning-overzicht, /planning-annuleren, /activiteitencheck, /activiteitencheck-stop, /promotie, /gangpot, /afwezig, /afmelden, /maandoverzicht, /bezwaar'] : []),
       ...(config.ticketsEnabled ? ['**Tickets:** /ticket openen, /ticket sluiten'] : []),
       '**Games:** /blackjack, /coinflip, /dobbel, /8ball, /steenpapier, /fish, /vangstenboek',
       '**Coins:** /saldo, /daily, /leaderboard, /missies',
@@ -201,6 +205,8 @@ async function handleCommand(ctx, interaction) {
   if (name === 'sollicitatiestatus') return showApplicationStatus(ctx,interaction);
   if(name==='activiteitencheck')return handleActivitiesCheck(ctx,interaction);
   if(name==='lidinfo')return handleMemberOverview(ctx,interaction);
+  if(name==='maandoverzicht')return handleMonthlyReport(ctx,interaction);
+  if(name==='bezwaar')return handleWarnAppealCommand(ctx,interaction);
   if(name==='activiteitencheck-stop')return handleStopActivityCheck(ctx,interaction);
   if (['planning','planning-overzicht','planning-annuleren'].includes(name)) return handlePlanningCommand(ctx,interaction);
   if (name === 'promotie') return handlePromotionCommand(ctx,interaction);
@@ -261,6 +267,7 @@ async function handleCommand(ctx, interaction) {
 }
 
 async function handleButton(ctx, interaction) {
+  if(interaction.customId.startsWith('warnappeal:'))return handleWarnAppealButton(ctx,interaction);
   const [type, action, id, extra, confirmer] = interaction.customId.split(':');
   if(type==='absencepanel')return handleAbsencePanel(ctx,interaction);
   if(type==='absflow')return handleAbsenceSelection(ctx,interaction);
@@ -360,9 +367,11 @@ client.on(Events.InteractionCreate, async interaction => {
     catch{if(!interaction.responded)await interaction.respond([]).catch(()=>{});}
     return;
   }
-  const activeContext=contexts.get(interaction.guildId);let interactionError;
+  const dmAppeal=interaction.isButton()&&/^warnappeal:start:(\d{17,20}):([a-f0-9]{12})$/.exec(interaction.customId);
+  const activeContext=contexts.get(interaction.guildId||dmAppeal?.[1]);let interactionError;
   if(activeContext)recordInteraction(activeContext,interaction,'started');
   try {
+    if(!interaction.inGuild()&&dmAppeal){assertUser(activeContext?.ready,'De hoofdserver is nog niet klaar. Probeer straks opnieuw.');await handleWarnAppealButton(activeContext,interaction);return;}
     assertUser(interaction.inGuild(), 'Gebruik deze bot in een Bakarov-guild.');
     const ctx = contexts.get(interaction.guildId);
     assertUser(ctx, 'Deze guild is niet ingesteld voor Bakarov.');
@@ -375,7 +384,7 @@ client.on(Events.InteractionCreate, async interaction => {
     interactionError=error;
     const content = error instanceof UserError ? error.message : 'De actie kon niet worden afgerond. Controleer de botrechten of vraag de leiding. Een bestaand blackjackspel kun je hervatten met /blackjack zonder inzet.';
     if (!(error instanceof UserError)) console.error(`Guild ${interaction.guildId}: interactie mislukt (${error.code ?? error.name}).`);
-    const payload = { content, flags: MessageFlags.Ephemeral, allowedMentions: quiet };
+    const payload = { content, ...(interaction.inGuild()?{flags:MessageFlags.Ephemeral}:{}), allowedMentions: quiet };
     if (interaction.deferred && !interaction.replied) await interaction.editReply({ content, allowedMentions: quiet }).catch(() => {});
     else if (interaction.replied || interaction.deferred) await interaction.followUp(payload).catch(() => {});
     else await interaction.reply(payload).catch(() => {});
@@ -515,10 +524,13 @@ async function performMaintenance(){
     const guild=client.guilds.cache.get(ctx.config.guildId);
     const jobs=[];
     if(guild){
+      if(ctx.config.gangpot)jobs.push(['warncorrecties',()=>syncAbsenceCorrections(ctx,guild)]);
+      if(ctx.config.gangpot)jobs.push(['bezwaren',()=>syncWarnAppeals(ctx,guild)]);
       if(ctx.config.gangpot)jobs.push(['gangpot',()=>syncGangpot(ctx,client)]);
       jobs.push(['afmeldingen',()=>syncAbsences(ctx,guild)]);
       if(ctx.config.absencePanelChannelId)jobs.push(['afmeldpaneel',()=>publishAbsencePanel(ctx,guild)]);
       jobs.push(['changelog',()=>announceRelease(ctx,guild)],['gesprekken',()=>cleanupInterviews(ctx,guild)],['check-ins',()=>syncActivityChecks(ctx,guild)],['planning',()=>syncActivities(ctx,guild)],['promoties',()=>syncPromotions(ctx,guild)]);
+      if(ctx.config.gangpot)jobs.push(['maandoverzicht',()=>syncMonthlyReports(ctx,guild)]);
     }
     jobs.push(['aannameberichten',async()=>{for(const notice of ctx.store.pendingAcceptances())await locks.run(`${ctx.config.guildId}:admission:${notice.case_id}`,()=>deliverAcceptance(ctx,client,notice.case_id)).catch(()=>{});}],
       ['uitnodigingen',()=>expireAcceptanceInvites(ctx,client)],

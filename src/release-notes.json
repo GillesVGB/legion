@@ -1,4 +1,10 @@
 {
+  "1.10.0": [
+    "Nieuw: Bezwaar maken bij gangwarns. Leden geven zonder formulier uitleg via /bezwaar; Lead beoordeelt het privé in Discord of het dashboard. Goedkeuren trekt de warn in en de beslissing gaat per DM.",
+    "Nieuw: automatisch maandoverzicht voor de leiding met activiteiten, planningreacties, check-ins, promoties en gangpotbijdragen. Standaard op de eerste dag om 09:00 Belgische tijd.",
+    "Bekijk een maand met /maandoverzicht of via de nieuwe dashboardpagina. Verzending, tijd en een privé bestemmingskanaal zijn instelbaar.",
+    "Bestaande automatische warns worden gecontroleerd op eerder goedgekeurde afwezigheid. Onterechte warns worden ingetrokken, ontbrekende gangpotvrijstellingen hersteld en de correctie wordt gelogd en per DM bevestigd. Handmatige warns blijven behouden."
+  ],
   "1.9.0": [
     "Legion heet vanaf nu Bakarov: vernieuwde botteksten, commands, panelen en dashboard.",
     "Het Bakarov-logo en de zwart-gouden huisstijl zijn toegevoegd aan dashboard, embeds en nieuwe transcripts.",

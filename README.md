@@ -1,5 +1,15 @@
 # Bakarov — Discord-bot voor Future RP
 
+## Maandoverzicht en correctie van eerdere warns — 1.10.0
+
+**Bezwaar maken:** nieuwe gangwarnberichten en DM's hebben een knop **Bezwaar maken**. Alleen de eigenaar kan daarop een bezwaar voorbereiden. Daarna geeft het lid in de hoofdserver de uitleg via `/bezwaar uitleg:...`; er opent geen formulier. Voor een oudere warn kan dit ook via `/mijnwarns` of `/bezwaar uitleg:... id:...`. De uitleg en beoordelingsknoppen verschijnen in het privé leidinglogkanaal en op **Bezwaren** in het dashboard. Alleen een huidig Lead-lid mag beslissen; een Lead kan het eigen bezwaar niet beoordelen. Goedkeuren trekt uitsluitend de gekoppelde warn in, afwijzen laat die staan. Het lid krijgt de beslissing per DM. Een lopend bezwaar geeft geen uitstel, vrijstelling of tijdelijke verwijdering van de warn. Eén bezwaar per warn voorkomt dubbele dossiers; een tussentijds ingetrokken warn sluit het bezwaar automatisch.
+
+In de hoofdserver maakt de bot iedere eerste dag van de maand om **09:00 Belgische tijd** een overzicht van de afgelopen maand voor de leiding. Het overzicht bevat activiteiten en planningreacties, check-ins en vrijstellingen, promoties en geldige gangpotboekingen. Planningreacties meten beschikbaarheid, geen daadwerkelijke aanwezigheid in FiveM. Geannuleerde activiteiten en teruggedraaide geldboekingen tellen niet mee in de bijbehorende totalen. Fictieve Discord-coins staan los van de gangpot.
+
+Automatische rapportage begint vanaf de maand waarin deze update voor het eerst draait. Na een storing worden gemiste maanden alsnog verstuurd; ieder maandbericht wordt eenmaal geplaatst. De verzending gebruikt standaard het bestaande **privé leidinglogkanaal**. Via **Modules instellen → Maandoverzicht** kunnen tijd en verzending worden aangepast; een administrator kan een ander privé maandoverzichtkanaal kiezen. **Maandoverzicht** in het dashboard en `/maandoverzicht maand:2026-10` geven de leiding ook tussentijds inzage. De commandoreactie is privé.
+
+Bij starten en tijdens de normale verwerking controleert de bot eerder gegeven **automatische** check-in-, legacy planning- en gangpotwarns. Alleen een gekoppelde, passende afmelding die aantoonbaar al vóór de warn was goedgekeurd, kan zo'n warn corrigeren. Handmatige warns, nog niet goedgekeurde afmeldingen, latere goedkeuringen en andere datums/planningen worden niet via deze correctie ingetrokken. Ontbrekende gangpotvrijstellingen worden vanuit eerdere goedkeuringen hersteld, zonder bewust ingetrokken vrijstellingen te overschrijven. Een correctie blijft in de warnhistorie bewaard, wordt gelogd en krijgt een eenmalige DM. De bestaande gangpotregels voor latere goedkeuring van een vrijstelling blijven gelden.
+
 Een Nederlandstalige bot met gangwarns, gangpotbetalingen, sollicitatietickets, privétickets, een automatische ledenlijst, informatie en games. De hosting draait op Bot-Hosting.net. Zie `HOSTING.md` voor installatie en updates. Het downloadpakket bevat geen bot-token of database.
 
 ![Bakarov](src/branding-assets/logo.webp)

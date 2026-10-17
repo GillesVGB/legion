@@ -14,6 +14,8 @@ export function commands(maxBet, ticketsEnabled = true) {
     cmd('dashboard', 'Open het privé Bakarov-dashboard (alleen leiding)'),
     cmd('botstatus','Bekijk verbinding, uptime en acties die op herhaling wachten (leiding)'),
     cmd('lidinfo','Bekijk check-ins, afmeldingen en gangwarns van een lid (leiding)').addUserOption(userOption),
+    cmd('maandoverzicht','Bekijk activiteiten, check-ins, promoties en gangpot per maand (leiding)')
+      .addStringOption(o=>o.setName('maand').setDescription('JJJJ-MM, bijvoorbeeld 2026-10; standaard de huidige maand').setMinLength(7).setMaxLength(7)),
     cmd('vangstenboek','Bekijk je visverzameling en wekelijkse challenges'),
     cmd('afmelden','Vraag Lead-goedkeuring voor afwezigheid op een planning')
       .addStringOption(o=>o.setName('planning').setDescription('Planning-ID onderaan het bericht').setRequired(true).setMinLength(12).setMaxLength(12))
@@ -48,6 +50,9 @@ export function commands(maxBet, ticketsEnabled = true) {
         .addStringOption(o => o.setName('id').setDescription('Warn-ID uit /gangwarn bekijken').setRequired(true).setMaxLength(12))
         .addStringOption(reasonOption)),
     cmd('mijnwarns', 'Bekijk alleen je eigen gangwarns'),
+    cmd('bezwaar','Dien je uitleg voor een bezwaar tegen je eigen gangwarn in')
+      .addStringOption(o=>o.setName('uitleg').setDescription('Waarom klopt deze gangwarn niet? Alleen de leiding ziet je uitleg.').setRequired(true).setMaxLength(1000))
+      .addStringOption(o=>o.setName('id').setDescription('Warn-ID; niet nodig als je op Bezwaar maken hebt geklikt').setMinLength(12).setMaxLength(12)),
     cmd('solliciteren', 'Open direct een prive sollicitatieticket met de Bakarov-template'),
     cmd('sollicitatiestatus', 'Bekijk privé je sollicitatiestatus en plek in de binnenkomstvolgorde'),
     cmd('planning', 'Plaats een planning in het vaste Bakarov-planningkanaal (alleen leiding)')
@@ -105,5 +110,5 @@ export function commands(maxBet, ticketsEnabled = true) {
       .addChoices({ name: 'Steen', value: 'steen' }, { name: 'Papier', value: 'papier' }, { name: 'Schaar', value: 'schaar' }))
   ];
   return result.filter(command => (ticketsEnabled || !['ticket','solliciteren','sollicitatiestatus'].includes(command.name)) &&
-    (!ticketsEnabled || !['planning','planning-overzicht','planning-annuleren','activiteitencheck','activiteitencheck-stop','promotie','gangpot','afwezig','afmelden'].includes(command.name))).map(command => command.toJSON());
+    (!ticketsEnabled || !['planning','planning-overzicht','planning-annuleren','activiteitencheck','activiteitencheck-stop','promotie','gangpot','afwezig','afmelden','maandoverzicht','bezwaar'].includes(command.name))).map(command => command.toJSON());
 }

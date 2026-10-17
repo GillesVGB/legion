@@ -7,6 +7,17 @@ import {Dashboard} from '../src/dashboard.mjs';
 import {Locks} from '../src/locks.mjs';
 import {syncGangpot,reportGangpotPayment} from '../src/gangpot.mjs';
 
+test('bezwaaroverzicht toont beslisknoppen en escapt uitleg, redenen en namen van leden',()=>{
+  const f=dashboardFixture();try{
+    const main=f.contexts.values().next().value,guild=f.guilds.get(main.config.guildId),data=new Dashboard({...f,locks:new Locks()}).summary(main,guild);
+    data.warnAppeals=[{id:'0123456789ab',warn_id:'abcdef012345',userName:'Naam <img src=x onerror=alert(1)>',warnReason:'<script>reden</script>',reason:'<script>uitleg</script>',status:'pending'}];
+    const source=readFileSync(new URL('../src/dashboard-assets/app.js',import.meta.url),'utf8'),context=vm.createContext({data,Intl,Date,Number,String,Math,URL,console});
+    vm.runInContext(source.slice(0,source.indexOf("document.addEventListener('click'"))+`\nstate.data=data;`,context);
+    const html=vm.runInContext('appealsPage()',context);assert.match(html,/Goedkeuren/);assert.match(html,/Afwijzen/);assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>|<img src=x/);
+    vm.runInContext('state.data.warnAppeals=null;',context);assert.match(vm.runInContext('appealsPage()',context),/hoofdserver/);
+  }finally{f.close();}
+});
+
 test('nieuwe dashboardpagina’s tonen de gangmodules, weigeren de community-planning en escapen ingevoerde tekst',()=>{
   const f=dashboardFixture();
   try{

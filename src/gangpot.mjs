@@ -1,3 +1,4 @@
+import {warnAppealRow} from './warn-appeal-ui.mjs';
 import {canonicalBrandText} from './branding.mjs';
 import {randomBytes} from 'node:crypto';
 import {MessageFlags,ButtonStyle,PermissionFlagsBits as P} from 'discord.js';
@@ -311,13 +312,14 @@ export async function publishGangpot(ctx,guild,now=Date.now()){
 async function deliverNotices(ctx,guild,client,now){
   for(const item of ctx.store.db.prepare('SELECT * FROM gangpot_notifications WHERE (log_id IS NULL OR (dm_id IS NULL AND dm_blocked=0)) AND next_attempt<=? ORDER BY rowid LIMIT 10').all(now)){
     try{
+      const components=item.kind!=='revoke'&&ctx.store.db.prepare('SELECT 1 FROM warnings WHERE id=? AND removed_at IS NULL').get(item.warn_id)?[warnAppealRow(ctx.config.guildId,item.warn_id)]:[];
       const title=item.kind==='revoke'?'Bakarov — Gangpotwarn ingetrokken':item.kind==='restore'?'Bakarov — Gangpotwarn hersteld':'Bakarov — Automatische gangpotwarn';
       const color=item.kind==='revoke'?0x22C55E:0xEF4444,count=ctx.store.warnCount(item.user_id);
       const card=embed(ctx.config,title,`${item.message}\n\n**Lid:** <@${item.user_id}>\n**Warn-ID:** \`${item.warn_id}\`\n**Actieve gangwarns:** ${count}${count>=ctx.config.warnThreshold?'\nDe warn-drempel is bereikt. De leiding beoordeelt dit.':''}`).setColor(color);
-      if(!item.log_id){const channel=await warnLogChannel(guild,ctx.config),message=await channel.send({embeds:[card],nonce:`gp-log:${item.id}`,enforceNonce:true,allowedMentions:quiet});ctx.store.db.prepare('UPDATE gangpot_notifications SET log_id=? WHERE id=?').run(message.id,item.id);}
+      if(!item.log_id){const channel=await warnLogChannel(guild,ctx.config),message=await channel.send({embeds:[card],components,nonce:`gp-log:${item.id}`,enforceNonce:true,allowedMentions:quiet});ctx.store.db.prepare('UPDATE gangpot_notifications SET log_id=? WHERE id=?').run(message.id,item.id);}
       if(!item.dm_id&&!item.dm_blocked){
         const user=guild.members.cache.get(item.user_id)?.user||await client.users.fetch(item.user_id);
-        try{const dm=await user.send({embeds:[card],nonce:`gp-dm:${item.id}`,enforceNonce:true,allowedMentions:quiet});ctx.store.db.prepare('UPDATE gangpot_notifications SET dm_id=? WHERE id=?').run(dm.id,item.id);}
+        try{const dm=await user.send({embeds:[card],components,nonce:`gp-dm:${item.id}`,enforceNonce:true,allowedMentions:quiet});ctx.store.db.prepare('UPDATE gangpot_notifications SET dm_id=? WHERE id=?').run(dm.id,item.id);}
         catch(error){if(error.code===50007)ctx.store.db.prepare('UPDATE gangpot_notifications SET dm_blocked=1,last_error=? WHERE id=?').run('DM_BLOCKED',item.id);else throw error;}
       }
     }catch(error){ctx.store.db.prepare('UPDATE gangpot_notifications SET next_attempt=?,last_error=? WHERE id=?').run(now+60000,String(error.code||error.name),item.id);}

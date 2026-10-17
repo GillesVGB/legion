@@ -191,6 +191,19 @@ export class Store {
       );
       CREATE TABLE IF NOT EXISTS message_audit (audit_id INTEGER PRIMARY KEY,snapshot TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS release_announcements (version TEXT PRIMARY KEY,message_id TEXT,last_error TEXT);
+      CREATE TABLE IF NOT EXISTS monthly_reports (
+        month TEXT PRIMARY KEY,payload TEXT NOT NULL,created_at INTEGER NOT NULL,
+        channel_id TEXT,message_id TEXT,sent_at INTEGER,next_attempt INTEGER NOT NULL DEFAULT 0,last_error TEXT
+      );
+      CREATE TABLE IF NOT EXISTS absence_warn_corrections (
+        warn_id TEXT PRIMARY KEY,user_id TEXT NOT NULL,request_id TEXT,source TEXT NOT NULL,
+        corrected_at INTEGER NOT NULL,log_id TEXT,next_attempt INTEGER NOT NULL DEFAULT 0,last_error TEXT
+      );
+      CREATE TABLE IF NOT EXISTS warn_appeals (
+        id TEXT PRIMARY KEY,warn_id TEXT NOT NULL UNIQUE,user_id TEXT NOT NULL,reason TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL,created_at INTEGER NOT NULL,submitted_at INTEGER,reviewer_id TEXT,reviewed_at INTEGER,
+        channel_id TEXT,message_id TEXT,dirty INTEGER NOT NULL DEFAULT 0,next_attempt INTEGER NOT NULL DEFAULT 0,last_error TEXT
+      );
       CREATE TABLE IF NOT EXISTS fish_collection (
         user_id TEXT NOT NULL,catch_id TEXT NOT NULL,amount INTEGER NOT NULL DEFAULT 1,
         first_at INTEGER NOT NULL,last_at INTEGER NOT NULL,PRIMARY KEY(user_id,catch_id)
@@ -229,7 +242,7 @@ export class Store {
       CREATE INDEX IF NOT EXISTS check_member_history ON activity_check_members(user_id,check_id);
       CREATE INDEX IF NOT EXISTS notice_due_kind ON feature_notices(status,kind,next_attempt);
       CREATE INDEX IF NOT EXISTS check_deadline_due ON activity_check_sessions(status,deadline_at,next_attempt);
-      PRAGMA user_version = 15;
+      PRAGMA user_version = 16;
     `);
   }
 

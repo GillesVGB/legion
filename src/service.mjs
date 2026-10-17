@@ -57,10 +57,10 @@ export async function warnLogChannel(guild, config) {
   return channel;
 }
 
-export async function writeWarnLog(ctx, guild, title, description) {
+export async function writeWarnLog(ctx, guild, title, description,components=[]) {
   try {
     const channel = await warnLogChannel(guild, ctx.config);
-    await channel.send({ embeds: [embed(ctx.config, title, description)], allowedMentions: quiet });
+    await channel.send({ embeds: [embed(ctx.config, title, description)],components, allowedMentions: quiet });
     return true;
   } catch (error) {
     console.error(`Guild ${guild.id}: gangwarnbericht niet verstuurd (${error.code ?? error.name}).`);

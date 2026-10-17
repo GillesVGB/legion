@@ -1,5 +1,7 @@
 # Bakarov op Bot-Hosting.net
 
+**Update 1.10.0:** behoud de bestaande `data/`-map en laat Git auto-pull de update ophalen bij een herstart. De bot controleert na starten automatisch eerdere warns tegenover al goedgekeurde afmeldingen; dit gebeurt op de hostingdatabase. Een lokaal uitgevoerde test wijzigt geen hostingwarns. Het eerste automatische maandoverzicht behandelt de installatiemaand en komt op de eerste dag van de volgende maand in het privé leidinglogkanaal, standaard om 09:00 Belgische tijd.
+
 Voor de update naar Bakarov: haal de nieuwste code van `main` op en herstart één botinstantie. De opstartprocedure maakt eerst een gegevensback-up als automatische back-ups aanstaan. Behoud `.env` en de volledige `data/`-map, inclusief de bestanden met hun bestaande `legion-`-naam. Het logo staat in `src/branding-assets/`; neem die map ook mee als je handmatig uploadt. Het changelogbericht verschijnt eenmalig in het ingestelde updatekanaal.
 
 Gebruik **Bakarov-FPS-ms.zip** voor FPS.ms of een vergelijkbare Linux x64-host. Het dashboard, de bot en de transcriptviewer starten samen. Het pakket bevat de officiële Cloudflare-client voor neutrale HTTPS-adressen; er staat geen bot-token of privé database in het codepakket.
