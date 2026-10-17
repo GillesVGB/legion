@@ -33,6 +33,7 @@ import {releaseVersion} from './release-announcements.mjs';
 import {dashboardAuditItem} from './audit-format.mjs';
 import {logo} from './branding.mjs';
 import {monthlyReport,monthlyReportIndex} from './monthly-reports.mjs';
+import {weeklyReport,weeklyReportIndex} from './weekly-reports.mjs';
 
 const secret = () => randomBytes(32).toString('base64url');
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -157,8 +158,9 @@ export class Dashboard {
       health:botHealth(ctx,this.client),operations:operationSettings(ctx),
       backups:config.gangpot?backupSummary(config.dataDir):[],
       monthlyReports:config.gangpot?monthlyReportIndex(ctx):null,
+      weeklyReports:config.gangpot?weeklyReportIndex(ctx):null,
       warnAppeals:config.gangpot?store.db.prepare("SELECT a.*,w.reason AS warnReason,w.removed_at AS warnRemovedAt FROM warn_appeals a JOIN warnings w ON w.id=a.warn_id WHERE a.status!='draft' ORDER BY a.submitted_at DESC LIMIT 100").all().map(item=>({...item,userName:name(item.user_id),reviewerName:name(item.reviewer_id)})):null,
-      channelSettings:{logChannelId:config.logChannelId,botLogChannelId:config.botLogChannelId||config.logChannelId,updateChannelId:config.updateChannelId||'',absencePanelChannelId:config.absencePanelChannelId||'',planningChannelId:config.planningChannelId,warnLogChannelId:config.warnLogChannelId,panelChannelId:config.panelChannelId,...(config.gangpot?{monthlyReportChannelId:config.monthlyReportChannelId||config.logChannelId,gangpotInfo:config.gangpot.infoChannelId,gangpotPayments:config.gangpot.paymentsChannelId,gangpotTotal:config.gangpot.totalChannelId}:{})},
+      channelSettings:{logChannelId:config.logChannelId,botLogChannelId:config.botLogChannelId||config.logChannelId,updateChannelId:config.updateChannelId||'',absencePanelChannelId:config.absencePanelChannelId||'',planningChannelId:config.planningChannelId,warnLogChannelId:config.warnLogChannelId,panelChannelId:config.panelChannelId,...(config.gangpot?{weeklyReportChannelId:config.weeklyReportChannelId||config.monthlyReportChannelId||config.logChannelId,gangpotInfo:config.gangpot.infoChannelId,gangpotPayments:config.gangpot.paymentsChannelId,gangpotTotal:config.gangpot.totalChannelId}:{})},
       embedColor:'#'+config.color.toString(16).padStart(6,'0'),canConfigureChannels:viewer?.permissions.has(P.Administrator)??false,
       absences:store.db.prepare('SELECT * FROM absence_requests ORDER BY created_at DESC LIMIT 100').all().map(item=>({...item,weeks:JSON.parse(item.weeks),userName:name(item.user_id),reviewerName:name(item.reviewer_id)})),
       exemptions:store.db.prepare('SELECT * FROM gangpot_exemptions ORDER BY period_id DESC LIMIT 100').all().map(item=>({...item,userName:name(item.user_id)})),
@@ -248,7 +250,7 @@ export class Dashboard {
       const candidate={config:{...config,gangpot:config.gangpot?{...config.gangpot}:null,recruitment:config.recruitment?{...config.recruitment}:null,admission:config.admission?{...config.admission}:null}};applyDashboardSettings(candidate,checked);
       let currentUpdate;
       if(config.gangpot&&value.applyCurrent===true){assertUser(value.confirm===true,'Bevestig wijzigen van de lopende gangpotweek.');const period=store.db.prepare('SELECT * FROM gangpot_periods WHERE starts_at<=? AND ends_at>? ORDER BY starts_at DESC LIMIT 1').get(Date.now(),Date.now());if(period){const end=planningTime(period.id,checked.operations?.gangpot?.deadlineTime||config.gangpot.deadlineTime||'23:59')+60000;assertUser(end>Date.now(),'De nieuwe deadline moet nog in de toekomst liggen.');currentUpdate={id:period.id,end};}}
-      if(checked.channels){assertUser(member.permissions.has(P.Administrator),'Alleen een administrator mag bestemmingskanalen veranderen.');for(const [key,id] of Object.entries(checked.channels)){await communityChannel(guild,id);if(['logChannelId','monthlyReportChannelId'].includes(key))await staffLogChannel(guild,{...config,logChannelId:id});if(key.startsWith('gangpot')||['absencePanelChannelId','planningChannelId','monthlyReportChannelId'].includes(key))requireGangPot(ctx);}}
+      if(checked.channels){assertUser(member.permissions.has(P.Administrator),'Alleen een administrator mag bestemmingskanalen veranderen.');for(const [key,id] of Object.entries(checked.channels)){await communityChannel(guild,id);if(['logChannelId','monthlyReportChannelId','weeklyReportChannelId'].includes(key))await staffLogChannel(guild,{...config,logChannelId:id});if(key.startsWith('gangpot')||['absencePanelChannelId','planningChannelId','monthlyReportChannelId','weeklyReportChannelId'].includes(key))requireGangPot(ctx);}}
       assertUser(!checked.gamesMembersOnly || config.memberRoleId,'Stel eerst een ledenrol in.');
       const desiredMax = checked.maxBet;
       if (desiredMax !== undefined) assertUser(Number.isSafeInteger(desiredMax) && desiredMax>=2 && desiredMax<=100000,'Kies een maximale inzet tussen 2 en 100000.');
@@ -313,10 +315,11 @@ export class Dashboard {
         send(200,{ok:true},{'Set-Cookie':this.cookie('',0)});return true;
       }
       if(path==='/api/dashboard/session'){ failure(request.method==='GET',405,'Gebruik GET.');send(200,await this.sessionInfo(session));return true; }
-      const match=/^\/api\/dashboard\/guilds\/(\d{17,20})\/(summary|actions|audit|monthly|cases\/([a-f0-9]{12})\/messages|members\/(\d{17,20}))$/.exec(path);
+      const match=/^\/api\/dashboard\/guilds\/(\d{17,20})\/(summary|actions|audit|monthly|weekly|cases\/([a-f0-9]{12})\/messages|members\/(\d{17,20}))$/.exec(path);
       failure(match,404,'Pagina niet gevonden.');
       const {ctx,guild,member}=await this.authorized(session,match[1]);
       if(match[2]==='monthly'){failure(request.method==='GET',405,'Gebruik GET.');const month=new URL(request.url,'http://localhost').searchParams.get('month')||undefined;send(200,monthlyReport(ctx,month));return true;}
+      if(match[2]==='weekly'){failure(request.method==='GET',405,'Gebruik GET.');const value=new URL(request.url,'http://localhost').searchParams.get('date')||undefined;send(200,weeklyReport(ctx,value));return true;}
       if(match[4]){failure(request.method==='GET',405,'Gebruik GET.');send(200,memberOverview(ctx,guild,match[4]));return true;}
       if(match[2]==='audit'){failure(request.method==='GET',405,'Gebruik GET.');const before=Number(new URL(request.url,'http://localhost').searchParams.get('before')||Number.MAX_SAFE_INTEGER);failure(Number.isSafeInteger(before)&&before>0,400,'Ongeldige logpagina.');const items=ctx.store.db.prepare("SELECT * FROM audit WHERE id<? AND event NOT LIKE '%.started' ORDER BY id DESC LIMIT 100").all(before).map(item=>dashboardAuditItem(ctx,guild,item));send(200,{items});return true;}
       if(match[2]==='summary'){ failure(request.method==='GET',405,'Gebruik GET.');send(200,this.summary(ctx,guild,member));return true; }

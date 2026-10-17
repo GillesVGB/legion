@@ -1,4 +1,9 @@
 {
+  "1.10.1": [
+    "Het automatische overzicht wordt voortaan iedere zondag om 09:00 Belgische tijd verstuurd, over de afgelopen zondag t/m zaterdag. De zaterdagse gangpotdeadline telt volledig mee.",
+    "Nieuw: /weekoverzicht en Weekoverzicht in het dashboard. Verzendtijd en privékanaal zijn instelbaar; bestaande rapportage-instellingen worden meegenomen. Maandcijfers blijven op aanvraag beschikbaar.",
+    "Het dashboardmenu kan scrollen, zodat alle pagina's bereikbaar blijven bij veel menu-items."
+  ],
   "1.10.0": [
     "Nieuw: Bezwaar maken bij gangwarns. Leden geven zonder formulier uitleg via /bezwaar; Lead beoordeelt het privé in Discord of het dashboard. Goedkeuren trekt de warn in en de beslissing gaat per DM.",
     "Nieuw: automatisch maandoverzicht voor de leiding met activiteiten, planningreacties, check-ins, promoties en gangpotbijdragen. Standaard op de eerste dag om 09:00 Belgische tijd.",

@@ -17,20 +17,24 @@ export function monthWindow(month){
 export function monthlyReport(ctx,month=monthId(),now=Date.now()){
   assertUser(ctx.config.guildId==='1555685630640652338','Maandoverzichten worden in de hoofdserver beheerd.');
   const {start,end}=monthWindow(month);assertUser(start<=now,'Kies de huidige maand of een afgelopen maand.');
+  return periodReport(ctx,{month,start,end},now);
+}
+export function periodReport(ctx,window,now=Date.now()){
+  const {start,end}=window;
   const db=ctx.store.db,activities=db.prepare('SELECT id,title,starts_at,status FROM activities WHERE starts_at>=? AND starts_at<? ORDER BY starts_at').all(start,end);
   const rsvps=db.prepare("SELECT r.activity_id,r.user_id,r.response FROM activity_rsvps r JOIN activities a ON a.id=r.activity_id WHERE a.starts_at>=? AND a.starts_at<? AND a.status!='cancelled'").all(start,end);
   const checks=db.prepare('SELECT id,status,deadline_at FROM activity_check_sessions WHERE deadline_at>=? AND deadline_at<? ORDER BY deadline_at').all(start,end);
   const confirmations=db.prepare("SELECT m.* FROM activity_check_members m JOIN activity_check_sessions c ON c.id=m.check_id WHERE c.deadline_at>=? AND c.deadline_at<? AND c.status!='cancelled'").all(start,end);
   const proposals=db.prepare('SELECT id,member_id,role_id,status,created_at,closed_at FROM promotions WHERE created_at>=? AND created_at<? OR closed_at>=? AND closed_at<?').all(start,end,start,end);
   const entries=db.prepare('SELECT kind,user_id,amount,paid_at FROM gangpot_entries WHERE paid_at>=? AND paid_at<? AND voided_at IS NULL').all(start,end);
-  const absences=db.prepare("SELECT user_id FROM absence_requests WHERE status='approved' AND kind='range' AND start_date<? AND end_date>=?").all(nextMonth(month)+'-01',month+'-01');
+  const absences=db.prepare("SELECT user_id FROM absence_requests WHERE status='approved' AND kind='range' AND start_date<? AND end_date>=?").all(missionDay(end),missionDay(start));
   const people=new Map(),person=id=>{if(!people.has(id))people.set(id,{id,yes:0,late:0,no:0,maybe:0,confirmed:0,exempt:0,warned:0,contribution:0});return people.get(id);};
   for(const item of rsvps)person(item.user_id)[item.response]++;
   for(const item of confirmations){const row=person(item.user_id);if(item.status==='responded')row.confirmed++;if(item.status==='exempt')row.exempt++;if(item.status==='warned')row.warned++;}
   for(const item of entries)if(item.kind==='payment'&&item.user_id)person(item.user_id).contribution+=item.amount;
   const sum=kind=>entries.filter(item=>item.kind===kind).reduce((n,item)=>n+item.amount,0);
   const count=(items,key,value)=>items.filter(item=>item[key]===value).length;
-  return{month,start,end,generatedAt:now,partial:now<end,
+  return{...window,start,end,generatedAt:now,partial:now<end,
     activities:{total:activities.length,cancelled:count(activities,'status','cancelled'),items:activities},
     attendance:{yes:count(rsvps,'response','yes'),late:count(rsvps,'response','late'),no:count(rsvps,'response','no'),maybe:count(rsvps,'response','maybe'),approvedAway:new Set(absences.map(item=>item.user_id)).size},
     checkins:{total:checks.length,cancelled:count(checks,'status','cancelled'),closed:count(checks,'status','closed'),confirmed:count(confirmations,'status','responded'),exempt:count(confirmations,'status','exempt'),warned:count(confirmations,'status','warned'),pending:count(confirmations,'status','pending')},
@@ -39,14 +43,17 @@ export function monthlyReport(ctx,month=monthId(),now=Date.now()){
 }
 export const reportMonthName=month=>new Intl.DateTimeFormat('nl-BE',{month:'long',year:'numeric',timeZone:'Europe/Brussels'}).format(new Date(`${month}-15T12:00:00Z`));
 export function monthlyReportMessage(ctx,report){
+  return periodReportMessage(ctx,report,`Bakarov — Maandoverzicht ${reportMonthName(report.month)}`,'Afgeronde maand',`Bakarov • Maandoverzicht ${report.month}`);
+}
+export function periodReportMessage(ctx,report,title,completedLabel,marker){
   const {activities:a,attendance:r,checkins:c,promotions:p,gangpot:g}=report;
-  return{embeds:[embed(ctx.config,`Bakarov — Maandoverzicht ${reportMonthName(report.month)}`,`${report.partial?'🟠 Tussentijds overzicht':'📊 Afgeronde maand'} · Belgische tijd\nDe cijfers komen uit bewaarde botregistraties. Planningreacties geven de aangegeven beschikbaarheid weer, geen vastgestelde aanwezigheid in FiveM.`)
+  return{embeds:[embed(ctx.config,title,`${report.partial?'🟠 Tussentijds overzicht':`📊 ${completedLabel}`} · Belgische tijd\nDe cijfers komen uit bewaarde botregistraties. Planningreacties geven de aangegeven beschikbaarheid weer, geen vastgestelde aanwezigheid in FiveM.`)
     .addFields(
       {name:'📅 Activiteiten',value:`Gepland: **${a.total}** · geannuleerd: **${a.cancelled}**\n🟢 Erbij: **${r.yes}** · 🕒 Later: **${r.late}**\n🔴 Niet erbij: **${r.no}** · 🟠 Onzeker: **${r.maybe}**`},
       {name:'✅ Check-ins & afwezigheid',value:`Checks: **${c.total}** · afgerond: **${c.closed}** · geannuleerd: **${c.cancelled}**\nBevestigd: **${c.confirmed}** · vrijgesteld: **${c.exempt}**\nMet gangwarn: **${c.warned}** · nog open: **${c.pending}**\nLeden met goedgekeurde langere afwezigheid: **${r.approvedAway}**`},
       {name:'📈 Promoties',value:`Voorgesteld: **${p.proposed}**\nGoedgekeurd: **${p.approved}** · afgewezen: **${p.rejected}**`},
-      {name:'💰 Gangpotbijdragen',value:`Goedgekeurde betalingen: **${gangpotMoney(g.payments)}** van **${g.contributors}** leden\nDonaties: **${gangpotMoney(g.donations)}** · uitgaven: **${gangpotMoney(g.expenses)}**\nNettomutatie deze maand: **${gangpotMoney(g.net)}**\nAlleen geldige boekingen op boekingsdatum; fictieve coins tellen niet mee.`})
-    .setFooter({text:`Bakarov • Maandoverzicht ${report.month}`})],allowedMentions:quiet};
+      {name:'💰 Gangpotbijdragen',value:`Goedgekeurde betalingen: **${gangpotMoney(g.payments)}** van **${g.contributors}** leden\nDonaties: **${gangpotMoney(g.donations)}** · uitgaven: **${gangpotMoney(g.expenses)}**\nNettomutatie in deze periode: **${gangpotMoney(g.net)}**\nAlleen geldige boekingen op boekingsdatum; fictieve coins tellen niet mee.`})
+    .setFooter({text:marker})],allowedMentions:quiet};
 }
 export function monthlyReportIndex(ctx,now=Date.now()){
   return{current:monthId(now),starts:ctx.store.setting('monthly:starts')||monthId(now),history:ctx.store.db.prepare('SELECT month,created_at,sent_at,message_id,channel_id,last_error FROM monthly_reports ORDER BY month DESC LIMIT 36').all()};

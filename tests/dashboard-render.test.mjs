@@ -7,6 +7,17 @@ import {Dashboard} from '../src/dashboard.mjs';
 import {Locks} from '../src/locks.mjs';
 import {syncGangpot,reportGangpotPayment} from '../src/gangpot.mjs';
 
+test('weekoverzicht en modules tonen de wekelijkse verzending; maandcijfers beloven geen automatische maandverzending meer',()=>{
+  const f=dashboardFixture();try{
+    const main=f.contexts.values().next().value,guild=f.guilds.get(main.config.guildId),data=new Dashboard({...f,locks:new Locks()}).summary(main,guild);
+    const source=readFileSync(new URL('../src/dashboard-assets/app.js',import.meta.url),'utf8'),context=vm.createContext({data,Intl,Date,Number,String,Math,URL,console});
+    vm.runInContext(source.slice(0,source.indexOf("document.addEventListener('click'"))+`\nstate.data=data;`,context);
+    const week=vm.runInContext('weeklyPage()',context),month=vm.runInContext('monthlyPage()',context),modules=vm.runInContext('modulesPage()',context);
+    assert.match(week,/Elke zondag om 09:00/);assert.match(week,/zondag tot en met zaterdag/);assert.match(month,/op aanvraag/);assert.doesNotMatch(month,/eerste dag van de volgende maand/);
+    assert.match(modules,/weeklyReports.sendTime/);assert.doesNotMatch(modules,/name="monthlyReports.sendTime"/);
+  }finally{f.close();}
+});
+
 test('bezwaaroverzicht toont beslisknoppen en escapt uitleg, redenen en namen van leden',()=>{
   const f=dashboardFixture();try{
     const main=f.contexts.values().next().value,guild=f.guilds.get(main.config.guildId),data=new Dashboard({...f,locks:new Locks()}).summary(main,guild);

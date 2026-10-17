@@ -16,6 +16,8 @@ export function commands(maxBet, ticketsEnabled = true) {
     cmd('lidinfo','Bekijk check-ins, afmeldingen en gangwarns van een lid (leiding)').addUserOption(userOption),
     cmd('maandoverzicht','Bekijk activiteiten, check-ins, promoties en gangpot per maand (leiding)')
       .addStringOption(o=>o.setName('maand').setDescription('JJJJ-MM, bijvoorbeeld 2026-10; standaard de huidige maand').setMinLength(7).setMaxLength(7)),
+    cmd('weekoverzicht','Bekijk activiteiten, check-ins, promoties en gangpot per week (leiding)')
+      .addStringOption(o=>o.setName('datum').setDescription('Een datum in de gewenste week: DD-MM-JJJJ; standaard huidige week').setMaxLength(10)),
     cmd('vangstenboek','Bekijk je visverzameling en wekelijkse challenges'),
     cmd('afmelden','Vraag Lead-goedkeuring voor afwezigheid op een planning')
       .addStringOption(o=>o.setName('planning').setDescription('Planning-ID onderaan het bericht').setRequired(true).setMinLength(12).setMaxLength(12))
@@ -110,5 +112,5 @@ export function commands(maxBet, ticketsEnabled = true) {
       .addChoices({ name: 'Steen', value: 'steen' }, { name: 'Papier', value: 'papier' }, { name: 'Schaar', value: 'schaar' }))
   ];
   return result.filter(command => (ticketsEnabled || !['ticket','solliciteren','sollicitatiestatus'].includes(command.name)) &&
-    (!ticketsEnabled || !['planning','planning-overzicht','planning-annuleren','activiteitencheck','activiteitencheck-stop','promotie','gangpot','afwezig','afmelden','maandoverzicht','bezwaar'].includes(command.name))).map(command => command.toJSON());
+    (!ticketsEnabled || !['planning','planning-overzicht','planning-annuleren','activiteitencheck','activiteitencheck-stop','promotie','gangpot','afwezig','afmelden','maandoverzicht','weekoverzicht','bezwaar'].includes(command.name))).map(command => command.toJSON());
 }

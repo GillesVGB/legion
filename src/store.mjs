@@ -195,6 +195,10 @@ export class Store {
         month TEXT PRIMARY KEY,payload TEXT NOT NULL,created_at INTEGER NOT NULL,
         channel_id TEXT,message_id TEXT,sent_at INTEGER,next_attempt INTEGER NOT NULL DEFAULT 0,last_error TEXT
       );
+      CREATE TABLE IF NOT EXISTS weekly_reports (
+        week TEXT PRIMARY KEY,payload TEXT NOT NULL,created_at INTEGER NOT NULL,
+        channel_id TEXT,message_id TEXT,sent_at INTEGER,next_attempt INTEGER NOT NULL DEFAULT 0,last_error TEXT
+      );
       CREATE TABLE IF NOT EXISTS absence_warn_corrections (
         warn_id TEXT PRIMARY KEY,user_id TEXT NOT NULL,request_id TEXT,source TEXT NOT NULL,
         corrected_at INTEGER NOT NULL,log_id TEXT,next_attempt INTEGER NOT NULL DEFAULT 0,last_error TEXT
@@ -242,7 +246,7 @@ export class Store {
       CREATE INDEX IF NOT EXISTS check_member_history ON activity_check_members(user_id,check_id);
       CREATE INDEX IF NOT EXISTS notice_due_kind ON feature_notices(status,kind,next_attempt);
       CREATE INDEX IF NOT EXISTS check_deadline_due ON activity_check_sessions(status,deadline_at,next_attempt);
-      PRAGMA user_version = 16;
+      PRAGMA user_version = 17;
     `);
   }
 

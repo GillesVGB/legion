@@ -10,7 +10,7 @@ export function validateDashboardSettings(value) {
   assertUser(Object.keys(value).every(key => allowed.includes(key)), 'Een instelling in dit verzoek mag niet via het dashboard worden gewijzigd.');
   const result = {};
   if(Object.hasOwn(value,'color')){assertUser(typeof value.color==='string'&&/^#[a-f0-9]{6}$/i.test(value.color),'Gebruik een geldige embedkleur.');result.color=value.color;}
-  if(Object.hasOwn(value,'channels')){assertUser(value.channels&&typeof value.channels==='object'&&!Array.isArray(value.channels),'Ongeldige kanalen.');result.channels={};for(const [key,id] of Object.entries(value.channels)){assertUser(['logChannelId','botLogChannelId','updateChannelId','absencePanelChannelId','planningChannelId','warnLogChannelId','panelChannelId','gangpotInfo','gangpotPayments','gangpotTotal','monthlyReportChannelId'].includes(key)&&typeof id==='string'&&/^\d{17,20}$/.test(id),'Kies een geldig ingesteld kanaal.');result.channels[key]=id;}}
+  if(Object.hasOwn(value,'channels')){assertUser(value.channels&&typeof value.channels==='object'&&!Array.isArray(value.channels),'Ongeldige kanalen.');result.channels={};for(const [key,id] of Object.entries(value.channels)){assertUser(['logChannelId','botLogChannelId','updateChannelId','absencePanelChannelId','planningChannelId','warnLogChannelId','panelChannelId','gangpotInfo','gangpotPayments','gangpotTotal','monthlyReportChannelId','weeklyReportChannelId'].includes(key)&&typeof id==='string'&&/^\d{17,20}$/.test(id),'Kies een geldig ingesteld kanaal.');result.channels[key]=id;}}
   if(Object.hasOwn(value,'operations'))result.operations=validateOperations(value.operations);
   for (const [key, [min,max]] of Object.entries(limits)) if (Object.hasOwn(value,key)) {
     assertUser(Number.isSafeInteger(value[key]) && value[key] >= min && value[key] <= max, `${key}: kies een geheel getal tussen ${min} en ${max}.`);
@@ -46,7 +46,11 @@ export function applyDashboardSettings(ctx, value) {
 export function loadDashboardSettings(ctx) {
   const saved = ctx.store.setting('dashboard-config');
   const migrated=migrateBrandSettings(ctx,JSON.parse(saved||'{}'));
+  let weeklyMigrated=false;
+  if(migrated.operations?.monthlyReports&&!migrated.operations.weeklyReports){migrated.operations.weeklyReports={...migrated.operations.monthlyReports};weeklyMigrated=true;}
+  if(migrated.channels?.monthlyReportChannelId&&!migrated.channels.weeklyReportChannelId){migrated.channels.weeklyReportChannelId=migrated.channels.monthlyReportChannelId;weeklyMigrated=true;}
   applyDashboardSettings(ctx,migrated);
+  if(weeklyMigrated)ctx.store.setSetting('dashboard-config',JSON.stringify(migrated));
   if(ctx.store.setting('branding:version')!=='bakarov-1')ctx.store.transaction(()=>{
     if(saved)ctx.store.setSetting('dashboard-config',JSON.stringify(migrated));
     for(const table of ['activities','promotions','absence_requests','gangpot_claims','activity_check_sessions']){

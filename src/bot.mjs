@@ -32,7 +32,8 @@ import {handleMemberOverview} from './member-overview.mjs';
 import {runMaintenanceJobs} from './maintenance.mjs';
 import {recordMessageEvent} from './message-logs.mjs';
 import {syncBotBranding} from './branding.mjs';
-import {syncMonthlyReports,handleMonthlyReport} from './monthly-reports.mjs';
+import {handleMonthlyReport} from './monthly-reports.mjs';
+import {syncWeeklyReports,handleWeeklyReport} from './weekly-reports.mjs';
 import {syncAbsenceCorrections} from './absence-corrections.mjs';
 import {handleWarnAppealButton,handleWarnAppealCommand,syncWarnAppeals} from './warn-appeals.mjs';
 import {warnAppealRow,warnAppealRows} from './warn-appeal-ui.mjs';
@@ -191,7 +192,7 @@ async function handleCommand(ctx, interaction) {
   if (name === 'help') {
     return interaction.reply({ ...privateReply, embeds: [embed(config, 'Bakarov | Commands', [
       `**Algemeen:** /info, /regels, /rangen, /mijnwarns${config.ticketsEnabled?', /solliciteren, /sollicitatiestatus':''}`,
-      ...(!config.ticketsEnabled ? ['**Gang:** /planning, /planning-overzicht, /planning-annuleren, /activiteitencheck, /activiteitencheck-stop, /promotie, /gangpot, /afwezig, /afmelden, /maandoverzicht, /bezwaar'] : []),
+      ...(!config.ticketsEnabled ? ['**Gang:** /planning, /planning-overzicht, /planning-annuleren, /activiteitencheck, /activiteitencheck-stop, /promotie, /gangpot, /afwezig, /afmelden, /weekoverzicht, /maandoverzicht, /bezwaar'] : []),
       ...(config.ticketsEnabled ? ['**Tickets:** /ticket openen, /ticket sluiten'] : []),
       '**Games:** /blackjack, /coinflip, /dobbel, /8ball, /steenpapier, /fish, /vangstenboek',
       '**Coins:** /saldo, /daily, /leaderboard, /missies',
@@ -206,6 +207,7 @@ async function handleCommand(ctx, interaction) {
   if(name==='activiteitencheck')return handleActivitiesCheck(ctx,interaction);
   if(name==='lidinfo')return handleMemberOverview(ctx,interaction);
   if(name==='maandoverzicht')return handleMonthlyReport(ctx,interaction);
+  if(name==='weekoverzicht')return handleWeeklyReport(ctx,interaction);
   if(name==='bezwaar')return handleWarnAppealCommand(ctx,interaction);
   if(name==='activiteitencheck-stop')return handleStopActivityCheck(ctx,interaction);
   if (['planning','planning-overzicht','planning-annuleren'].includes(name)) return handlePlanningCommand(ctx,interaction);
@@ -530,7 +532,7 @@ async function performMaintenance(){
       jobs.push(['afmeldingen',()=>syncAbsences(ctx,guild)]);
       if(ctx.config.absencePanelChannelId)jobs.push(['afmeldpaneel',()=>publishAbsencePanel(ctx,guild)]);
       jobs.push(['changelog',()=>announceRelease(ctx,guild)],['gesprekken',()=>cleanupInterviews(ctx,guild)],['check-ins',()=>syncActivityChecks(ctx,guild)],['planning',()=>syncActivities(ctx,guild)],['promoties',()=>syncPromotions(ctx,guild)]);
-      if(ctx.config.gangpot)jobs.push(['maandoverzicht',()=>syncMonthlyReports(ctx,guild)]);
+      if(ctx.config.gangpot)jobs.push(['weekoverzicht',()=>syncWeeklyReports(ctx,guild)]);
     }
     jobs.push(['aannameberichten',async()=>{for(const notice of ctx.store.pendingAcceptances())await locks.run(`${ctx.config.guildId}:admission:${notice.case_id}`,()=>deliverAcceptance(ctx,client,notice.case_id)).catch(()=>{});}],
       ['uitnodigingen',()=>expireAcceptanceInvites(ctx,client)],
