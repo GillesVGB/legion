@@ -34,6 +34,7 @@ import {dashboardAuditItem} from './audit-format.mjs';
 import {logo} from './branding.mjs';
 import {monthlyReport,monthlyReportIndex} from './monthly-reports.mjs';
 import {weeklyReport,weeklyReportIndex} from './weekly-reports.mjs';
+import {DiscordLogin,DiscordLoginError} from './discord-login.mjs';
 
 const secret = () => randomBytes(32).toString('base64url');
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -63,11 +64,12 @@ async function bodyJSON(request) {
 }
 
 export class Dashboard {
-  constructor({ client, contexts, locks, origin, allowLocalPreview = false }) {
+  constructor({ client, contexts, locks, origin, allowLocalPreview = false, oauthFetch = fetch }) {
     this.client = client; this.contexts = contexts; this.locks = locks;
     this.origin = origin || (() => contexts.values().next().value?.config.transcriptSiteURL);
     this.allowLocalPreview = allowLocalPreview;
     this.logins = new Map(); this.sessions = new Map();
+    this.discordLogin=new DiscordLogin({config:()=>contexts.values().next().value?.config,origin:()=>this.currentOrigin(),preview:allowLocalPreview,fetchImpl:oauthFetch});
   }
   currentOrigin() {
     const value = this.connection ? this.connection.origin : this.origin();
@@ -96,7 +98,7 @@ export class Dashboard {
     this.prune();
     const value = request.headers.cookie?.split(';').map(part => part.trim()).find(part => part.startsWith(this.cookieName() + '='))?.slice(this.cookieName().length + 1);
     const session = value ? this.sessions.get(digest(value)) : null;
-    failure(session, 401, 'Gebruik /dashboard in Discord om veilig in te loggen.');
+    failure(session, 401, 'Log in met Discord om het dashboard te openen.');
     return session;
   }
   async authorized(session, guildId) {
@@ -106,7 +108,7 @@ export class Dashboard {
     let member;
     try { member = await guild.members.fetch({ user: session.userId, force: true }); }
     catch (error) { throw new HTTPError(error.code === 10007 ? 403 : 503, error.code === 10007 ? 'Je zit niet meer in deze guild.' : 'Discordtoegang kan nu niet worden gecontroleerd.'); }
-    failure(member.permissions.has(P.Administrator) || ctx.config.staffRoleIds.some(id => member.roles.cache.has(id)), 403, 'Alleen de leiding van deze guild heeft dashboardtoegang.');
+    failure(!member.user.bot && ctx.config.staffRoleIds.some(id => member.roles.cache.has(id)), 403, 'Je hebt de Legion Lead-rol van deze server nodig voor dashboardtoegang.');
     return { ctx, guild, member };
   }
   async sessionInfo(session) {
@@ -120,6 +122,13 @@ export class Dashboard {
     }
     failure(guilds.length, 403, 'Je hebt geen leidingtoegang meer.');
     return { user, guilds, selectedGuild: guilds.some(g => g.id === session.guildId) ? session.guildId : guilds[0].id, csrf: session.csrf, expires: session.expires };
+  }
+  async createSession(userId,guildId){
+    const session={userId,guildId,csrf:secret(),expires:Date.now()+1800000};
+    const info=await this.sessionInfo(session),token=secret();
+    for(const [key,item]of this.sessions)if(item.userId===userId)this.sessions.delete(key);
+    this.sessions.set(digest(token),session);
+    return{info,cookie:this.cookie(token,1800)};
   }
   summary(ctx, guild, viewer) {
     const { config, store } = ctx;
@@ -296,16 +305,34 @@ export class Dashboard {
       if(path==='/'){ response.writeHead(302,{...security,Location:'/dashboard'});response.end();return true; }
       const asset=assets.get(path==='/dashboard/'?'/dashboard':path);
       if(asset){ failure(['GET','HEAD'].includes(request.method),405,'Alleen lezen toegestaan.'); response.writeHead(200,{...security,'Content-Type':asset.type});response.end(request.method==='HEAD'?undefined:asset.body);return true; }
+      if(path==='/api/dashboard/auth'){
+        failure(request.method==='GET',405,'Gebruik GET.');
+        const enabled=this.discordLogin.enabled();
+        send(200,{discordLoginEnabled:enabled,loginURL:enabled?`${this.currentOrigin()}/api/dashboard/oauth/start`:null});return true;
+      }
+      if(path==='/api/dashboard/oauth/start'||path==='/api/dashboard/oauth/callback'){
+        failure(request.method==='GET',405,'Gebruik GET.');
+        try{
+          if(path.endsWith('/start')){
+            const login=this.discordLogin.start(request);
+            response.writeHead(302,{...security,Location:login.url,'Set-Cookie':login.cookie});response.end();return true;
+          }
+          const userId=await this.discordLogin.complete(request,new URL(request.url,'https://dashboard.invalid'));
+          const account=await this.createSession(userId);
+          response.writeHead(303,{...security,Location:'/dashboard','Set-Cookie':[account.cookie,this.discordLogin.cookie('',0)]});response.end();return true;
+        }catch(error){
+          const reason=error instanceof DiscordLoginError?error.reason:error.status===403?'denied':'unavailable';
+          response.writeHead(303,{...security,Location:`/dashboard#oauth=${reason}`,'Set-Cookie':this.discordLogin.cookie('',0)});response.end();return true;
+        }
+      }
       if(request.method==='POST') failure(request.headers.origin===this.currentOrigin(),403,'Dit verzoek komt niet van het Bakarov-dashboard.');
       if(path==='/api/dashboard/login'){
         failure(request.method==='POST',405,'Gebruik POST.');
         const body=await bodyJSON(request); failure(/^[A-Za-z0-9_-]{43}$/.test(body.code),401,'Ongeldige inloglink.');
         this.prune(); const key=digest(body.code), pending=this.logins.get(key); failure(pending,401,'Deze inloglink is verlopen of al gebruikt. Gebruik opnieuw /dashboard.');
         this.logins.delete(key); await this.authorized(pending,pending.guildId);
-        const token=secret(), session={userId:pending.userId,guildId:pending.guildId,csrf:secret(),expires:Date.now()+1800000};
-        for(const [key,item] of this.sessions) if(item.userId===session.userId)this.sessions.delete(key);
-        this.sessions.set(digest(token),session);
-        send(200,await this.sessionInfo(session),{'Set-Cookie':this.cookie(token,1800)});return true;
+        const account=await this.createSession(pending.userId,pending.guildId);
+        send(200,account.info,{'Set-Cookie':account.cookie});return true;
       }
       const session=this.session(request);
       if(request.method==='POST') failure(same(request.headers['x-csrf-token'],session.csrf),403,'De sessiebeveiliging is verlopen. Open het dashboard opnieuw.');
@@ -335,5 +362,5 @@ export class Dashboard {
       send(200,{messages:await fetchTranscriptMessages(channel,Infinity),closed:false});return true;
     }catch(error){ send(error.status || (error instanceof UserError ? 400 : 503),{error:error.status || error instanceof UserError ? error.message : 'Deze actie kon nu niet worden uitgevoerd. Probeer opnieuw.'});return true; }
   }
-  close(){this.sessions.clear();this.logins.clear();}
+  close(){this.sessions.clear();this.logins.clear();this.discordLogin.close();}
 }

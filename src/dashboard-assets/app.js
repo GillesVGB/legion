@@ -60,16 +60,23 @@ async function load(render=true) {
   $('#updated').textContent='Bijgewerkt '+new Date().toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Brussels'});
   $('#connection').innerHTML='<i></i> Live'; if(render)renderPage();else navigation();
 }
+async function configureLogin(){
+  try{const auth=await api('/api/dashboard/auth');$('#discord-login').hidden=!auth.discordLoginEnabled;$('#login-setup').hidden=auth.discordLoginEnabled;if(auth.loginURL)$('#discord-login').href=auth.loginURL;}catch{$('#discord-login').hidden=true;$('#login-setup').hidden=false;}
+}
 async function boot() {
+  const fragment=new URLSearchParams(location.hash.slice(1)),oauthError=fragment.get('oauth');
+  if(oauthError)history.replaceState(null,'','/dashboard');
+  const loginMessages={state:'Deze aanmelding is verlopen. Klik opnieuw op Inloggen met Discord.',cancelled:'Je hebt de aanmelding geannuleerd. Je kunt opnieuw inloggen.',denied:'Je hebt de Legion Lead-rol nodig. Controleer ook of je met het juiste Discord-account inlogt.',unavailable:'Discord-inloggen is tijdelijk niet beschikbaar. Probeer het opnieuw of gebruik /dashboard in Discord.'};
+  await configureLogin();
   try {
-    const code=new URLSearchParams(location.hash.slice(1)).get('login');
+    const code=fragment.get('login');
     if(code){history.replaceState(null,'','/dashboard');state.session=await api('/api/dashboard/login',{code});}
     else state.session=await api('/api/dashboard/session');
     state.guild=state.session.selectedGuild;
     $('#guild-select').innerHTML=state.session.guilds.map(guild=>`<option value="${e(guild.id)}">${e(guild.name)}</option>`).join('');$('#guild-select').value=state.guild;
     $('#profile').innerHTML=photo(state.session.user.avatar,state.session.user.name)+'<span class="profile-name">Leiding</span>';
     $('#loading').hidden=true;$('#login').hidden=true;$('#app').hidden=false;await load();
-  }catch(error){showLogin(error.status===401?'':error.message);}
+  }catch(error){showLogin(loginMessages[oauthError]||(error.status===401?'':error.message));}
 }
 function quotaCard() {
   const q=state.data.overview.quota;
@@ -288,6 +295,6 @@ $('#guild-select').addEventListener('change',async event=>{state.guild=event.tar
 $('#menu').addEventListener('click',()=>document.body.classList.toggle('menu-open'));
 $('#dialog-close').addEventListener('click',()=>$('#dialog').close());
 $('#refresh').addEventListener('click',async()=>{try{await load();toast('Dashboard bijgewerkt.');}catch(error){toast(error.message,true);}});
-$('#logout').addEventListener('click',async()=>{try{await api('/api/dashboard/logout',{});}catch{}showLogin('Je bent uitgelogd. Gebruik /dashboard voor een nieuwe persoonlijke link.');});
+$('#logout').addEventListener('click',async()=>{try{await api('/api/dashboard/logout',{});}catch{}showLogin('Je bent uitgelogd. Je kunt opnieuw inloggen met Discord.');});
 setInterval(async()=>{if(!state.session||state.busy||$('#dialog').open)return;try{await load(!['settings','information','games'].includes(state.page));}catch(error){if(error.status===401||error.status===403)showLogin(error.message);else $('#connection').textContent='Verbinding controleren…';}},30000);
 await boot();

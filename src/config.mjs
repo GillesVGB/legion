@@ -27,6 +27,7 @@ export function loadConfig(env = process.env, requireDiscord = true) {
   const publicURL = (env.DASHBOARD_PUBLIC_URL ?? hostedURL ?? '').trim();
   const config = {
     token, clientId: (env.CLIENT_ID ?? '').trim(),
+    discordClientSecret: (env.DISCORD_CLIENT_SECRET ?? '').trim(),
     transcriptViewerMode: (env.TRANSCRIPT_VIEWER_MODE || 'local').trim(),
     dashboardPublicURL: publicURL,
     transcriptPort: integer(publicURL && env.SERVER_PORT ? 'SERVER_PORT' : 'TRANSCRIPT_PORT', 8793, 1024, 65535),

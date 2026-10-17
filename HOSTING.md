@@ -1,5 +1,15 @@
 # Bakarov op Bot-Hosting.net
 
+## Discord-inloggen instellen — 1.11.0
+
+1. Open in Discord Developer Portal de applicatie met dezelfde `CLIENT_ID` als de bot, ga naar **OAuth2** en haal daar de **Client Secret** op. Dit is een ander geheim dan het bot-token.
+2. Zet die privé in je hostingvariabelen of bestaande `.env`: `DISCORD_CLIENT_SECRET=...`. Zet de echte waarde nooit in GitHub of in de voorbeeldbestanden. Is een secret gedeeld, reset die dan eerst in Developer Portal.
+3. Voeg bij **OAuth2 → Redirects** exact toe: `https://wlll36f6gd.apps.bot-hosting.cloud/api/dashboard/oauth/callback` en sla op.
+4. Haal de nieuwste code op en herstart de hosting. Open het dashboard en klik **Inloggen met Discord**. Je hebt de ingestelde Legion Lead-rol nodig, ook wanneer je Administrator hebt. Test met het juiste Discord-account.
+
+De callback wordt automatisch opgebouwd uit het vaste dashboardadres. Bij een andere deployment registreer je het adres uit `DASHBOARD_PUBLIC_URL` met `/api/dashboard/oauth/callback` erachter. Gebruik voor OAuth een vast HTTPS-adres; een wisselend tunneladres moet telkens opnieuw worden geregistreerd. De login-knop gaat naar het vaste adres, ook wanneer je eerst een alias bezoekt. Bestaande `.env`, databases en bot-token blijven behouden. Zonder Client Secret start de bot gewoon en blijft `/dashboard` voor Lead beschikbaar.
+
+
 **Update 1.10.1:** het automatische overzicht is nu wekelijks, iedere zondag om 09:00 Belgische tijd over zondag t/m zaterdag. Maandcijfers worden alleen op aanvraag getoond. Haal de nieuwste code op en herstart de hosting; behoud `.env` en de volledige bestaande `data/`-map.
 
 **Update 1.10.0:** behoud de bestaande `data/`-map en laat Git auto-pull de update ophalen bij een herstart. De bot controleert na starten automatisch eerdere warns tegenover al goedgekeurde afmeldingen; dit gebeurt op de hostingdatabase. Een lokaal uitgevoerde test wijzigt geen hostingwarns. De automatische overzichten volgen vanaf 1.10.1 het wekelijkse schema hierboven.

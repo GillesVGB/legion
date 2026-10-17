@@ -1,4 +1,9 @@
 {
+  "1.11.0": [
+    "Nieuw: rechtstreeks aanmelden met je eigen Discord-account via een eenvoudige loginpagina met Discord-icoon.",
+    "Alleen leden met de ingestelde Legion Lead-rol krijgen toegang. Administrator zonder deze rol geeft geen toegang; verloren rollen blokkeren ook bestaande sessies.",
+    "De Discord-login gebruikt beveiligde, eenmalige browsergebonden aanmeldingen. Eenmalige OAuth2-configuratie op de hosting is nodig; /dashboard blijft als terugval beschikbaar."
+  ],
   "1.10.1": [
     "Het automatische overzicht wordt voortaan iedere zondag om 09:00 Belgische tijd verstuurd, over de afgelopen zondag t/m zaterdag. De zaterdagse gangpotdeadline telt volledig mee.",
     "Nieuw: /weekoverzicht en Weekoverzicht in het dashboard. Verzendtijd en privékanaal zijn instelbaar; bestaande rapportage-instellingen worden meegenomen. Maandcijfers blijven op aanvraag beschikbaar.",

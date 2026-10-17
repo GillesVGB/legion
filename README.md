@@ -1,5 +1,11 @@
 # Bakarov — Discord-bot voor Future RP
 
+## Inloggen met Discord — 1.11.0
+
+Open het dashboard en klik **Inloggen met Discord**. Je eigen Discord-account en je actuele **Legion Lead-rol** bepalen de toegang. In de hoofdserver is dat rol `1555685630707769382`; in de community is dat de ingestelde Lead-rol `1555726440933363761`. Je ziet alleen de servers waar je die rol hebt. Administrator zonder Lead-rol geeft geen toegang. Een verloren Lead-rol blokkeert ook een bestaande sessie.
+
+Stel eenmalig de private `DISCORD_CLIENT_SECRET` en de OAuth2-redirect in volgens **HOSTING.md**. De bot vraagt uitsluitend je Discord-identiteit op, geen e-mail of extra serverrechten. Discord-tokens blijven op de server, worden niet in de botdatabase bewaard en komen niet in de browser. De dashboardsessie blijft dertig minuten geldig. `/dashboard` opent dezelfde loginpagina; zonder OAuth-configuratie blijft de bestaande eenmalige Lead-link beschikbaar.
+
 ## Wekelijks overzicht — 1.10.1
 
 Het automatische overzicht wordt **iedere zondag om 09:00 Belgische tijd** verstuurd naar het privé leidinglogkanaal. Het behandelt de afgelopen **zondag tot en met zaterdag**, inclusief de zaterdagse gangpotdeadline. De eerste rapportage behandelt de week waarin deze update start; gemiste weken worden na een storing alsnog verstuurd, eenmaal per week. Bij een installatie op zaterdag 17 oktober is het eerste overzicht dus zondag 18 oktober om 09:00, over 11 t/m 17 oktober.
@@ -208,9 +214,9 @@ Bij een tunnelstoring bewaart de bot het volledige transcript alvast lokaal. Zod
 
 ## Bakarov-dashboard en persoonlijke invites
 
-Gebruik `/dashboard` als leiding om het dashboard te openen. Je kunt beide beschikbare guilds selecteren en tickets, sollicitaties, transcripts, warns, leden, coins, informatie en instellingen beheren. De inlogknop is privé, eenmalig en twee minuten geldig; de sessie duurt dertig minuten. Ieder verzoek controleert de actuele Discord-leidingrechten voor die guild.
+Open het dashboard en meld je aan met Discord, of gebruik `/dashboard`. Met de Lead-rol kun je tickets, sollicitaties, transcripts, warns, leden, coins, informatie en instellingen beheren. Ieder verzoek controleert de actuele Lead-rol voor de gekozen guild; Administrator geeft geen extra inlogtoegang. De sessie duurt dertig minuten. Zonder OAuth-configuratie geeft `/dashboard` nog een privé inloglink die één keer werkt en twee minuten geldig is.
 
-Het dashboard staat op dezelfde neutrale HTTPS-origin als de transcriptviewer. Er is geen ChatGPT-aanmelding of OAuth-clientsecret nodig. De dashboardinstellingen worden per guild in SQLite bewaard. Games blijven openbaar in Discord.
+Het dashboard staat op dezelfde neutrale HTTPS-origin als de transcriptviewer. Discord-inloggen gebruikt een private OAuth2 Client Secret; zie HOSTING.md voor de eenmalige instelling. Er is geen ChatGPT-aanmelding nodig. De dashboardinstellingen worden per guild in SQLite bewaard. Games blijven openbaar in Discord.
 
 Aannemen stuurt automatisch een groene DM met een gebruikersgebonden, eenmalige uitnodiging naar de gangserver `1555685630640652338`. De link vervalt na joinen en uiterlijk na 24 uur. De bot controleert bij Discord dat alleen de beoogde gebruiker de invite kan accepteren. Geblokkeerde DM’s worden zichtbaar in het dashboard. De sollicitant kan `/uitnodiging` gebruiken; leiding kan opnieuw sturen.
 

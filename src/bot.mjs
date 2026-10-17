@@ -67,6 +67,7 @@ for (const guildConfig of base.guilds) {
   contexts.set(config.guildId, ctx);
 }
 const dashboard = new Dashboard({ client, contexts, locks });
+if(!base.discordClientSecret)console.log('Discord-inloggen: stel DISCORD_CLIENT_SECRET privé in op de hosting en registreer de OAuth2-redirect uit HOSTING.md. /dashboard blijft beschikbaar voor Lead.');
 
 function requireGames(ctx, interaction) {
   const { config } = ctx;
@@ -218,8 +219,11 @@ async function handleCommand(ctx, interaction) {
   if (name === 'dashboard') {
     requireStaff(interaction, config);
     await interaction.deferReply(privateReply);
-    const url = dashboard.issueLogin(interaction.user.id, interaction.guildId);
-    return interaction.editReply({ allowedMentions: quiet, content: 'Open je privé Bakarov-dashboard. De inloglink is twee minuten geldig en werkt één keer.',
+    try{await dashboard.authorized({userId:interaction.user.id},interaction.guildId);}
+    catch(error){if(error.status)throw new UserError(error.message);throw error;}
+    const discordLogin=dashboard.discordLogin.enabled();
+    const url = discordLogin?`${dashboard.currentOrigin()}/dashboard`:dashboard.issueLogin(interaction.user.id, interaction.guildId);
+    return interaction.editReply({ allowedMentions: quiet, content: discordLogin?'Open het Bakarov-dashboard en meld je aan met Discord. Je hebt de Legion Lead-rol nodig.':'Open je privé Bakarov-dashboard. De inloglink is twee minuten geldig en werkt één keer.',
       components: [row(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Dashboard openen').setURL(url))] });
   }
   if (name === 'uitnodiging') {
