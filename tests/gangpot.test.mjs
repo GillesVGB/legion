@@ -102,12 +102,13 @@ test('zonder ledenrol hoeft een lid niet te betalen, kan het geen melding maken 
   assert.equal(f.main.store.db.prepare('SELECT active FROM gangpot_dues WHERE period_id=? AND user_id=?').get(period(f).id,id).active,0);
 });
 
-test('een ontvangen ledenrol schrijft het lid in, ook als het later in de week lid wordt',async t=>{
+test('een ontvangen ledenrol geeft vrijstelling in de instapweek, daarna geldt de volgende volledige termijn',async t=>{
   const f=fixture(t),id='100000000000000078',member=f.guild.addMember(id,'Nieuw lid',[]);
   await syncGangpot(f.main,f.client,SAT);assert.ok(!gangpotMembers(f.main,period(f),SAT).some(item=>item.user_id===id));
   member.roles.cache.set(f.main.config.gangpot.memberRoleId,f.guild.roles.cache.get(f.main.config.gangpot.memberRoleId));
   await syncGangpot(f.main,f.client,SAT+86400000);assert.ok(gangpotMembers(f.main,period(f),SAT).some(item=>item.user_id===id&&item.active));
-  await syncGangpot(f.main,f.client,END);assert.equal(warns(f,id).length,1);
+  await syncGangpot(f.main,f.client,END);assert.equal(warns(f,id).length,0);
+  await syncGangpot(f.main,f.client,END+7*86400000);assert.equal(warns(f,id).length,1);
 });
 
 test('migratie bewaart oude zondagbetalingen en meldingen, hergebruikt de oude gangpot-embed als informatie en verplaatst het totaal',async t=>{
@@ -300,7 +301,7 @@ test('schema 9 migreert eerdere correcties naar ingetrokken betaalmeldingen en b
   const newClaim=claim(f,OTHER,25000,'new-payment-after-migration');
   const removalResult=removeGangpotPayment(f.main,removal(f),SAT+3000);
   f.main.store.close();f.main.store=new Store(f.main.config,path);
-  assert.equal(f.main.store.db.prepare('PRAGMA user_version').get().user_version,17);
+  assert.equal(f.main.store.db.prepare('PRAGMA user_version').get().user_version,18);
   assert.equal(f.main.store.db.prepare('SELECT id FROM gangpot_removals').get().id,removalResult.id);
   assert.ok(f.main.store.db.prepare('SELECT withdrawn_at FROM gangpot_claims WHERE id=?').get(newClaim.id).withdrawn_at);
 });

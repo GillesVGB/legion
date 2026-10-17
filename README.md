@@ -1,5 +1,12 @@
 # Bakarov — Discord-bot voor Future RP
 
+## Gangpot voor nieuwe leden — 1.12.0
+
+De instapweek van een nieuw ganglid is vrijgesteld. De verplichte weekbijdrage begint bij de volgende volledige gangpottermijn. De instapweek geeft geen automatische gangpotwarn of betaalherinnering; een vrijwillige betaling blijft mogelijk. `/gangpot status` en het dashboard tonen de vrijstelling en startdatum. De eerste vastgelegde betaalplicht blijft bewaard bij herstarts; een ledenrol weghalen en teruggeven start geen nieuwe vrijstelling.
+
+Bij de update blijven bestaande betaalverplichtingen intact. Een vastgelegde roltoekenning of Discord-toetreding kan aantonen dat iemand pas in een termijn lid werd. Alleen de gekoppelde automatische gangpotwarn voor zo'n instapweek wordt dan ingetrokken, met log en DM. Zonder bewijs van nieuwe toetreding worden bestaande leden niet algemeen vrijgesteld. Nieuwe leden die de bot na een offline periode voor het eerst aantreft krijgen vanaf die registratie een instapweek. Discord levert geen historisch tijdstip van een roltoekenning; de bot legt nieuwe toekenningen daarom zelf vast.
+
+
 ## Inloggen met Discord — 1.11.0
 
 Open het dashboard en klik **Inloggen met Discord**. Je eigen Discord-account en je actuele **Legion Lead-rol** bepalen de toegang. In de hoofdserver is dat rol `1555685630707769382`; in de community is dat de ingestelde Lead-rol `1555726440933363761`. Je ziet alleen de servers waar je die rol hebt. Administrator zonder Lead-rol geeft geen toegang. Een verloren Lead-rol blokkeert ook een bestaande sessie.

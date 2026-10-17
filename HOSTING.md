@@ -1,5 +1,7 @@
 # Bakarov op Bot-Hosting.net
 
+**Update 1.12.0:** nieuwe gangleden zijn vrijgesteld in hun instapweek en betalen vanaf de volgende volledige termijn. Behoud de bestaande `data/`-map; de eerste betaalplicht wordt daarin blijvend opgeslagen. Bij de eerste synchronisatie worden alleen aantoonbare automatische gangpotwarns uit een instapweek gecorrigeerd. Herstart na het ophalen van de update om deze regel op de hosting toe te passen.
+
 ## Discord-inloggen instellen — 1.11.0
 
 1. Open in Discord Developer Portal de applicatie met dezelfde `CLIENT_ID` als de bot, ga naar **OAuth2** en haal daar de **Client Secret** op. Dit is een ander geheim dan het bot-token.

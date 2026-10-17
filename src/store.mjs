@@ -134,6 +134,9 @@ export class Store {
         active INTEGER NOT NULL DEFAULT 1, warn_id TEXT, warn_cleared_by_payment INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY(period_id,user_id)
       );
+      CREATE TABLE IF NOT EXISTS gangpot_memberships (
+        user_id TEXT PRIMARY KEY,started_at INTEGER,required_from INTEGER NOT NULL,source TEXT NOT NULL
+      );
       CREATE TABLE IF NOT EXISTS gangpot_entries (
         id TEXT PRIMARY KEY, request_id TEXT NOT NULL UNIQUE,
         kind TEXT NOT NULL CHECK(kind IN ('payment','donation','expense')),
@@ -246,7 +249,7 @@ export class Store {
       CREATE INDEX IF NOT EXISTS check_member_history ON activity_check_members(user_id,check_id);
       CREATE INDEX IF NOT EXISTS notice_due_kind ON feature_notices(status,kind,next_attempt);
       CREATE INDEX IF NOT EXISTS check_deadline_due ON activity_check_sessions(status,deadline_at,next_attempt);
-      PRAGMA user_version = 17;
+      PRAGMA user_version = 18;
     `);
   }
 

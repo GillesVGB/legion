@@ -1,4 +1,9 @@
 {
+  "1.12.0": [
+    "Nieuwe gangleden zijn vrijgesteld in hun instapweek. De verplichte gangpotbijdrage begint bij de volgende volledige zaterdag–zaterdagtermijn; in de instapweek volgen geen automatische gangpotwarns of betaalherinneringen.",
+    "De betaalstatus en het dashboard tonen de instapvrijstelling. De start van de betaalplicht blijft bewaard bij herstarts en wordt niet opnieuw vrijgesteld wanneer een ledenrol wordt weggehaald en teruggezet.",
+    "Bestaande automatische gangpotwarns voor een aantoonbare instapweek worden ingetrokken met log en DM. Andere warns en eerdere betaalverplichtingen blijven behouden."
+  ],
   "1.11.1": [
     "De loginpagina heeft een vernieuwd zwart-gouden Bakarov-thema: een omlijst logo, gouden Discord-knop en subtiele achtergrond. De pagina blijft compact en werkt op mobiel."
   ],

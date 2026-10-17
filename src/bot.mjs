@@ -21,7 +21,7 @@ import { handlePlanningCommand,handlePlanningAutocomplete,handlePlanningReaction
 import {handleActivitiesCheck,handleStopActivityCheck,handleActivityCheckReaction,syncActivityChecks} from './activity-check.mjs';
 import { handlePromotionCommand,handlePromotionButton,syncPromotions } from './promotions.mjs';
 import { syncCommands } from './command-sync.mjs';
-import {handleGangpotCommand,handleGangpotStatus,handleGangpotReview,syncGangpot} from './gangpot.mjs';
+import {handleGangpotCommand,handleGangpotStatus,handleGangpotReview,syncGangpot,trackGangpotMembership} from './gangpot.mjs';
 import {handleAbsenceCommand,handleAbsenceButton,syncAbsences} from './absence.mjs';
 import {fishBookMessage,handleFishBookButton} from './fish-book.mjs';
 import {handleBotStatus} from './bot-status.mjs';
@@ -482,6 +482,7 @@ client.on(Events.GuildMemberRemove, member => {
 });
 client.on(Events.GuildMemberUpdate, (before, after) => {
   const ctx = contexts.get(after.guild.id);
+  if(ctx?.config.gangpot&&!shuttingDown)trackGangpotMembership(ctx,before,after);
   if (ctx?.config.recruitment && before.roles.cache.has(ctx.config.memberRoleId) !== after.roles.cache.has(ctx.config.memberRoleId)) membershipChanged(after.guild);
   if (ctx?.config.memberRoleId && before.roles.cache.has(ctx.config.memberRoleId) && !after.roles.cache.has(ctx.config.memberRoleId)) revokeAcceptances(ctx, client, after.id).catch(() => {});
   if (ctx?.config.roster && (before.displayName !== after.displayName || ctx.config.roster.roleIds.some(id => before.roles.cache.has(id) !== after.roles.cache.has(id)))) rosterChanged(after.guild);

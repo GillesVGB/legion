@@ -13,6 +13,11 @@ import {missionDay} from './mission-definitions.mjs';
 import {exemptionFor} from './absence.mjs';
 import {syncGangpotReminders} from './gangpot-reminders.mjs';
 import {editIfChanged} from './message-updates.mjs';
+import {gangpotIntroduction,syncGangpotMemberships,recordGangpotMembership} from './gangpot-membership.mjs';
+
+export function trackGangpotMembership(ctx,before,after,now=Date.now()){
+  recordGangpotMembership(ctx,before,after,time=>gangpotWindow(ctx.config.gangpot,time),now);
+}
 
 const uid=()=>randomBytes(6).toString('hex');
 export const GANGPOT_LEAD_ROLE_ID='1555685630707769382';
@@ -37,9 +42,9 @@ export function gangpotMembers(ctx,period,now=Date.now()){
   if(!period)return[];
   return ctx.store.db.prepare('SELECT * FROM gangpot_dues WHERE period_id=? ORDER BY user_id').all(period.id).map(item=>{
     const paid=gangpotPaid(ctx,period,item.user_id),warning=item.warn_id?ctx.store.db.prepare('SELECT removed_at FROM warnings WHERE id=?').get(item.warn_id):null;
-    const exemption=exemptionFor(ctx,item.user_id,period.id);
+    const introduction=gangpotIntroduction(ctx,item.user_id,period),exemption=introduction||exemptionFor(ctx,item.user_id,period.id);
     const status=!item.active?'left':exemption?'exempt':paid.on_time>=period.weekly_amount?'paid':warning&&warning.removed_at===null?'warned':paid.total>=period.weekly_amount?'late':paid.total?'partial':'unpaid';
-    return{...item,paid:paid.total,onTime:paid.on_time,remaining:exemption?0:Math.max(0,period.weekly_amount-paid.total),status,exempt:Boolean(exemption),overdue:now>=period.ends_at};
+    return{...item,paid:paid.total,onTime:paid.on_time,remaining:exemption?0:Math.max(0,period.weekly_amount-paid.total),status,exempt:Boolean(exemption),newMember:Boolean(introduction),requiredFrom:introduction?.required_from||null,overdue:now>=period.ends_at};
   });
 }
 function migrateOpenTerms(ctx,guild,now){
@@ -85,14 +90,15 @@ function reconcileDebt(ctx,period,user,actor,now){
   const debt=ctx.store.db.prepare('SELECT * FROM gangpot_dues WHERE period_id=? AND user_id=?').get(period.id,user);if(!debt)return;
   const paid=gangpotPaid(ctx,period,user);
   const warning=debt.warn_id?ctx.store.db.prepare('SELECT * FROM warnings WHERE id=?').get(debt.warn_id):null;
-  const exempt=exemptionFor(ctx,user,period.id);
+  const introduction=gangpotIntroduction(ctx,user,period),exempt=introduction||exemptionFor(ctx,user,period.id);
   if(exempt||paid.on_time>=period.weekly_amount){
-    if(warning&&warning.removed_at===null){
-      const reason=`Gangpot ${period.id}: ${exempt?'vrijstelling goedgekeurd':'tijdige betaling bevestigd'} door de leiding.`;
+    if(warning&&warning.removed_at===null&&(!introduction||(warning.actor_id===ctx.config.clientId&&warning.user_id===user&&warning.reason.startsWith('Gangpot t/m ')))){
+      const reason=introduction?`Gangpot ${period.id}: instapweek van een nieuw lid; betaalplicht begint bij de volgende volledige termijn.`:`Gangpot ${period.id}: ${exempt?'vrijstelling goedgekeurd':'tijdige betaling bevestigd'} door de leiding.`;
       ctx.store.db.prepare('UPDATE warnings SET removed_at=?,removed_by=?,removed_reason=? WHERE id=?').run(now,actor,reason,warning.id);
-      ctx.store.db.prepare('UPDATE gangpot_dues SET warn_cleared_by_payment=1 WHERE period_id=? AND user_id=?').run(period.id,user);
+      ctx.store.db.prepare('UPDATE gangpot_dues SET warn_cleared_by_payment=? WHERE period_id=? AND user_id=?').run(introduction?0:1,period.id,user);
       ctx.store.audit('warn.remove',actor,{id:warning.id,user,reason});
-      queueNotice(ctx,user,period,warning.id,'revoke',`De gangpotwarn voor termijn ${period.id} is ingetrokken: ${exempt?'je bent vrijgesteld':'je betaling is tijdig bevestigd'}.`);
+      if(introduction)ctx.store.db.prepare("UPDATE gangpot_notifications SET log_id=COALESCE(log_id,'skipped'),dm_id=COALESCE(dm_id,'skipped'),last_error=NULL WHERE warn_id=? AND kind IN ('issue','restore')").run(warning.id);
+      queueNotice(ctx,user,period,warning.id,'revoke',`De gangpotwarn voor termijn ${period.id} is ingetrokken: ${introduction?'dit is je instapweek. Je betaalplicht begint bij de volgende volledige termijn':exempt?'je bent vrijgesteld':'je betaling is tijdig bevestigd'}.`);
     }
     return;
   }
@@ -244,8 +250,8 @@ export async function reviewGangpotPayment(ctx,guild,member,id,decision,clock=Da
 }
 export function gangpotClaimMessage(ctx,claim){
   if(claim.withdrawn_at)return{embeds:[embed(ctx.config,'Bakarov — Betaling verwijderd',`**Lid:** <@${claim.user_id}>\n**Termijn:** t/m ${claim.period_id}\n**Bedrag:** ${gangpotMoney(claim.amount)}\n**Status:** ⚪ Verwijderd\n**Door:** <@${claim.withdrawn_by}>\n**Reden:** ${safeText(claim.withdraw_reason||'Registratie gecorrigeerd.')}\n\nDeze betaling telt niet meer mee. Het lid kan opnieuw /gangpot betaling gebruiken. De oorspronkelijke deadline blijft gelden.`).setColor(0x64748B).setFooter({text:`Bakarov • Gangpotmelding ${claim.id}`})],components:[],allowedMentions:quiet};
-  const pending=claim.status==='pending',approved=claim.status==='approved';
-  const card=embed(ctx.config,'Bakarov — Betaalmelding',`**Lid:** <@${claim.user_id}>\n**Termijn:** t/m ${claim.period_id}\n**Gemeld bedrag:** ${gangpotMoney(claim.amount)}\n**Status:** ${pending?'🟠 Wacht op Lead-vinkje':approved?'✅ Goedgekeurd':'❌ Afgekeurd'}${claim.reviewer_id?`\n**Beoordeeld door:** <@${claim.reviewer_id}>`:''}${claim.note?`\n\n**Toelichting:** ${safeText(claim.note)}`:''}\n\n${pending?'Lead: controleer of het bedrag werkelijk in-game is ontvangen. Zonder volledige goedkeuring vóór de weekdeadline volgt automatisch een gangwarn.':approved?'Het bedrag is toegevoegd aan de gangpot. Een vinkje na de deadline verwijdert een gangwarn niet.':'Er is geen bedrag toegevoegd. Meld je betaling opnieuw zodra deze klopt; de deadline blijft gelden.'}`).setColor(pending?0xF59E0B:approved?0x22C55E:0xEF4444).setFooter({text:`Bakarov • Gangpotmelding ${claim.id}`});
+  const pending=claim.status==='pending',approved=claim.status==='approved',introduction=gangpotIntroduction(ctx,claim.user_id,periodById(ctx,claim.period_id));
+  const card=embed(ctx.config,'Bakarov — Betaalmelding',`**Lid:** <@${claim.user_id}>\n**Termijn:** t/m ${claim.period_id}\n**Gemeld bedrag:** ${gangpotMoney(claim.amount)}\n**Status:** ${pending?'🟠 Wacht op Lead-vinkje':approved?'✅ Goedgekeurd':'❌ Afgekeurd'}${claim.reviewer_id?`\n**Beoordeeld door:** <@${claim.reviewer_id}>`:''}${claim.note?`\n\n**Toelichting:** ${safeText(claim.note)}`:''}\n\n${introduction?'Dit is de instapweek van een nieuw lid. De bijdrage is deze week vrijwillig; zonder betaling of vinkje volgt geen gangpotwarn.':pending?'Lead: controleer of het bedrag werkelijk in-game is ontvangen. Zonder volledige goedkeuring vóór de weekdeadline volgt automatisch een gangwarn.':approved?'Het bedrag is toegevoegd aan de gangpot. Een vinkje na de deadline verwijdert een gangwarn niet.':'Er is geen bedrag toegevoegd. Meld je betaling opnieuw zodra deze klopt; de deadline blijft gelden.'}`).setColor(pending?0xF59E0B:approved?0x22C55E:0xEF4444).setFooter({text:`Bakarov • Gangpotmelding ${claim.id}`});
   return{embeds:[card],components:[row(button(`gangpot:approve:${claim.id}`,'✅ Goedkeuren',ButtonStyle.Success).setDisabled(!pending),button(`gangpot:reject:${claim.id}`,'❌ Afkeuren',ButtonStyle.Danger).setDisabled(!pending))],allowedMentions:quiet};
 }
 async function publishClaims(ctx,guild,now){
@@ -264,17 +270,17 @@ export async function handleGangpotReview(ctx,interaction){
   await syncGangpot(ctx,interaction.client);
   return interaction.editReply({content:result.status==='approved'?'✅ Betaling goedgekeurd en aan de gangpot toegevoegd.':'❌ Betaalmelding afgekeurd.',allowedMentions:quiet});
 }
-function dueLines(items){return items.length?items.slice(0,22).map(item=>`${item.status==='paid'?'🟢':item.status==='warned'?'🔴':'🟠'} <@${item.user_id}> · ${gangpotMoney(item.paid)}/${gangpotMoney(item.expected)}`).join('\n')+(items.length>22?`\n… en ${items.length-22} andere leden. Bekijk /gangpot status voor je eigen termijn.`:''):'Nog geen leden geregistreerd.';}
+function dueLines(items){return items.length?items.slice(0,22).map(item=>`${['paid','exempt'].includes(item.status)?'🟢':item.status==='warned'?'🔴':'🟠'} <@${item.user_id}> · ${item.newMember?'Instapweek — vrijgesteld':item.exempt?'Vrijgesteld':`${gangpotMoney(item.paid)}/${gangpotMoney(item.expected)}`}`).join('\n')+(items.length>22?`\n… en ${items.length-22} andere leden. Bekijk /gangpot status voor je eigen termijn.`:''):'Nog geen leden geregistreerd.';}
 export function gangpotPaymentMessage(ctx,guild,now=Date.now()){
   const settings=ctx.config.gangpot;
-  const description=`Samen bouwen we een gangpot op om Bakarov te steunen. **Leden met rol <@&${settings.memberRoleId}> betalen ${gangpotMoney(settings.weeklyAmount)} per week.** Zonder deze rol hoef je geen bijdrage te melden en ontvang je geen automatische gangpotwarn.\n\n**Termijn: zaterdag–zaterdag.**\n**Deadline: iedere zaterdag om ${settings.deadlineTime||'23:59'}, Belgische tijd.**\n\n**Zo werkt het**\n1. Betaal je bijdrage in-game aan de verantwoordelijke leiding.\n2. Meld zelf je betaling met **/gangpot betaling**. Je melding verschijnt in <#${settings.paymentsChannelId}>.\n3. Lead controleert je melding en kiest **✅ Goedkeuren** of **❌ Afkeuren**. Alleen goedgekeurde bedragen tellen mee.\n\n**Geen melding, geen vinkje of geen volledige goedkeuring vóór de deadline? Dan volgt automatisch één gangwarn voor die week.** Ook een melding die nog op controle wacht geeft geen uitstel. Een vinkje na de deadline verwijdert de warn niet. Zorg dus dat je op tijd betaalt én goedkeuring krijgt.\n\nHet totaal en wie betaald heeft vind je in <#${settings.totalChannelId}>. Gebruik **/gangpot status** voor je eigen betaalstatus en deadline. Dit gaat om FiveM-geld. Vragen of opmerkingen? Bespreek het met de leiding in de chat.`;
+  const description=`Samen bouwen we een gangpot op om Bakarov te steunen. **Leden met rol <@&${settings.memberRoleId}> betalen ${gangpotMoney(settings.weeklyAmount)} per week.** Zonder deze rol hoef je geen bijdrage te melden en ontvang je geen automatische gangpotwarn.\n\n**Termijn: zaterdag–zaterdag.**\n**Deadline: iedere zaterdag om ${settings.deadlineTime||'23:59'}, Belgische tijd.**\n\n**Nieuw in de gang?** Je instapweek is vrijgesteld: geen verplichte bijdrage, betaalherinnering of automatische gangpotwarn. Je betaalplicht begint bij de volgende volledige termijn. Dit staat bij **/gangpot status**.\n\n**Zo werkt het**\n1. Betaal je bijdrage in-game aan de verantwoordelijke leiding.\n2. Meld zelf je betaling met **/gangpot betaling**. Je melding verschijnt in <#${settings.paymentsChannelId}>.\n3. Lead controleert je melding en kiest **✅ Goedkeuren** of **❌ Afkeuren**. Alleen goedgekeurde bedragen tellen mee.\n\n**Geen melding, geen vinkje of geen volledige goedkeuring vóór de deadline? Dan volgt automatisch één gangwarn voor die week.** Ook een melding die nog op controle wacht geeft geen uitstel. Een vinkje na de deadline verwijdert de warn niet. Zorg dus dat je op tijd betaalt én goedkeuring krijgt.\n\nHet totaal en wie betaald heeft vind je in <#${settings.totalChannelId}>. Gebruik **/gangpot status** voor je eigen betaalstatus en deadline. Dit gaat om FiveM-geld. Vragen of opmerkingen? Bespreek het met de leiding in de chat.`;
   const card=embed(ctx.config,'Bakarov — Gangpotinformatie',description).setColor(0xF59E0B).setFooter({text:'Bakarov • Gangpotinformatie'});
   return{embeds:[card],components:[row(button('gangpot:status','Mijn betaalstatus'))],allowedMentions:quiet};
 }
 export function gangpotTotalMessage(ctx,guild,now=Date.now()){
   const data=gangpotSummary(ctx,guild,now),period=data.period,active=data.members.filter(item=>item.active);
   const paid=active.filter(item=>item.paid>=period.weekly_amount);
-  const card=embed(ctx.config,'Bakarov — Totaal gangpot & betalingen',`## ${gangpotMoney(data.balance)}\nBevestigd in-game saldo: goedgekeurde betalingen en donaties, min uitgaven.${period?`\n\n**Termijn:** t/m zaterdag ${period.id}\n**Deadline:** <t:${Math.floor((period.ends_at-60000)/1000)}:F>\n**Deze week betaald:** ${paid.length}/${active.length} leden met <@&${ctx.config.gangpot.memberRoleId}>.`:''}`).setColor(0x22C55E).setFooter({text:'Bakarov • Totaal gangpot'});
+  const card=embed(ctx.config,'Bakarov — Totaal gangpot & betalingen',`## ${gangpotMoney(data.balance)}\nBevestigd in-game saldo: goedgekeurde betalingen en donaties, min uitgaven.${period?`\n\n**Termijn:** t/m zaterdag ${period.id}\n**Deadline:** <t:${Math.floor((period.ends_at-60000)/1000)}:F>\n**Deze week betaald:** ${paid.filter(item=>!item.exempt).length}/${active.filter(item=>!item.exempt).length} verplichte bijdragen.\n**Vrijgesteld:** ${active.filter(item=>item.exempt).length}, waarvan ${active.filter(item=>item.newMember).length} nieuwe leden.`:''}`).setColor(0x22C55E).setFooter({text:'Bakarov • Totaal gangpot'});
   let lines=[];let length=0,shown=0;
   for(const item of paid){const line=`${item.onTime>=period.weekly_amount?'✅':'🕒'} <@${item.user_id}> · ${gangpotMoney(item.paid)}`;if(length+line.length>3300)break;lines.push(line);length+=line.length+1;shown++;}
   if(!lines.length)lines=['Nog geen volledige weekbijdragen goedgekeurd.'];
@@ -330,7 +336,9 @@ export async function syncGangpot(ctx,client,now=Date.now()){
   return serializeCommunity(`${ctx.config.guildId}:gangpot`,async()=>{
     const guild=client.guilds.cache.get(ctx.config.guildId);assertUser(guild,'De gangpot-hoofdserver is niet bereikbaar.');
     // Geen automatische straf op basis van een lege of verouderde ledencache.
-    await refreshMembers(guild);migrateOpenTerms(ctx,guild,now);ensurePeriod(ctx,guild,now);enforcePeriods(ctx,guild,now);
+    await refreshMembers(guild);migrateOpenTerms(ctx,guild,now);
+    syncGangpotMemberships(ctx,guild,time=>gangpotWindow(ctx.config.gangpot,time),now);
+    ensurePeriod(ctx,guild,now);enforcePeriods(ctx,guild,now);
     await deliverNotices(ctx,guild,client,now);
     await publishClaims(ctx,guild,now);
     await publishGangpot(ctx,guild,now);
@@ -342,7 +350,7 @@ export function gangpotStatusMessage(ctx,user,now=Date.now()){
   const period=currentPeriod(ctx,now);assertUser(period,'De gangpottermijn wordt nog gestart. Probeer over een minuut opnieuw.');
   const item=gangpotMembers(ctx,period,now).find(item=>item.user_id===user);assertUser(item,'Je staat nog niet in het betaaloverzicht. Probeer over een minuut opnieuw.');
   const pending=ctx.store.db.prepare("SELECT amount FROM gangpot_claims WHERE period_id=? AND user_id=? AND status='pending'").get(period.id,user);
-  return{embeds:[embed(ctx.config,'Bakarov — Jouw gangpotbijdrage',`**Termijn:** t/m ${period.id}\n**Weekbijdrage:** ${gangpotMoney(period.weekly_amount)}\n**Goedgekeurd:** ${gangpotMoney(item.paid)}\n**Nog open:** ${gangpotMoney(item.remaining)}${pending?`\n**Wacht op Lead-vinkje:** ${gangpotMoney(pending.amount)}`:''}\n**Deadline:** zaterdag ${deadlineClock(period)} · <t:${Math.floor((period.ends_at-60000)/1000)}:R>\n\n${item.status==='exempt'?'✅ Je bent voor deze week vrijgesteld. Je hoeft geen gangpotbijdrage te betalen.':item.status==='paid'?'🟢 Je weekbijdrage is tijdig goedgekeurd.':'🟠 Gebruik /gangpot betaling en zorg dat Lead vóór de deadline goedkeurt. Zonder volledige goedkeuring volgt automatisch een gangwarn.'}`).setColor(['paid','exempt'].includes(item.status)?0x22C55E:0xF59E0B)],allowedMentions:quiet};
+  return{embeds:[embed(ctx.config,'Bakarov — Jouw gangpotbijdrage',`**Termijn:** t/m ${period.id}\n**Weekbijdrage:** ${gangpotMoney(period.weekly_amount)}\n**Goedgekeurd:** ${gangpotMoney(item.paid)}\n**Nog open:** ${gangpotMoney(item.remaining)}${pending?`\n**Wacht op Lead-vinkje:** ${gangpotMoney(pending.amount)}`:''}\n**Deadline:** zaterdag ${deadlineClock(period)} · <t:${Math.floor((period.ends_at-60000)/1000)}:R>\n\n${item.newMember?`✅ Dit is je instapweek. Je hoeft deze week niet te betalen en krijgt hiervoor geen gangpotwarn. Je betaalplicht begint op <t:${Math.floor(item.requiredFrom/1000)}:D>, bij de volgende volledige termijn.`:item.status==='exempt'?'✅ Je bent voor deze week vrijgesteld. Je hoeft geen gangpotbijdrage te betalen.':item.status==='paid'?'🟢 Je weekbijdrage is tijdig goedgekeurd.':'🟠 Gebruik /gangpot betaling en zorg dat Lead vóór de deadline goedkeurt. Zonder volledige goedkeuring volgt automatisch een gangwarn.'}`).setColor(['paid','exempt'].includes(item.status)?0x22C55E:0xF59E0B)],allowedMentions:quiet};
 }
 export async function handleGangpotStatus(ctx,interaction){requireGangPot(ctx);await interaction.deferReply({flags:MessageFlags.Ephemeral});await syncGangpot(ctx,interaction.client);assertUser(gangpotEligible(ctx,interaction.guild.members.cache.get(interaction.user.id)),`Zonder rol <@&${ctx.config.gangpot.memberRoleId}> hoef je geen gangpotbijdrage te betalen.`);await interaction.editReply(gangpotStatusMessage(ctx,interaction.user.id));}
 export async function handleGangpotCommand(ctx,interaction){
@@ -365,7 +373,7 @@ export async function handleGangpotCommand(ctx,interaction){
     const period=selectPeriod(ctx,interaction.options.getString('termijn'),submittedAt);
     const claim=reportGangpotPayment(ctx,{userId:interaction.user.id,periodId:period.id,amount:interaction.options.getInteger('bedrag')??Math.max(1,period.weekly_amount-gangpotPaid(ctx,period,interaction.user.id).total),requestId:interaction.id,note:interaction.options.getString('notitie')||''},submittedAt);
     await syncGangpot(ctx,interaction.client);
-    return interaction.editReply({content:`Je betaalmelding van **${gangpotMoney(claim.amount)}** voor **${period.id}** is opgeslagen in <#${ctx.config.gangpot.paymentsChannelId}>. Lead moet vóór zaterdag ${deadlineClock(period)} goedkeuren. Zonder volledige goedkeuring krijg je automatisch een gangwarn.`,allowedMentions:quiet});
+    return interaction.editReply({content:`Je betaalmelding van **${gangpotMoney(claim.amount)}** voor **${period.id}** is opgeslagen in <#${ctx.config.gangpot.paymentsChannelId}>. ${gangpotIntroduction(ctx,interaction.user.id,period)?'Dit is je instapweek; deze bijdrage is vrijwillig en zonder betaling volgt deze week geen gangpotwarn.':`Lead moet vóór zaterdag ${deadlineClock(period)} goedkeuren. Zonder volledige goedkeuring krijg je automatisch een gangwarn.`}`,allowedMentions:quiet});
   }
   let result;
   if(action==='correctie')result=voidGangpotEntry(ctx,interaction.options.getString('id',true),interaction.user.id,interaction.options.getString('reden',true));
