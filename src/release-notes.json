@@ -1,4 +1,7 @@
 {
+  "1.11.1": [
+    "De loginpagina heeft een vernieuwd zwart-gouden Bakarov-thema: een omlijst logo, gouden Discord-knop en subtiele achtergrond. De pagina blijft compact en werkt op mobiel."
+  ],
   "1.11.0": [
     "Nieuw: rechtstreeks aanmelden met je eigen Discord-account via een eenvoudige loginpagina met Discord-icoon.",
     "Alleen leden met de ingestelde Legion Lead-rol krijgen toegang. Administrator zonder deze rol geeft geen toegang; verloren rollen blokkeren ook bestaande sessies.",
