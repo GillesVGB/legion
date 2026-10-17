@@ -1,10 +1,12 @@
-# Legion op Bot-Hosting.net
+# Bakarov op Bot-Hosting.net
 
-Gebruik **Legion-FPS-ms.zip** voor FPS.ms of een vergelijkbare Linux x64-host. Het dashboard, de bot en de transcriptviewer starten samen. Het pakket bevat de officiële Cloudflare-client voor neutrale HTTPS-adressen; er staat geen bot-token of privé database in het codepakket.
+Voor de update naar Bakarov: haal de nieuwste code van `main` op en herstart één botinstantie. De opstartprocedure maakt eerst een gegevensback-up als automatische back-ups aanstaan. Behoud `.env` en de volledige `data/`-map, inclusief de bestanden met hun bestaande `legion-`-naam. Het logo staat in `src/branding-assets/`; neem die map ook mee als je handmatig uploadt. Het changelogbericht verschijnt eenmalig in het ingestelde updatekanaal.
+
+Gebruik **Bakarov-FPS-ms.zip** voor FPS.ms of een vergelijkbare Linux x64-host. Het dashboard, de bot en de transcriptviewer starten samen. Het pakket bevat de officiële Cloudflare-client voor neutrale HTTPS-adressen; er staat geen bot-token of privé database in het codepakket.
 
 ## Bot-Hosting.net via GitHub
 
-Voor de huidige Legion-deployment staat het vaste HTTPS-adres `https://wlll36f6gd.apps.bot-hosting.cloud` in `hosting.json`. Zodra de hosting `SERVER_PORT=25237` meegeeft, start het dashboard rechtstreeks op `0.0.0.0:25237`. Er wordt dan geen cloudflared gestart. Je hoeft hiervoor geen nieuwe `.env` te maken of token te veranderen.
+Voor de huidige Bakarov-deployment staat het vaste HTTPS-adres `https://wlll36f6gd.apps.bot-hosting.cloud` in `hosting.json`. Zodra de hosting `SERVER_PORT=25237` meegeeft, start het dashboard rechtstreeks op `0.0.0.0:25237`. Er wordt dan geen cloudflared gestart. Je hoeft hiervoor geen nieuwe `.env` te maken of token te veranderen.
 
 Bij een andere deployment zet je `DASHBOARD_PUBLIC_URL` op het nieuwe HTTPS-basisadres uit Domains. De bot gebruikt de toegewezen `SERVER_PORT`, ook als `.env` nog `TRANSCRIPT_PORT=8793` bevat. De hosting verzorgt TLS; alle private dashboardacties behouden hun beveiligde cookie, leidingcontrole en CSRF-controle. De vaste hosting-URL wordt ook gebruikt voor nieuwe en bestaande transcriptknoppen.
 
@@ -12,7 +14,7 @@ Bij een andere deployment zet je `DASHBOARD_PUBLIC_URL` op het nieuwe HTTPS-basi
 2. Kies runtime **Node.js 24** en **Entry File / STARTUP_FILE: index.js**.
 3. Laat de standaard startopdracht dependencies installeren. Als je zelf een startopdracht instelt, gebruik `npm ci --omit=dev && exec node index.js` vanuit de hoofdmap van de deployment.
 4. Stel je actuele `DISCORD_TOKEN` en `CLIENT_ID=1556774794358169652` in via het paneel of een private `.env`. Het dashboard gebruikt automatisch `bin/cloudflared`; `TRANSCRIPT_VIEWER_MODE=local` geeft ook webtranscripts. Zet geen tokens of databases in GitHub.
-5. Behoud de hele bestaande `data/`-map en stop de lokale bot voordat je de hosting start. Herstart de hosting om de laatste commit op te halen. Wacht op **beide guilds gereed** en **Legion dashboard bereikbaar**; gebruik daarna `/dashboard`.
+5. Behoud de hele bestaande `data/`-map en stop de lokale bot voordat je de hosting start. Herstart de hosting om de laatste commit op te halen. Wacht op **beide guilds gereed** en **Bakarov dashboard bereikbaar**; gebruik daarna `/dashboard`.
 
 De standaard Node.js-startup leest `package.json` voor dependencies. Zie de officiële [installatiehandleiding](https://bot-hosting.net/docs/guides/set-up-a-deployment), [Git auto-pull](https://bot-hosting.net/changelog) en [startopdracht-documentatie](https://bot-hosting.net/api).
 
@@ -20,14 +22,14 @@ De standaard Node.js-startup leest `package.json` voor dependencies. Zie de offi
 
 1. Stop de oude bot voordat je de nieuwe instantie start.
 2. Kies **Node.js 24** en **Main file: index.js**. Op FPS.ms zet je **User uploaded files** aan.
-3. Upload en pak `Legion-FPS-ms.zip` uit in `/home/container`. Controleer dat **index.js** en **package.json** rechtstreeks in die map staan, samen met `src/`, `bin/` en `guilds.json`. Ze mogen niet in een extra bovenliggende map staan.
+3. Upload en pak `Bakarov-FPS-ms.zip` uit in `/home/container`. Controleer dat **index.js** en **package.json** rechtstreeks in die map staan, samen met `src/`, `bin/` en `guilds.json`. Ze mogen niet in een extra bovenliggende map staan.
 4. Maak `.env` van `.env.hosting.example` en vul je actuele `DISCORD_TOKEN` in. De Application-ID staat al ingevuld. Deel `.env` niet en zet hem niet in Git.
 5. Neem de **hele bestaande data-map** mee. De twee `legion-<guildId>.sqlite`-databases bewaren coins, warns, dossiers, dashboardinstellingen, transcripts, sleutels en aanname-DM’s. Stop de oude bot voor de definitieve kopie of gebruik een consistente SQLite-backup. Kopieer een actieve database niet zonder zijn nog aanwezige WAL/journal.
 6. FPS.ms installeert de dependencies automatisch. Bij een eigen host voer je `npm ci --omit=dev` uit en start je met `npm start`.
-7. Start de server. De console moet `Legion is online` en **beide guilds gereed** tonen. Het neutrale webadres volgt zodra de HTTPS-verbinding bereikbaar is.
+7. Start de server. De console moet `Bakarov is online` en **beide guilds gereed** tonen. Het neutrale webadres volgt zodra de HTTPS-verbinding bereikbaar is.
 8. Registreer bij een nieuwe installatie of gewijzigde commands eenmaal `npm run deploy`. In dit project zijn de commands al op de bestaande Discord-applicatie geregistreerd.
 
-De bot moet **Server Members Intent** en **Message Content Intent** hebben. De leidingrollen en kanalen staan in `guilds.json`. Die bestaande waarden zijn voor de twee Legion-guilds ingevuld.
+De bot moet **Server Members Intent** en **Message Content Intent** hebben. De leidingrollen en kanalen staan in `guilds.json`. Die bestaande waarden zijn voor de twee Bakarov-guilds ingevuld.
 
 ## Dashboard
 
@@ -69,7 +71,7 @@ Vaste Discord-berichten worden voortaan alleen aangepast wanneer de inhoud veran
 
 ## Planning, promoties, wachtlijst en fun-missies
 
-**Planning:** in de gangserver `1555685630640652338` gebruikt de leiding bijvoorbeeld `/planning datum:12-10-2026 tijd:20:30 afspreekpunt:Legion HQ`. De bot plaatst uitsluitend in kanaal `1555685633266163793` een gewoon tekstbericht, zonder embed of knoppen. Het bericht bevat datum, Belgische tijd, afspreekpunt en de voorbereiding: volledig geheald, voertuig afgetankt, repairkits en benodigde spullen mee, op tijd aanwezig en duidelijke communicatie.
+**Planning:** in de gangserver `1555685630640652338` gebruikt de leiding bijvoorbeeld `/planning datum:12-10-2026 tijd:20:30 afspreekpunt:Bakarov HQ`. De bot plaatst uitsluitend in kanaal `1555685633266163793` een gewoon tekstbericht, zonder embed of knoppen. Het bericht bevat datum, Belgische tijd, afspreekpunt en de voorbereiding: volledig geheald, voertuig afgetankt, repairkits en benodigde spullen mee, op tijd aanwezig en duidelijke communicatie.
 
 Bij `datum` kun je ook **deze avond** of **morgenavond** invullen of uit de suggesties kiezen. De bot rekent met de kalenderdatum in **Europe/Brussels**, ook rond middernacht, zomer- en wintertijd. `tijd` blijft de opgegeven starttijd bepalen. Een tijdstip dat deze avond al voorbij is wordt niet automatisch naar morgen verplaatst; de bot vraagt dan een toekomstig tijdstip te kiezen.
 
@@ -107,14 +109,14 @@ Bewaar `data/` op een **persistente schijf/volume** en maak regelmatig backups. 
 
 ## Als starten mislukt
 
-De opstartregel toont de botversie en of het dashboard via **hostingadres** of **tunnel** draait. Bij directe hosting hoort `Legion dashboard luistert op hostingpoort 25237` te verschijnen en daarna `Legion dashboard bereikbaar`. Een ontbrekend antwoord op de poort wijst op een fout port/bind-adres; controleer de Domains-pagina en SERVER_PORT.
+De opstartregel toont de botversie en of het dashboard via **hostingadres** of **tunnel** draait. Bij directe hosting hoort `Bakarov dashboard luistert op hostingpoort 25237` te verschijnen en daarna `Bakarov dashboard bereikbaar`. Een ontbrekend antwoord op de poort wijst op een fout port/bind-adres; controleer de Domains-pagina en SERVER_PORT.
 
 Als je een tunnel gebruikt: de bot probeert standaard IPv4 met protocol `auto` (QUIC, met fallback naar HTTP/2). Hij toont aparte DNS-, netwerk- en certificaatfouten, controleert de bereikbaarheid ook nadat hij online is en herstelt na een storing. Cloudflare vereist uitgaand UDP of TCP op poort 7844. Als de hosting beide blokkeert, gebruik het vaste HTTPS-adres via `DASHBOARD_PUBLIC_URL`. [Cloudflare-verbindingsproblemen](https://developers.cloudflare.com/tunnel/troubleshooting/).
 
 - `Cannot find module /home/container/index.js`: het pakket is niet in de hoofdmap uitgepakt of Main file klopt niet.
 - Discord `401` of `TokenInvalid`: vervang alleen het private bot-token in `.env` en herstart.
 - `cloudflared ENOENT`: controleer `CLOUDFLARED_PATH=./bin/cloudflared` en of de binary aanwezig is. De bootstrap maakt hem op Linux uitvoerbaar.
-- Geen dashboardlink: controleer het consolebericht `Legion dashboard bereikbaar`. `/dashboard` geeft bij ontbrekende of ongeschikte cloudflared een concrete fout. De bot probeert een verbroken tunnel automatisch opnieuw.
+- Geen dashboardlink: controleer het consolebericht `Bakarov dashboard bereikbaar`. `/dashboard` geeft bij ontbrekende of ongeschikte cloudflared een concrete fout. De bot probeert een verbroken tunnel automatisch opnieuw.
 - `Cannot find package discord.js`: voer in de map met `package.json` eerst `npm ci` uit en start daarna met `npm start`.
 - Fouten `10062` of `40060`, of wisselende reacties: controleer of maar één botinstantie met dit token draait. Stop de lokale bot als je de hosting gebruikt.
 - Een FPS.ms Error Event zonder Node.js-stacktrace: controleer eerst de hostingserver; dit is een fout van het paneel/hostingsysteem.

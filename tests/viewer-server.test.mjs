@@ -16,7 +16,7 @@ function exportFixture(t) {
   const store = new Store(local, ':memory:'); t.after(() => store.close());
   const dossier = store.reserveCase('ticket', 'member', {});
   store.bindCase(dossier.id, 'source'); store.openCase(dossier.id, 'intro'); store.closeCase(dossier.id, 'closed', 'staff');
-  const guild = { id: local.guildId, name: 'Legion', members: { me: { id: 'bot' } } };
+  const guild = { id: local.guildId, name: 'Bakarov', members: { me: { id: 'bot' } } };
   const source = { id: 'source', name: 'vraag-voorbeeld', isTextBased: () => true, messages: { fetch: async () => new Collection() } };
   let sent = 0;
   const destination = { id: local.ticketTranscriptChannelId, guildId: local.guildId, guild, isTextBased: () => true,
@@ -66,7 +66,7 @@ test('bestaande open tickets worden hernoemd, andere kanalen blijven ongemoeid',
   for (const [owner, kind, own] of [['one', 'application', true], ['two', 'ticket', true], ['three', 'ticket', false]]) {
     const dossier = store.reserveCase(kind, owner, { template: true });
     store.bindCase(dossier.id, owner); store.openCase(dossier.id, 'intro');
-    channels.set(owner, { id: owner, guildId: config.guildId, type: 0, name: 'oud-ticket', topic: own ? `Legion dossier:${dossier.id} | ${kind}` : '',
+    channels.set(owner, { id: owner, guildId: config.guildId, type: 0, name: 'oud-ticket', topic: own ? `Bakarov dossier:${dossier.id} | ${kind}` : '',
       messages: { fetch: async () => null }, setName: async name => renamed.push(name) });
   }
   const guild = { id: config.guildId, channels: { fetch: async () => channels }, members: { me: { id: 'bot' }, fetch: async id => ({ user: { username: id } }) } };
@@ -94,7 +94,7 @@ test('viewer serveert alleen versleutelde dossiers en openbare assets, geen sleu
   assert.equal((await fetch(`${origin}/api/transcripts/${record.view_id}`, { method: 'PUT', body: '{}' })).status, 405);
   assert.equal((await fetch(`${origin}/`, { method: 'HEAD' })).status, 200);
   const page = await (await fetch(`${origin}/t/${record.view_id}`)).text();
-  assert.ok(page.includes('LEGION') && !page.includes(record.secret_key));
+  assert.ok(page.includes('BAKAROV') && !page.includes(record.secret_key));
   assert.ok(!page.includes('allow-scripts'));
 });
 

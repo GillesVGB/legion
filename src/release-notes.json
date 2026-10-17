@@ -1,4 +1,9 @@
 {
+  "1.9.0": [
+    "Legion heet vanaf nu Bakarov: vernieuwde botteksten, commands, panelen en dashboard.",
+    "Het Bakarov-logo en de zwart-gouden huisstijl zijn toegevoegd aan dashboard, embeds en nieuwe transcripts.",
+    "De botnaam en profielfoto worden bij opstarten bijgewerkt. Bestaande gegevens en oude panelen blijven bruikbaar."
+  ],
   "1.8.2": [
     "Alle botlogs, inclusief verwijderde en bewerkte berichten, gaan in de hoofdserver naar botlogkanaal 1555685637129109586.",
     "Wachtende logs volgen ook het ingestelde botlogkanaal."
@@ -20,7 +25,7 @@
   ],
   "1.7.3": [
     "De lijst met leden die nog niet bevestigd hebben is uit het activiteitencheckbericht verwijderd.",
-    "Bij een nieuwe activiteitencheck tagt de bot de Legion-ledenrol. Bij verversen of herstarten wordt deze niet opnieuw gepingd."
+    "Bij een nieuwe activiteitencheck tagt de bot de Bakarov-ledenrol. Bij verversen of herstarten wordt deze niet opnieuw gepingd."
   ],
   "1.7.2": [
     "Activiteitencheck is nu een aparte check-in voor actieve leden, los van de activiteitenplanning.",
@@ -31,7 +36,7 @@
   ],
   "1.7.1": [
     "Nieuw: /activiteitencheck planning voor de leiding in de hoofdserver, vanaf de geplande datum en starttijd.",
-    "Legion-leden zonder een van de vier emoji-reacties en zonder goedgekeurde afmelding krijgen één gangwarn per activiteit.",
+    "Bakarov-leden zonder een van de vier emoji-reacties en zonder goedgekeurde afmelding krijgen één gangwarn per activiteit.",
     "De check haalt reacties en leden opnieuw op, slaat nieuwe leden die na de start zijn gejoind over en geeft nooit dubbele warns bij opnieuw controleren of herstarten.",
     "Gangwarns verschijnen in het gangwarnkanaal en worden per DM verstuurd; mislukte meldingen worden automatisch opnieuw geprobeerd."
   ],

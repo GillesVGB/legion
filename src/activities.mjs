@@ -15,7 +15,7 @@ export const attendanceChoices=[
   {id:'maybe',emoji:'🟠',label:'Ik weet het nog niet zeker'}
 ];
 export const planningPreparation='### Kom voorbereid\n• Zorg dat je volledig bent geheald.\n• Tank je voertuig vooraf helemaal vol.\n• Neem voldoende repairkits en de benodigde spullen mee.\n• Sta op tijd klaar op het afspreekpunt.\n• Volg de aanwijzingen van de leiding en houd de communicatie duidelijk.';
-export function requirePlanningGuild(ctx){assertUser(ctx.config.guildId==='1555685630640652338'&&ctx.config.planningChannelId,'De planning wordt alleen in de Legion-gangserver beheerd.');}
+export function requirePlanningGuild(ctx){assertUser(ctx.config.guildId==='1555685630640652338'&&ctx.config.planningChannelId,'De planning wordt alleen in de Bakarov-gangserver beheerd.');}
 export function planningDateLabel(value){
   const input=String(value).trim().toLowerCase().replace(/\s+/g,'');
   return input==='dezeavond'?'Deze avond':input==='morgenavond'?'Morgenavond':'';
@@ -69,7 +69,7 @@ export function activityMessage(ctx,activity,now=Date.now()) {
   const dateText=date.toLocaleDateString('nl-BE',{timeZone:'Europe/Brussels',day:'2-digit',month:'2-digit',year:'numeric'});
   const displayDate=activity.date_label?`${activity.date_label} (${dateText})`:dateText;
   const timeText=date.toLocaleTimeString('nl-BE',{timeZone:'Europe/Brussels',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
-  let content=`## Legion — Planning\n**Activiteit:** ${safeText(activity.title)}\n**Datum:** ${displayDate}\n**Tijd:** ${timeText} (Belgische tijd) · <t:${Math.floor(activity.starts_at/1000)}:R>\n**Afspreekpunt:** ${safeText(activity.location)}\n`;
+  let content=`## Bakarov — Planning\n**Activiteit:** ${safeText(activity.title)}\n**Datum:** ${displayDate}\n**Tijd:** ${timeText} (Belgische tijd) · <t:${Math.floor(activity.starts_at/1000)}:R>\n**Afspreekpunt:** ${safeText(activity.location)}\n`;
   if(activity.description)content+=`\n${safeText(activity.description)}\n`;
   content+=`\n### Kom voorbereid\n${safeText(operationSettings(ctx).planning.preparation)}\n\n### Laat weten of je erbij bent\n`;
   content+=attendanceChoices.map(choice=>`${choice.emoji}: ${choice.label} — **${responses.filter(item=>item.response===choice.id).length}**`).join('\n');
@@ -172,7 +172,7 @@ export async function handlePlanningCommand(ctx,interaction) {
     return interaction.editReply({content:'De planning is geannuleerd. Nieuwe aanwezigheidsreacties worden niet meer aangenomen.',allowedMentions:quiet});
   }
   const items=ctx.store.db.prepare("SELECT * FROM activities WHERE status='open' AND ends_at>? ORDER BY starts_at LIMIT 10").all(Date.now());
-  let content='## Legion — Activiteitenkalender\n';
+  let content='## Bakarov — Activiteitenkalender\n';
   for(const item of items){const line=`• **${safeText(item.title)}** · <t:${Math.floor(item.starts_at/1000)}:F>\n  ${safeText(item.location)}${item.message_id?` · [Planning openen](https://discord.com/channels/${interaction.guildId}/${item.channel_id}/${item.message_id})`:' · Bericht wordt geplaatst'}\n`;if(content.length+line.length>1900)break;content+=line;}
   if(!items.length)content+='Er staan nog geen activiteiten gepland. De leiding kan een activiteit toevoegen met /planning.';
   return interaction.reply({content,flags:MessageFlags.Ephemeral,allowedMentions:quiet});

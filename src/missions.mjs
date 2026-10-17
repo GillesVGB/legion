@@ -5,7 +5,7 @@ import { quiet } from './service.mjs';
 
 export function missionMessage(ctx,user,now=Date.now()) {
   const status=ctx.store.missionStatus(user,now);
-  const card=embed(ctx.config,'Legion — Dagelijkse fun-missies',`<@${user}>, speel mee en verdien extra **${ctx.config.content.coinName}**.\nNieuwe missies starten iedere dag om **00:00, Belgische tijd**. Je voortgang wordt automatisch bijgehouden.`).setColor(0x5865F2);
+  const card=embed(ctx.config,'Bakarov — Dagelijkse fun-missies',`<@${user}>, speel mee en verdien extra **${ctx.config.content.coinName}**.\nNieuwe missies starten iedere dag om **00:00, Belgische tijd**. Je voortgang wordt automatisch bijgehouden.`).setColor(0x5865F2);
   for(const mission of status.missions)card.addFields({name:`${mission.claimed?'✅':mission.progress>=mission.target?'🎁':'🎯'} ${mission.title}`,value:`${mission.description}\n**Voortgang:** ${mission.progress}/${mission.target} · **Beloning:** ${mission.reward} coins${mission.claimed?'\nBeloning ontvangen.':''}`});
   const claimable=status.missions.some(mission=>mission.progress>=mission.target&&!mission.claimed);
   return {embeds:[card],components:[row(button(`mission:claim:${user}:${status.day}`,'Beloningen claimen',ButtonStyle.Success).setDisabled(!claimable))],allowedMentions:quiet};

@@ -43,7 +43,7 @@ test('tijdige bevestiging telt eenmaal; niet reageren geeft automatisch precies 
   await syncActivityChecks(f.ctx,f.guild,DEADLINE);await syncActivityChecks(f.ctx,f.guild,DEADLINE+60000);
   assert.equal(f.ctx.store.warnCount(OTHER),0);assert.equal(f.ctx.store.warnCount(f.ids[1]),1);assert.equal(f.record(check.id).status,'closed');
   assert.equal(f.ctx.store.db.prepare('SELECT COUNT(*) AS n FROM activity_check_warnings').get().n,5);
-  assert.equal(f.calls.filter(item=>item.method==='dm'&&item.payload.embeds?.[0]?.title==='Legion — Gangwarn: activiteitencheck').length,5);
+  assert.equal(f.calls.filter(item=>item.method==='dm'&&item.payload.embeds?.[0]?.title==='Bakarov — Gangwarn: activiteitencheck').length,5);
   assert.equal(f.guild.channels.cache.get(f.ctx.config.warnLogChannelId).posted.size,5);
   const post=f.guild.channels.cache.get(check.channel_id).posted.get(check.message_id);assert.equal(post.components.length,0);
 });
@@ -158,7 +158,7 @@ test('een wachtende herinnering wordt na een vinkje overgeslagen en uitschakelen
 });
 test('een privékanaal kan geen automatische check voor onzichtbare leden starten en verloren leestoegang geeft geen warn',async t=>{
   const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.planningChannelId),permissions=channel.permissionsFor;
-  channel.permissionsFor=target=>target.id===OTHER?new PermissionsBitField(0n):permissions(target);await assert.rejects(f.start(),/alle Legion-leden/);
+  channel.permissionsFor=target=>target.id===OTHER?new PermissionsBitField(0n):permissions(target);await assert.rejects(f.start(),/alle Bakarov-leden/);
   channel.permissionsFor=permissions;const {check}=await f.start();channel.permissionsFor=target=>target.id===OTHER?new PermissionsBitField(0n):permissions(target);
   await finishActivityCheck(f.ctx,f.guild,check.id,DEADLINE);assert.equal(f.ctx.store.warnCount(OTHER),0);assert.equal(f.ctx.store.warnCount(f.ids[1]),1);
 });

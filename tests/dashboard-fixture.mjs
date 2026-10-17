@@ -25,10 +25,10 @@ export function dashboardFixture() {
     const store=new Store(config,':memory:');const ctx={config,store,ready:true,recruitment:config.recruitment?recruitmentState(17):null};contexts.set(settings.guildId,ctx);
     const roles=new Collection();
     const role=(id,name,position,admin=false)=>({id,name,position,managed:false,permissions:new PermissionsBitField(admin?P.Administrator:0n),comparePositionTo(other){return position-other.position;}});
-    roles.set(settings.guildId,role(settings.guildId,'@everyone',0));roles.set(settings.staffRoleIds[0],role(settings.staffRoleIds[0],'Leiding',40));roles.set(settings.memberRoleId,role(settings.memberRoleId,'Legion',4));
+    roles.set(settings.guildId,role(settings.guildId,'@everyone',0));roles.set(settings.staffRoleIds[0],role(settings.staffRoleIds[0],'Leiding',40));roles.set(settings.memberRoleId,role(settings.memberRoleId,'Bakarov',4));
     for(const [i,id] of (settings.roster?.roleIds||[]).entries())roles.set(id,role(id,base.content.ranks[i] || 'Recruter',30-i));
     const cache=new Collection(),channels=new Collection();
-    const guild={id:settings.guildId,name:settings.ticketsEnabled?'Legion Community | Future Roleplay':'Legion | Future Roleplay',memberCount:0,
+    const guild={id:settings.guildId,name:settings.ticketsEnabled?'Bakarov Community | Future Roleplay':'Bakarov | Future Roleplay',memberCount:0,
       iconURL:()=>null,client,roles:{cache:roles,fetch:async id=>id?roles.get(id):roles},channels:{cache:channels,fetch:async id=>{if(!id)return channels;const channel=channels.get(id);if(!channel)throw Object.assign(new Error('Onbekend kanaal'),{code:10003});return channel;}},
       members:{cache,fetch:async options=>{const id=typeof options==='string'?options:options.user;const member=cache.get(id);if(!member)throw Object.assign(new Error('Onbekend lid'),{code:10007});return member;},list:async()=>new Collection(cache)}};
     guilds.set(guild.id,guild);
@@ -39,7 +39,7 @@ export function dashboardFixture() {
       cache.set(id,member);return member;
     };
     guild.addMember=addMember;
-    guild.members.me=addMember(base.clientId,'Legion',[],true,true);
+    guild.members.me=addMember(base.clientId,'Bakarov',[],true,true);
     guild.members.fetchMe=async()=>guild.members.me;
     addMember(ACTOR,'Voorbeeld leiding',settings.staffRoleIds,true);addMember(OTHER,'Nieuw communitylid',[]);
     const names=['Jay Vega','Noah Moreau','Luca Renaud','Milan Dupont','Rafael Leclerc','Enzo Laurent','Milo Ferrand','Alex Mercier','Samuel Beaufort','Louis Pascal','Finn Laurent','Victor Dumont','Lucas Martin','Nolan Pierre','Daan Lefevre','Elias Lucien','Tygo Roland'];
@@ -55,7 +55,7 @@ export function dashboardFixture() {
         setName:async value=>{channel.name=value;},
         send:async payload=>{
           const id=String(BigInt('100000000000000500')+BigInt(++message));
-          const item={id,channelId:channel.id,guild,channel,partial:false,createdTimestamp:Date.now(),author:client.user,member:{displayName:'Legion'},content:'',attachments:new Collection(),embeds:[],components:[]};
+          const item={id,channelId:channel.id,guild,channel,partial:false,createdTimestamp:Date.now(),author:client.user,member:{displayName:'Bakarov'},content:'',attachments:new Collection(),embeds:[],components:[]};
           const apply=payload=>{if(payload.content!==undefined)item.content=payload.content;if(payload.embeds)item.embeds=payload.embeds.map(card=>{const json=card.toJSON?.()||card;return{...json,toJSON:()=>json};});if(payload.components)item.components=payload.components.map(row=>row.toJSON?.()||row);};
           item.edit=async payload=>{apply(payload);calls.push({method:'message.edit',id,payload});return item;};
           item.delete=async()=>posted.delete(id);item.fetch=async()=>item;
@@ -80,16 +80,16 @@ export function dashboardFixture() {
   }
   const source=contexts.get(base.guilds[1].guildId),guild=guilds.get(source.config.guildId);
   const open=source.store.reserveCase('application',APPLICANT,{template:true});
-  const channel=guild.makeChannel('100000000000000100','sollicitatie-kai-mercier',`Legion dossier:${open.id} | application`);
+  const channel=guild.makeChannel('100000000000000100','sollicitatie-kai-mercier',`Bakarov dossier:${open.id} | application`);
   source.store.bindCase(open.id,channel.id);source.store.openCase(open.id,'100000000000000101');
   const time=Date.now()-7200000;
   const messages=[
-    {id:'100000000000000101',createdTimestamp:time,author:{id:base.clientId,tag:'Legion',bot:true},member:{displayName:'Legion'},content:'',embeds:[{toJSON:()=>({title:'Legion — Sollicitatie',description:'Welkom! Vul de sollicitatietemplate in dit kanaal in.'})}],attachments:new Collection(),edit:async()=>{}},
-    {id:'100000000000000102',createdTimestamp:time+60000,author:{id:APPLICANT,tag:'Kai Mercier',bot:false},member:{displayName:'Kai Mercier'},content:'Naam: Kai Mercier\nLeeftijd: 19\nPlaytime: 240 uur\nMotivatie: Ik wil samen met een actieve groep serieus roleplay spelen en mijn bijdrage leveren aan Legion.',embeds:[],attachments:new Collection(),edit:async()=>{}},
+    {id:'100000000000000101',createdTimestamp:time,author:{id:base.clientId,tag:'Bakarov',bot:true},member:{displayName:'Bakarov'},content:'',embeds:[{toJSON:()=>({title:'Bakarov — Sollicitatie',description:'Welkom! Vul de sollicitatietemplate in dit kanaal in.'})}],attachments:new Collection(),edit:async()=>{}},
+    {id:'100000000000000102',createdTimestamp:time+60000,author:{id:APPLICANT,tag:'Kai Mercier',bot:false},member:{displayName:'Kai Mercier'},content:'Naam: Kai Mercier\nLeeftijd: 19\nPlaytime: 240 uur\nMotivatie: Ik wil samen met een actieve groep serieus roleplay spelen en mijn bijdrage leveren aan Bakarov.',embeds:[],attachments:new Collection(),edit:async()=>{}},
     {id:'100000000000000103',createdTimestamp:time+120000,author:{id:ACTOR,tag:'Leiding',bot:false},member:{displayName:'Leiding'},content:'Bedankt voor je antwoorden. We bespreken je sollicitatie met de leiding.',embeds:[],attachments:new Collection(),edit:async()=>{}}
   ];
   for(const message of messages)channel.posted.set(message.id,message);
-  const ticket=source.store.reserveCase('ticket',OTHER,{});source.store.bindCase(ticket.id,'100000000000000110');source.store.openCase(ticket.id,'100000000000000111');guild.makeChannel('100000000000000110','vraag-nieuw-communitylid',`Legion dossier:${ticket.id} | ticket`);
+  const ticket=source.store.reserveCase('ticket',OTHER,{});source.store.bindCase(ticket.id,'100000000000000110');source.store.openCase(ticket.id,'100000000000000111');guild.makeChannel('100000000000000110','vraag-nieuw-communitylid',`Bakarov dossier:${ticket.id} | ticket`);
   const closed=source.store.reserveCase('application','100000000000000020',{template:true});source.store.bindCase(closed.id,'100000000000000200');source.store.openCase(closed.id,'100000000000000201');source.store.closeCase(closed.id,'accepted',ACTOR);source.store.acceptanceSent(closed.id,'100000000000000202',true);
   const record=messages.map(item=>({id:item.id,created:item.createdTimestamp,author:item.member.displayName,authorId:item.author.id,bot:item.author.bot,content:item.content,embeds:item.embeds.map(card=>card.toJSON()),attachments:[]}));
   source.store.saveTranscriptView(closed.id,encryptTranscript(renderTranscript(guild,{id:closed.channel_id,name:'sollicitatie-jay-vega'},source.store.caseById(closed.id),record)));

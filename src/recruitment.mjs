@@ -22,17 +22,17 @@ export async function refreshRecruitment(ctx, guild) {
 }
 
 export function requireApplicationsOpen(ctx) {
-  assertUser(ctx.config.guildId!=='1555685630640652338','Solliciteren kan alleen in de Legion-communityserver.');
+  assertUser(ctx.config.guildId!=='1555685630640652338','Solliciteren kan alleen in de Bakarov-communityserver.');
   if (!ctx.config.recruitment) return;
   assertUser(ctx.recruitment?.count !== null && ctx.recruitment?.count !== undefined, 'De ledenstand wordt nog gecontroleerd. Probeer zo opnieuw.');
 }
 
 export const applicationWaitingNotice = state => state?.full
-  ? 'Legion zit momenteel vol. Je kunt wel solliciteren, maar het bekijken van je sollicitatie kan langer duren.'
+  ? 'Bakarov zit momenteel vol. Je kunt wel solliciteren, maar het bekijken van je sollicitatie kan langer duren.'
   : '';
 
 export function requireRecruitmentSpace(ctx) {
   requireApplicationsOpen(ctx);
   if (ctx.config.recruitment) assertUser(ctx.recruitment.count < ctx.config.recruitment.capacity,
-    `Legion zit vol: ${ctx.recruitment.count}/${ctx.config.recruitment.capacity} plaatsen. De sollicitatie blijft open; aannemen kan zodra er een plek vrijkomt.`);
+    `Bakarov zit vol: ${ctx.recruitment.count}/${ctx.config.recruitment.capacity} plaatsen. De sollicitatie blijft open; aannemen kan zodra er een plek vrijkomt.`);
 }

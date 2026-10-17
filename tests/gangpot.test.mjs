@@ -118,14 +118,14 @@ test('migratie bewaart oude zondagbetalingen en meldingen, hergebruikt de oude g
   await reviewGangpotPayment(f.main,f.guild,f.lead,reported.id,'approve',()=>SAT+1000);
   const pending=reportGangpotPayment(f.main,{userId:ACTOR,amount:25000,periodId:old,requestId:'legacy-pending-request'},SAT);
   const information=f.guild.channels.cache.get(f.main.config.gangpot.infoChannelId),payments=f.guild.channels.cache.get(f.main.config.gangpot.paymentsChannelId);
-  const oldTotal=await information.send({embeds:[{title:'Oud totaal',description:'$25.000',footer:{text:'Legion • Totaal gangpot'}}]}),oldPanel=await payments.send({embeds:[{footer:{text:'Legion • Gangpotbetalingen'}}]});
-  const someoneElse=await payments.send({embeds:[{footer:{text:'Legion • Gangpotbetalingen'}}]});someoneElse.author={id:OTHER};
+  const oldTotal=await information.send({embeds:[{title:'Oud totaal',description:'$25.000',footer:{text:'Bakarov • Totaal gangpot'}}]}),oldPanel=await payments.send({embeds:[{footer:{text:'Bakarov • Gangpotbetalingen'}}]});
+  const someoneElse=await payments.send({embeds:[{footer:{text:'Bakarov • Gangpotbetalingen'}}]});someoneElse.author={id:OTHER};
   f.main.store.setSetting('gangpot:total:message',oldTotal.id);f.main.store.setSetting('gangpot:payments:message',oldPanel.id);
   await syncGangpot(f.main,f.client,SAT+2000);
   assert.equal(f.main.store.db.prepare('SELECT * FROM gangpot_periods WHERE id=?').get(old),undefined);
   assert.equal(f.main.store.db.prepare('SELECT period_id FROM gangpot_claims WHERE id=?').get(pending.id).period_id,'2026-10-17');
   assert.equal(gangpotPaid(f.main,period(f),OTHER).on_time,25000);assert.equal(gangpotBalance(f.main),25000);
-  assert.equal(information.posted.size,1);assert.equal(information.posted.first().id,oldTotal.id);assert.equal(information.posted.first().embeds[0].footer.text,'Legion • Gangpotinformatie');
+  assert.equal(information.posted.size,1);assert.equal(information.posted.first().id,oldTotal.id);assert.equal(information.posted.first().embeds[0].footer.text,'Bakarov • Gangpotinformatie');
   assert.equal(payments.posted.has(oldPanel.id),false);assert.equal(payments.posted.has(someoneElse.id),true);
   const total=f.guild.channels.cache.get('1558420548000813126').posted.first();assert.ok(total.embeds[0].fields[0].value.includes(`<@${OTHER}>`));
   await syncGangpot(f.main,f.client,Date.parse('2026-10-12T10:00:00Z'));assert.equal(warns(f,ACTOR).length,0);
@@ -237,7 +237,7 @@ test('betalingen verwijderen per gebruiker corrigeert alle deelbetalingen, laat 
   await assert.rejects(reviewGangpotPayment(f.main,f.guild,f.lead,first.id,'approve',()=>SAT+5000),/verwijderd/);
   await syncGangpot(f.main,f.client,SAT+5000);
   const closed=f.main.store.db.prepare('SELECT * FROM gangpot_claims WHERE id=?').get(first.id),message=f.guild.channels.cache.get(f.main.config.gangpot.paymentsChannelId).posted.get(closed.message_id);
-  assert.equal(message.components.length,0);assert.equal(message.embeds[0].title,'Legion — Betaling verwijderd');
+  assert.equal(message.components.length,0);assert.equal(message.embeds[0].title,'Bakarov — Betaling verwijderd');
   assert.ok(!f.guild.channels.cache.get(f.main.config.gangpot.totalChannelId).posted.first().embeds[0].fields[0].value.includes(`<@${OTHER}>`));
   const again=claim(f,OTHER,25000,'new-after-removal');await reviewGangpotPayment(f.main,f.guild,f.lead,again.id,'approve',()=>SAT+6000);
   assert.equal(removeGangpotPayment(f.main,removal(f),SAT+7000).id,result.id); // Herhaald verzoek raakt de nieuwe betaling niet.

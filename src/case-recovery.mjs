@@ -1,7 +1,7 @@
 import { ChannelType, PermissionFlagsBits as P } from 'discord.js';
 import { assertUser } from './errors.mjs';
 
-const topicPattern = /^Legion dossier:([a-f0-9]{12}) \| (application|ticket) \| eigenaar:(\d{17,20})$/;
+const topicPattern = /^(?:Bakarov|Legion) dossier:([a-f0-9]{12}) \| (application|ticket) \| eigenaar:(\d{17,20})$/;
 const closedTitles = new Set(['Sollicitatie geaccepteerd', 'Sollicitatie afgewezen', 'Sollicitatie gesloten', 'Ticket gesloten']);
 
 // Alleen oorspronkelijke, nog open botkanalen mogen ontbrekende lokale dossiers herstellen.

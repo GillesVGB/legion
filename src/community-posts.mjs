@@ -1,3 +1,4 @@
+import {canonicalBrandText} from './branding.mjs';
 import { ChannelType,PermissionFlagsBits as P } from 'discord.js';
 import { assertUser } from './errors.mjs';
 import { quiet } from './service.mjs';
@@ -25,7 +26,7 @@ export async function updateCommunityPost(ctx,guild,table,item,payload,marker,se
     for(let page=0;page<10;page++) {
       const history=await channel.messages.fetch({limit:100,...(before?{before}:{})});
       message=[...history.values()].find(message=>message.author.id===guild.members.me.id&&
-        (message.content?.includes(marker)||message.embeds?.some(card=>card.footer?.text===marker)));
+        (canonicalBrandText(message.content).includes(marker)||message.embeds?.some(card=>canonicalBrandText(card.footer?.text)===marker)));
       if(message||history.size<100)break;
       before=history.last().id;
     }
@@ -34,7 +35,7 @@ export async function updateCommunityPost(ctx,guild,table,item,payload,marker,se
     ctx.store.db.prepare(`UPDATE ${table} SET dirty=0,last_error='MESSAGE_DELETED' WHERE id=?`).run(item.id);
     return null; // Een bewust verwijderd bericht wordt niet opnieuw geplaatst.
   }
-  assertUser(!message||message.author.id===guild.members.me.id,'Dit bericht hoort niet bij de Legion-bot.');
+  assertUser(!message||message.author.id===guild.members.me.id,'Dit bericht hoort niet bij de Bakarov-bot.');
   const posted=message?await editIfChanged(message,{...payload,allowedMentions:quiet}):await channel.send({...payload,nonce:`${table==='gangpot_claims'?'gp':table==='absence_requests'?'ab':table==='activity_check_sessions'?'acp':table}:${item.id}`,enforceNonce:true,allowedMentions:sendMentions});
   ctx.store.db.prepare(`UPDATE ${table} SET message_id=?,dirty=0,next_attempt=0,last_error=NULL WHERE id=?`).run(posted.id,item.id);
   return posted;

@@ -17,15 +17,15 @@ export function promotionMessage(ctx,proposal) {
   const labels={pending:'Stemming open',approving:'Meerderheid voor — promotie wordt uitgevoerd',approved:'Goedgekeurd door de meerderheid',rejected:'Afgekeurd door de meerderheid'};
   const count=promotionVotes(ctx,proposal.id);
   const progress=count.total<3?`Nog **${count.remaining}** unieke Lead-stem${count.remaining===1?'':'men'} nodig.`:count.approve===count.reject?'De stemmen zijn gelijk. Een extra Lead-stem is nodig.':'';
-  const card=embed(ctx.config,'Legion — Promotievoorstel',`**Lid:** <@${proposal.member_id}>\n**Voorgestelde rang:** <@&${proposal.role_id}>\n**Voorgesteld door:** <@${proposal.proposer_id}>\n\n**Motivatie**\n${safeText(proposal.reason)}\n\n**Stemmen:** 🟢 ${count.approve} goedkeuren · 🔴 ${count.reject} afkeuren\n${progress}\n**Status:** ${labels[proposal.status]||proposal.status}\n\nAlleen leden met de Lead-rol kunnen stemmen. Elk lid heeft één stem. Vanaf drie Lead-stemmen bepaalt de meerderheid de uitslag.${proposal.status==='approving'&&proposal.last_error?`\n\nDe uitslag staat vast. Uitvoeren wordt opnieuw geprobeerd: ${safeText(proposal.last_error)}.`:''}`).setColor(proposal.status==='approved'?0x22C55E:proposal.status==='rejected'?0xEF4444:0xF59E0B).setFooter({text:`Legion • Promotie ${proposal.id}`});
+  const card=embed(ctx.config,'Bakarov — Promotievoorstel',`**Lid:** <@${proposal.member_id}>\n**Voorgestelde rang:** <@&${proposal.role_id}>\n**Voorgesteld door:** <@${proposal.proposer_id}>\n\n**Motivatie**\n${safeText(proposal.reason)}\n\n**Stemmen:** 🟢 ${count.approve} goedkeuren · 🔴 ${count.reject} afkeuren\n${progress}\n**Status:** ${labels[proposal.status]||proposal.status}\n\nAlleen leden met de Lead-rol kunnen stemmen. Elk lid heeft één stem. Vanaf drie Lead-stemmen bepaalt de meerderheid de uitslag.${proposal.status==='approving'&&proposal.last_error?`\n\nDe uitslag staat vast. Uitvoeren wordt opnieuw geprobeerd: ${safeText(proposal.last_error)}.`:''}`).setColor(proposal.status==='approved'?0x22C55E:proposal.status==='rejected'?0xEF4444:0xF59E0B).setFooter({text:`Bakarov • Promotie ${proposal.id}`});
   return {embeds:[card],components:proposal.status==='pending'?[row(button(`promotion:approve:${proposal.id}`,'Goedkeuren',ButtonStyle.Success),button(`promotion:reject:${proposal.id}`,'Afkeuren',ButtonStyle.Danger))]:[],allowedMentions:quiet};
 }
 async function validatePromotion(ctx,guild,memberId,roleId,resuming=false) {
   const ranks=ctx.config.roster?.roleIds;
-  assertUser(ranks?.includes(roleId),'Kies een gangrang in de hoofdserver van Legion.');
+  assertUser(ranks?.includes(roleId),'Kies een gangrang in de hoofdserver van Bakarov.');
   await Promise.all([guild.roles.fetch(),guild.members.fetchMe({force:true})]);
   const role=guild.roles.cache.get(roleId),member=await guild.members.fetch({user:memberId,force:true});
-  assertUser(member&&!member.user.bot&&member.roles.cache.has(ctx.config.memberRoleId),'Kies een echt Legion-lid met de ledenrol.');
+  assertUser(member&&!member.user.bot&&member.roles.cache.has(ctx.config.memberRoleId),'Kies een echt Bakarov-lid met de ledenrol.');
   assertUser(role&&!role.managed&&!role.permissions.has(P.Administrator),'Deze rol is niet geschikt als promotierang.');
   const current=ranks.findIndex(id=>member.roles.cache.has(id)),target=ranks.indexOf(roleId);
   assertUser(resuming||!member.roles.cache.has(roleId),'Dit lid heeft de gekozen gangrang al. Kies een hogere rang.');
@@ -43,8 +43,8 @@ async function applyGangRank(ctx,guild,proposal) {
   const {member}=await validatePromotion(ctx,guild,proposal.member_id,proposal.role_id,true);
   const previous=ctx.config.roster.roleIds.filter(id=>id!==proposal.role_id&&member.roles.cache.has(id));
   // Alleen de bedoelde gangrollen worden aangepast via idempotente role-endpoints.
-  if(!member.roles.cache.has(proposal.role_id))await member.roles.add(proposal.role_id,`Legion promotie ${proposal.id}: meerderheid van minstens drie Lead-leden`);
-  for(const id of previous)await member.roles.remove(id,`Legion promotie ${proposal.id}: oude gangrang vervangen`);
+  if(!member.roles.cache.has(proposal.role_id))await member.roles.add(proposal.role_id,`Bakarov promotie ${proposal.id}: meerderheid van minstens drie Lead-leden`);
+  for(const id of previous)await member.roles.remove(id,`Bakarov promotie ${proposal.id}: oude gangrang vervangen`);
 }
 async function eligibleVotes(ctx,guild,id) {
   for(const vote of promotionVotes(ctx,id).votes) {
@@ -87,12 +87,12 @@ async function resolvePending(ctx,guild,id,actor,now=Date.now()) {
 export async function publishPromotion(ctx,guild,id) {
   return serializeCommunity(`${guild.id}:promotion:${id}`,async()=>{
     const proposal=promotionById(ctx,id);assertUser(proposal,'Dit promotievoorstel bestaat niet.');
-    return updateCommunityPost(ctx,guild,'promotions',proposal,promotionMessage(ctx,proposal),`Legion • Promotie ${id}`);
+    return updateCommunityPost(ctx,guild,'promotions',proposal,promotionMessage(ctx,proposal),`Bakarov • Promotie ${id}`);
   });
 }
 export async function createPromotion(ctx,interaction,input) {
   const staff=isStaff(interaction,ctx.config);
-  assertUser(staff||interaction.member.roles.cache.has(ctx.config.memberRoleId),'Alleen Legion-leden en de leiding kunnen een promotie voorstellen.');
+  assertUser(staff||interaction.member.roles.cache.has(ctx.config.memberRoleId),'Alleen Bakarov-leden en de leiding kunnen een promotie voorstellen.');
   assertUser(staff||input.memberId===interaction.user.id,'Je kunt alleen voor jezelf een promotie aanvragen. De leiding kan voorstellen voor andere leden maken.');
   const reason=input.reason?.trim();assertUser(reason&&reason.length<=500,'Geef een duidelijke motivatie van maximaal 500 tekens.');
   await validatePromotion(ctx,interaction.guild,input.memberId,input.roleId);
@@ -121,7 +121,7 @@ export async function decidePromotion(ctx,guild,actor,id,decision,source) {
       if(previous?.response!==decision)ctx.store.audit('promotion.vote',voter.id,{id,response:decision});
     });
     const result=await resolvePending(ctx,guild,id,voter.id);
-    await updateCommunityPost(ctx,guild,'promotions',result,promotionMessage(ctx,result),`Legion • Promotie ${id}`).catch(()=>{});
+    await updateCommunityPost(ctx,guild,'promotions',result,promotionMessage(ctx,result),`Bakarov • Promotie ${id}`).catch(()=>{});
     return {...result,voting:promotionVotes(ctx,id)};
   });
 }

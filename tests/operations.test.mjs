@@ -75,7 +75,7 @@ test('DM-blokkades spammen niet; een mislukte herinnering wordt na betalen overg
   const paid=pay(f);await reviewGangpotPayment(f.ctx,f.guild,f.lead,paid.id,'approve',()=>FRI+1000);
   await syncGangpot(f.ctx,f.client,Date.parse('2026-10-17T18:00:00Z'));await syncGangpot(f.ctx,f.client,Date.parse('2026-10-17T18:01:00Z'));
   assert.equal(f.ctx.store.db.prepare("SELECT COUNT(*) AS n FROM feature_notices WHERE kind='gangpot.lead' AND status='sent'").get().n,1);
-  assert.ok([...f.guild.channels.cache.get(f.ctx.config.logChannelId).posted.values()].some(message=>message.embeds?.[0]?.title==='Legion — Betalingen wachten op Lead'));
+  assert.ok([...f.guild.channels.cache.get(f.ctx.config.logChannelId).posted.values()].some(message=>message.embeds?.[0]?.title==='Bakarov — Betalingen wachten op Lead'));
   assert.equal(f.ctx.store.db.prepare("SELECT COUNT(*) AS n FROM feature_notices WHERE user_id=? AND kind='gangpot.member'").get(OTHER).n,1);
 });
 

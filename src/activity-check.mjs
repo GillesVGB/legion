@@ -1,3 +1,4 @@
+import {canonicalBrandText} from './branding.mjs';
 import {randomBytes} from 'node:crypto';
 import {MessageFlags,PermissionFlagsBits as P} from 'discord.js';
 import {assertUser,UserError} from './errors.mjs';
@@ -12,11 +13,11 @@ import {operationSettings} from './feature-settings.mjs';
 
 const checkById=(ctx,id)=>ctx.store.db.prepare('SELECT * FROM activity_check_sessions WHERE id=?').get(id);
 const membersOf=(ctx,id)=>ctx.store.db.prepare('SELECT * FROM activity_check_members WHERE check_id=? ORDER BY user_id').all(id);
-const marker=id=>`Legion • Check-in ${id}`;
+const marker=id=>`Bakarov • Check-in ${id}`;
 const eligible=(ctx,member)=>Boolean(member&&!member.user.bot&&member.roles.cache.has(ctx.config.memberRoleId));
 async function checkStaff(ctx,guild,member){
   requirePlanningGuild(ctx);
-  assertUser(guild.id===ctx.config.guildId,'Gebruik de Legion-hoofdserver.');
+  assertUser(guild.id===ctx.config.guildId,'Gebruik de Bakarov-hoofdserver.');
   const actor=await guild.members.fetch({user:member.id,force:true});
   requireStaff({member:actor,memberPermissions:actor.permissions},ctx.config);
   assertUser(!actor.user.bot,'Alleen de leiding kan activiteiten controleren.');
@@ -25,7 +26,7 @@ async function checkStaff(ctx,guild,member){
 export function activityCheckMessage(ctx,check){
   const members=membersOf(ctx,check.id),count=status=>members.filter(item=>item.status===status).length;
   const open=check.status==='open';
-  const card=embed(ctx.config,'Legion — Activiteitencheck',`Laat weten dat je nog actief bent binnen Legion. Reageer vóór de deadline met **✅** onder dit bericht. Een geregistreerde bevestiging blijft bewaard.\n\n**Deadline:** <t:${Math.floor(check.deadline_at/1000)}:F> · <t:${Math.floor(check.deadline_at/1000)}:R>\n**Bevestigd:** ${count('responded')}/${members.length}\n**Status:** ${open?'🟢 Open':check.status==='closed'?'🔒 Afgerond':'⚪ Geannuleerd'}\n\n${open?'Niet op tijd bevestigd en geen goedgekeurde afwezigheid? Dan geeft de bot na de deadline automatisch één gangwarn. Dit geldt voor de Legion-leden die bij het starten van deze check zijn opgenomen.':check.status==='closed'?`**Goedgekeurd afwezig:** ${count('exempt')}\n**Gangwarns:** ${count('warned')}\n**Niet meer verplicht:** ${count('left')}`:'Deze check is geannuleerd. Er volgen geen nieuwe gangwarns.'}\n\nDeze check-in bevestigt je activiteit binnen Legion. Je Discord-status bepaalt niet of je een gangwarn krijgt.`).setColor(open?0x22C55E:check.status==='closed'?0x64748B:0xF59E0B).setFooter({text:marker(check.id)});
+  const card=embed(ctx.config,'Bakarov — Activiteitencheck',`Laat weten dat je nog actief bent binnen Bakarov. Reageer vóór de deadline met **✅** onder dit bericht. Een geregistreerde bevestiging blijft bewaard.\n\n**Deadline:** <t:${Math.floor(check.deadline_at/1000)}:F> · <t:${Math.floor(check.deadline_at/1000)}:R>\n**Bevestigd:** ${count('responded')}/${members.length}\n**Status:** ${open?'🟢 Open':check.status==='closed'?'🔒 Afgerond':'⚪ Geannuleerd'}\n\n${open?'Niet op tijd bevestigd en geen goedgekeurde afwezigheid? Dan geeft de bot na de deadline automatisch één gangwarn. Dit geldt voor de Bakarov-leden die bij het starten van deze check zijn opgenomen.':check.status==='closed'?`**Goedgekeurd afwezig:** ${count('exempt')}\n**Gangwarns:** ${count('warned')}\n**Niet meer verplicht:** ${count('left')}`:'Deze check is geannuleerd. Er volgen geen nieuwe gangwarns.'}\n\nDeze check-in bevestigt je activiteit binnen Bakarov. Je Discord-status bepaalt niet of je een gangwarn krijgt.`).setColor(open?0x22C55E:check.status==='closed'?0x64748B:0xF59E0B).setFooter({text:marker(check.id)});
   for(const [status,label] of [['responded','✅ Actief bevestigd'],['exempt','Goedgekeurd afwezig'],['warned','Gangwarn gegeven']]){
     const list=members.filter(item=>item.status===status);if(list.length)card.addFields({name:label,value:list.slice(0,25).map(item=>`<@${item.user_id}>`).join(', ')+(list.length>25?`\n… en ${list.length-25} anderen. Zie het dashboard voor de volledige lijst.`:'')});
   }
@@ -49,12 +50,12 @@ export async function createActivityCheck(ctx,guild,member,input,now=Date.now())
   assertUser(deadline>=now+60000&&deadline<=now+31*86400000,'Kies een deadline vanaf één minuut in de toekomst, binnen 31 dagen.');
   const channel=await communityChannel(guild,input.channelId);
   assertUser(channel.permissionsFor(guild.members.me)?.has([P.EmbedLinks,P.AddReactions,P.ManageMessages]),'Geef de bot Links insluiten, Reacties toevoegen en Berichten beheren in het check-in-kanaal.');
-  assertUser(ctx.config.memberRoleId,'Stel eerst de Legion-ledenrol in.');
+  assertUser(ctx.config.memberRoleId,'Stel eerst de Bakarov-ledenrol in.');
   const role=await guild.roles.fetch(ctx.config.memberRoleId);
-  assertUser(role&&(role.mentionable||channel.permissionsFor(guild.members.me)?.has(P.MentionEveryone)),'De bot kan Legion nog niet taggen. Maak de Legion-rol vermeldbaar of geef de bot Iedereen, @here en alle rollen vermelden in dit kanaal.');
+  assertUser(role&&(role.mentionable||channel.permissionsFor(guild.members.me)?.has(P.MentionEveryone)),'De bot kan Bakarov nog niet taggen. Maak de Bakarov-rol vermeldbaar of geef de bot Iedereen, @here en alle rollen vermelden in dit kanaal.');
   const members=await refreshMembers(guild),targets=[...members.values()].filter(member=>eligible(ctx,member));
-  assertUser(targets.length,'Er zijn geen mensen met de Legion-ledenrol om te controleren.');
-  assertUser(targets.every(target=>channel.permissionsFor(target)?.has([P.ViewChannel,P.ReadMessageHistory])),'Kies een kanaal dat alle Legion-leden kunnen bekijken. Anders kunnen zij niet op de check reageren.');
+  assertUser(targets.length,'Er zijn geen mensen met de Bakarov-ledenrol om te controleren.');
+  assertUser(targets.every(target=>channel.permissionsFor(target)?.has([P.ViewChannel,P.ReadMessageHistory])),'Kies een kanaal dat alle Bakarov-leden kunnen bekijken. Anders kunnen zij niet op de check reageren.');
   const id=randomBytes(6).toString('hex');
   ctx.store.transaction(()=>{
     assertUser(!ctx.store.db.prepare("SELECT 1 FROM activity_check_sessions WHERE status='open'").get(),'Er loopt al een activiteitencheck. Wacht tot deze is afgerond of annuleer die eerst.');
@@ -72,7 +73,7 @@ export async function respondActivityCheck(ctx,guild,member,id,binding,now=Date.
     assertUser(check&&guild.id===ctx.config.guildId&&binding.channelId===check.channel_id&&binding.messageId===check.message_id,'Deze reactie hoort niet bij deze activiteitencheck.');
     assertUser(check.status==='open'&&now<check.deadline_at,'De deadline is verstreken of deze activiteitencheck is gesloten.');
     const target=await guild.members.fetch({user:member.id,force:true});
-    assertUser(eligible(ctx,target),'Alleen Legion-leden kunnen hun activiteit bevestigen.');
+    assertUser(eligible(ctx,target),'Alleen Bakarov-leden kunnen hun activiteit bevestigen.');
     const entry=ctx.store.db.prepare('SELECT * FROM activity_check_members WHERE check_id=? AND user_id=?').get(id,target.id);
     assertUser(entry,'Je bent na het starten van deze check toegevoegd en hoeft hier niet aan mee te doen.');
     if(entry.responded_at!==null)return false;
@@ -115,7 +116,7 @@ export async function finishActivityCheck(ctx,guild,id,now=Date.now()){
         const warning=ctx.store.addWarnInside(entry.user_id,guild.members.me.id,reason,now);
         ctx.store.db.prepare('INSERT INTO activity_check_warnings(activity_id,user_id,warn_id,created_at) VALUES(?,?,?,?)').run(id,entry.user_id,warning.id,now);
         ctx.store.db.prepare("UPDATE activity_check_members SET status='warned',warn_id=? WHERE check_id=? AND user_id=?").run(warning.id,id,entry.user_id);
-        queueFeatureNotice(ctx,{key:`activity.warn:${id}:${entry.user_id}`,kind:'activity.warn',user:entry.user_id,now,payload:{embeds:[embed(ctx.config,'Legion — Gangwarn: activiteitencheck',`${safeText(reason)}\n\nJe had vóór de deadline niet met **✅** gereageerd en geen goedgekeurde afwezigheid.\n**Actieve gangwarns:** ${warning.count}\n**Warn-ID:** \`${warning.id}\`\n[Check-in bekijken](https://discord.com/channels/${guild.id}/${check.channel_id}/${check.message_id})\nNeem contact op met de leiding als deze waarschuwing niet klopt.`).setColor(0xEF4444)]}});
+        queueFeatureNotice(ctx,{key:`activity.warn:${id}:${entry.user_id}`,kind:'activity.warn',user:entry.user_id,now,payload:{embeds:[embed(ctx.config,'Bakarov — Gangwarn: activiteitencheck',`${safeText(reason)}\n\nJe had vóór de deadline niet met **✅** gereageerd en geen goedgekeurde afwezigheid.\n**Actieve gangwarns:** ${warning.count}\n**Warn-ID:** \`${warning.id}\`\n[Check-in bekijken](https://discord.com/channels/${guild.id}/${check.channel_id}/${check.message_id})\nNeem contact op met de leiding als deze waarschuwing niet klopt.`).setColor(0xEF4444)]}});
       }
       ctx.store.db.prepare("UPDATE activity_check_sessions SET status='closed',checked_at=?,dirty=1,next_attempt=0,last_error=NULL WHERE id=?").run(now,id);
       ctx.store.audit('activitycheck.finish',guild.members.me.id,{id,results:membersOf(ctx,id)});
@@ -131,14 +132,14 @@ export async function syncActivityWarnings(ctx,guild,now=Date.now()){
       WHERE c.log_id IS NULL AND c.next_attempt<=? ORDER BY c.created_at LIMIT 30`).all(now)){
       try{
         if(item.removed_at!==null){db.prepare("UPDATE activity_check_warnings SET log_id='skipped',last_error=NULL WHERE warn_id=?").run(item.warn_id);continue;}
-        const channel=await warnLogChannel(guild,ctx.config),marker=`Legion • Activiteitencheck ${item.warn_id}`;
+        const channel=await warnLogChannel(guild,ctx.config),marker=`Bakarov • Activiteitencheck ${item.warn_id}`;
         let message;
         if(channel.permissionsFor(guild.members.me)?.has(P.ReadMessageHistory)){
           const history=await channel.messages.fetch({limit:100});
-          message=[...history.values()].find(value=>value.author.id===guild.members.me.id&&value.embeds?.some(card=>card.footer?.text===marker));
+          message=[...history.values()].find(value=>value.author.id===guild.members.me.id&&value.embeds?.some(card=>canonicalBrandText(card.footer?.text)===marker));
         }
         const count=ctx.store.warnCount(item.user_id),threshold=count>=ctx.config.warnThreshold?`\n⚠️ Drempel bereikt: ${count}/${ctx.config.warnThreshold}. De leiding moet dit beoordelen.`:'';
-        message??=await channel.send({embeds:[embed(ctx.config,'Legion — Gangwarn: activiteitencheck',`**Lid:** <@${item.user_id}>\n**Reden:** ${safeText(item.reason)}\n**Warn-ID:** \`${item.warn_id}\`\n**Actieve warns:** ${count}${threshold}`).setColor(0xEF4444).setFooter({text:marker})],nonce:`ac:${item.warn_id}`,enforceNonce:true,allowedMentions:quiet});
+        message??=await channel.send({embeds:[embed(ctx.config,'Bakarov — Gangwarn: activiteitencheck',`**Lid:** <@${item.user_id}>\n**Reden:** ${safeText(item.reason)}\n**Warn-ID:** \`${item.warn_id}\`\n**Actieve warns:** ${count}${threshold}`).setColor(0xEF4444).setFooter({text:marker})],nonce:`ac:${item.warn_id}`,enforceNonce:true,allowedMentions:quiet});
         db.prepare('UPDATE activity_check_warnings SET log_id=?,last_error=NULL WHERE warn_id=?').run(message.id,item.warn_id);
       }catch(error){db.prepare('UPDATE activity_check_warnings SET next_attempt=?,last_error=? WHERE warn_id=?').run(now+60000,String(error.code||error.name),item.warn_id);}
     }
@@ -226,6 +227,6 @@ export async function syncCheckReminders(ctx,guild,now=Date.now()){
     const date=missionDay(check.deadline_at);
     return !ctx.store.db.prepare("SELECT 1 FROM absence_requests WHERE user_id=? AND kind='range' AND status='approved' AND start_date<=? AND end_date>=?").get(user,date,date);
   };
-  for(const check of due)for(const member of membersOf(ctx,check.id))if(canRemind(check,member.user_id))queueFeatureNotice(ctx,{key:`checkin.reminder:${check.id}:${member.user_id}`,kind:'checkin.reminder',user:member.user_id,period:check.id,now,payload:{embeds:[embed(ctx.config,'Legion — Check-in-herinnering',`Je hebt de activiteitencheck nog niet bevestigd.\n\nReageer vóór <t:${Math.floor(check.deadline_at/1000)}:F> met **✅** onder [het check-in-bericht](https://discord.com/channels/${guild.id}/${check.channel_id}/${check.message_id}).\n\nZonder bevestiging of goedgekeurde afwezigheid volgt na de deadline één gangwarn.`).setColor(0xF59E0B)]}});
+  for(const check of due)for(const member of membersOf(ctx,check.id))if(canRemind(check,member.user_id))queueFeatureNotice(ctx,{key:`checkin.reminder:${check.id}:${member.user_id}`,kind:'checkin.reminder',user:member.user_id,period:check.id,now,payload:{embeds:[embed(ctx.config,'Bakarov — Check-in-herinnering',`Je hebt de activiteitencheck nog niet bevestigd.\n\nReageer vóór <t:${Math.floor(check.deadline_at/1000)}:F> met **✅** onder [het check-in-bericht](https://discord.com/channels/${guild.id}/${check.channel_id}/${check.message_id}).\n\nZonder bevestiging of goedgekeurde afwezigheid volgt na de deadline één gangwarn.`).setColor(0xF59E0B)]}});
   await deliverFeatureNotices(ctx,guild,now,item=>canRemind(checkById(ctx,item.period_id),item.user_id),['checkin.reminder']);
 }

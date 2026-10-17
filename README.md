@@ -1,6 +1,12 @@
-# Legion — Discord-bot voor Future RP
+# Bakarov — Discord-bot voor Future RP
 
-Een Nederlandstalige bot met gangwarns, gangpotbetalingen, sollicitatietickets, privétickets, een automatische ledenlijst, informatie en games. De bot **Legion#1420** draait op Bot-Hosting.net. Zie `HOSTING.md` voor installatie en updates. Het downloadpakket bevat geen bot-token of database.
+Een Nederlandstalige bot met gangwarns, gangpotbetalingen, sollicitatietickets, privétickets, een automatische ledenlijst, informatie en games. De hosting draait op Bot-Hosting.net. Zie `HOSTING.md` voor installatie en updates. Het downloadpakket bevat geen bot-token of database.
+
+![Bakarov](src/branding-assets/logo.webp)
+
+Versie **1.9.0** geeft de bot, het dashboard, de panelen en nieuwe transcripts de naam **Bakarov** en een zwart-gouden huisstijl met het aangeleverde logo. De bot werkt zijn Discord-naam en profielfoto bij de eerste start bij; bij een geweigerde profielwijziging volgt een melding in de console en een nieuwe poging bij de volgende start. Oude botbijnamen worden waar mogelijk aangepast.
+
+Bestaande dashboardteksten met de oude naam worden eenmalig bijgewerkt. Coins, warns, betalingen, afmeldingen en dossiers blijven bewaard. De databasebestanden houden bewust hun bestaande naam `legion-<guildId>.sqlite`; hernoem of verwijder die niet. Oude panelen, ledenlijsten en sollicitatieknoppen blijven herkenbaar. Eerder opgeslagen gesprekken en berichten van leden blijven historische gegevens. De bestaande GitHub-repository en het vaste hostingadres blijven bruikbaar.
 
 ## Jouw servers
 
@@ -16,9 +22,9 @@ Rollen, kanaalinstellingen, warns, coins, spellen en dossiers zijn **per guild g
 ## In ongeveer 10 minuten installeren
 
 1. Installeer [Node.js](https://nodejs.org/en/download). Gebruik Node 24 LTS, of minimaal Node 22.13.0. Pak het ZIP-bestand uit.
-2. Gebruik je bestaande Legion-applicatie in de [Discord Developer Portal](https://discord.com/developers/applications), of maak een nieuwe applicatie. Open **Bot**, maak/reset het token en kopieer het. Kopieer onder **General Information** ook het **Application ID** als je een nieuwe applicatie gebruikt.
+2. Gebruik je bestaande Bakarov-applicatie in de [Discord Developer Portal](https://discord.com/developers/applications), of maak een nieuwe applicatie. Open **Bot**, maak/reset het token en kopieer het. Kopieer onder **General Information** ook het **Application ID** als je een nieuwe applicatie gebruikt.
 3. Kopieer `.env.example` naar `.env` en vul alleen `DISCORD_TOKEN` en `CLIENT_ID` in. Houd het token lokaal; stuur het niet in Discord of in een chat. Dit pakket bevat geen token.
-4. Nodig dezelfde bot uit in **beide guilds**. Kies bij **Installation → Guild Install** de scopes `bot` en `applications.commands`. Geef de bot de onderstaande rechten. Zet onder **Bot → Privileged Gateway Intents** ook **Message Content Intent** en **Server Members Intent** aan: die zijn nodig voor gesprekstranscripts en het aantal leden met de Legion-rol. Deze zijn voor de bestaande Legion-applicatie al geactiveerd.
+4. Nodig dezelfde bot uit in **beide guilds**. Kies bij **Installation → Guild Install** de scopes `bot` en `applications.commands`. Geef de bot de onderstaande rechten. Zet onder **Bot → Privileged Gateway Intents** ook **Message Content Intent** en **Server Members Intent** aan: die zijn nodig voor gesprekstranscripts en het aantal leden met de Bakarov-rol. Deze zijn voor de bestaande Bakarov-applicatie al geactiveerd.
 5. Open een terminal in de map met `package.json` en voer uit:
 
    ```powershell
@@ -33,7 +39,7 @@ Rollen, kanaalinstellingen, warns, coins, spellen en dossiers zijn **per guild g
 6. Gebruik als administrator **in elke guild**:
 
    ```text
-   /inrichten leiding:@Legion-Leiding leden:@Legion
+   /inrichten leiding:@Bakarov-Leiding leden:@Bakarov
    ```
 
    Kies je echte rollen in Discord. `leden` is optioneel. De bot maakt een privécategorie voor sollicitaties en een privélogkanaal. Alleen in de tweede guild maakt hij ook een ticketcategorie. Hij bewaart de nieuwe ID's in de lokale database; je hoeft die niet achteraf handmatig in te vullen.
@@ -63,7 +69,7 @@ Nieuwe commands worden bij het starten automatisch geregistreerd: 32 in de hoofd
 | `/gangwarn bekijken lid:@lid` | Leiding bekijkt de meest recente 15 warns en totaal actieve warns. |
 | `/gangwarn intrekken id:... reden:...` | Leiding trekt een warn in; reden en historie blijven opgeslagen. |
 | `/mijnwarns` | Lid ziet alleen zijn eigen warns, privé. |
-| `/solliciteren` | Open direct een privé ticket met de volledige Legion-template. |
+| `/solliciteren` | Open direct een privé ticket met de volledige Bakarov-template. |
 | `/sollicitatiestatus` | Bekijk privé je wachtlijstpositie, gesprekstatus of de beslissing. |
 | `/planning datum tijd afspreekpunt` | Leiding plaatst een tekstbericht met vier emoji-reacties in het vaste gangkanaal. |
 | `/planning-overzicht` | Bekijk privé de komende activiteiten in de gangserver. |
@@ -81,7 +87,7 @@ Nieuwe commands worden bij het starten automatisch geregistreerd: 32 in de hoofd
 | `/missies` | Bekijk drie dagelijkse fun-missies en claim verdiende fictieve coins. |
 | `/ticket openen` | Open direct een privéticket, uitsluitend in de tweede guild. |
 | `/ticket sluiten` | Sluit het huidige ticket met een bevestiging. |
-| `/saldo` | Je fictieve Legion-coins. |
+| `/saldo` | Je fictieve Bakarov-coins. |
 | `/daily` | 250 coins, eenmaal per 24 uur. |
 | `/leaderboard` | Top 10 van deze guild. |
 | `/blackjack inzet:100` | Blackjack met knoppen. Kies een even inzet. |
@@ -92,7 +98,7 @@ Nieuwe commands worden bij het starten automatisch geregistreerd: 32 in de hoofd
 | `/steenpapier keuze:steen` | Steen, papier, schaar tegen de bot. |
 | `/fish` | Vissen: zeldzame vangsten geven meer coins, slechte vangsten kosten coins. |
 
-`/activiteitencheck datum:morgenavond tijd:20:00` start een aparte check-in in het huidige kanaal. Met het optionele `kanaal` kies je een ander tekstkanaal in de hoofdserver. De deadline is in Belgische tijd en moet binnen 31 dagen liggen. Leden bevestigen met een **✅-reactie** onder het bericht; dit werkt ook wanneer hun Discord-status onzichtbaar is. De bot controleert automatisch binnen ongeveer één minuut na de deadline en geeft maximaal één gangwarn per lid en check, met log en DM. Hiervoor is geen planning nodig. Alleen mensen met de Legion-ledenrol bij het starten worden opgenomen. Goedgekeurde langere afwezigheid die de deadlinedatum omvat geeft vrijstelling; een losse afmelding voor een planning geldt uitsluitend voor die planning. Nieuwe leden na het starten, bots, bezoekers, vertrokken leden en leden die hun ledenrol verloren zijn krijgen geen warn. De leiding kan een lopende check annuleren via /activiteitencheck-stop of het dashboard. Check-ins, bevestigingen en afhandeling blijven bewaard bij herstarts. Een verwijderde of niet tijdig gepubliceerde check geeft geen nieuwe warns; bij verbindingsproblemen wacht de controle op herstel. Discord geeft geen tijdstip van een losse emoji-reactie mee. Bij herstel tellen bestaande vinkjes daarom mee om onterechte waarschuwingen te voorkomen.
+`/activiteitencheck datum:morgenavond tijd:20:00` start een aparte check-in in het huidige kanaal. Met het optionele `kanaal` kies je een ander tekstkanaal in de hoofdserver. De deadline is in Belgische tijd en moet binnen 31 dagen liggen. Leden bevestigen met een **✅-reactie** onder het bericht; dit werkt ook wanneer hun Discord-status onzichtbaar is. De bot controleert automatisch binnen ongeveer één minuut na de deadline en geeft maximaal één gangwarn per lid en check, met log en DM. Hiervoor is geen planning nodig. Alleen mensen met de Bakarov-ledenrol bij het starten worden opgenomen. Goedgekeurde langere afwezigheid die de deadlinedatum omvat geeft vrijstelling; een losse afmelding voor een planning geldt uitsluitend voor die planning. Nieuwe leden na het starten, bots, bezoekers, vertrokken leden en leden die hun ledenrol verloren zijn krijgen geen warn. De leiding kan een lopende check annuleren via /activiteitencheck-stop of het dashboard. Check-ins, bevestigingen en afhandeling blijven bewaard bij herstarts. Een verwijderde of niet tijdig gepubliceerde check geeft geen nieuwe warns; bij verbindingsproblemen wacht de controle op herstel. Discord geeft geen tijdstip van een losse emoji-reactie mee. Bij herstel tellen bestaande vinkjes daarom mee om onterechte waarschuwingen te voorkomen.
 | `/inrichten` | Administrator kiest leiding- en ledenrol en maakt kanalen. |
 | `/setup paneel:alles` | Plaatst/ververst het gecombineerde paneel van deze guild. |
 
@@ -126,19 +132,19 @@ Nieuwe commands worden bij het starten automatisch geregistreerd: 32 in de hoofd
 
 **Tickets.** De knop en `/ticket openen` maken direct een privé kanaal, zonder formulier of verplichte vraag vooraf. De aanvrager typt zijn vraag in het kanaal. Alleen de aanvrager, leiding en Discord-administrators hebben toegang. Een persoon kan één open ticket hebben. Na sluiten maakt de bot het transcript en verwijdert daarna het kanaal. Bij een mislukte export blijft het kanaal tijdelijk gesloten totdat het opnieuw proberen slaagt. Een nieuw dossier openen kan maximaal eenmaal per minuut.
 
-**Transcripts, alleen in de community-guild.** Bij sluiten, aannemen of afwijzen gaat een sollicitatietranscript naar `1555746237582409789`. Vraagtranscripts gaan naar `1555747964461260861`. De knop **Transcript bekijken** opent een opgemaakte pagina met zoeken, HTML downloaden en printen/PDF. TXT- en HTML-bestanden blijven ook in Discord beschikbaar. De webinhoud is met AES-256-GCM versleuteld; de sleutel staat alleen in het fragment van de volledige dossierlink. Iedereen met die volledige link kan het gesprek openen: deel hem alleen met bevoegde personen. Er is geen ChatGPT-aanmelding nodig. De viewer toont alleen Legion, zonder persoonlijke naam in het adres of de vormgeving. Bijlagelinks kunnen verlopen.
+**Transcripts, alleen in de community-guild.** Bij sluiten, aannemen of afwijzen gaat een sollicitatietranscript naar `1555746237582409789`. Vraagtranscripts gaan naar `1555747964461260861`. De knop **Transcript bekijken** opent een opgemaakte pagina met zoeken, HTML downloaden en printen/PDF. TXT- en HTML-bestanden blijven ook in Discord beschikbaar. De webinhoud is met AES-256-GCM versleuteld; de sleutel staat alleen in het fragment van de volledige dossierlink. Iedereen met die volledige link kan het gesprek openen: deel hem alleen met bevoegde personen. Er is geen ChatGPT-aanmelding nodig. De viewer toont alleen Bakarov, zonder persoonlijke naam in het adres of de vormgeving. Bijlagelinks kunnen verlopen.
 
 **Automatische ledenlijst.** Kanaal `1555685633266163795` hoort bij guild `1555685630640652338`. Chef, Sous-Chef, Conseiller, Capitane, Head Killer, Killer, Spécialiste, Membre, Recruter en Hangaround worden in die volgorde getoond. Iedereen staat bij zijn hoogste rang; bots tellen niet mee. Rolwijzigingen, nieuwe leden, vertrek en naamwijzigingen verversen dezelfde berichten. Elke vijf minuten volgt ook een volledige synchronisatie.
 
-**Openbare games.** Alle fun-resultaten, saldo, daily en leaderboard verschijnen in het kanaal. Blackjack is blauw tijdens spelen, groen bij winst, rood bij verlies en geel bij gelijkspel. `/fish` geeft 25 coins voor een gewone vis, 55 voor een ongebruikelijke vangst, 100-150 voor zeldzame vondsten en 500 voor de legendarische trofee. Slechte vangsten kosten 20-100 coins, met maximaal het beschikbare saldo. Games gebruiken uitsluitend fictieve Legion-coins, per guild gescheiden. De algemene wachttijd voor fun-acties is drie seconden.
+**Openbare games.** Alle fun-resultaten, saldo, daily en leaderboard verschijnen in het kanaal. Blackjack is blauw tijdens spelen, groen bij winst, rood bij verlies en geel bij gelijkspel. `/fish` geeft 25 coins voor een gewone vis, 55 voor een ongebruikelijke vangst, 100-150 voor zeldzame vondsten en 500 voor de legendarische trofee. Slechte vangsten kosten 20-100 coins, met maximaal het beschikbare saldo. Games gebruiken uitsluitend fictieve Bakarov-coins, per guild gescheiden. De algemene wachttijd voor fun-acties is drie seconden.
 
-**Privacy.** Dossierkanalen krijgen expliciete kanaaloverrides. Discord-administrators kunnen privékanalen altijd zien. De algemene logs en transcriptkanalen worden gecontroleerd op toegang voor de leiding, de bot en administrators. Gangwarns in de eerste guild gaan naar het door jou gekozen kanaal `1556778849407213698`; dat kanaal is ook zichtbaar voor Legion-leden. Warns en dossiers staan ook lokaal in de database; geef alleen beheerders toegang tot de hosting en backups.
+**Privacy.** Dossierkanalen krijgen expliciete kanaaloverrides. Discord-administrators kunnen privékanalen altijd zien. De algemene logs en transcriptkanalen worden gecontroleerd op toegang voor de leiding, de bot en administrators. Gangwarns in de eerste guild gaan naar het door jou gekozen kanaal `1556778849407213698`; dat kanaal is ook zichtbaar voor Bakarov-leden. Warns en dossiers staan ook lokaal in de database; geef alleen beheerders toegang tot de hosting en backups.
 
 **Games.** Iedereen begint in elke guild met 1.000 fictieve coins. Er zijn geen betalingen, geldprijzen, transfers of koppelingen met het FiveM-saldo. De standaard maximuminzet is 500. Blackjack gebruikt een geschud deck van 52 kaarten, past op soft 17, betaalt natuurlijke blackjack 3:2 en gewone winst 1:1. Gelijkspel geeft de inzet terug. Splits, verzekering en double down zitten niet in deze versie. Na 10 minuten wordt automatisch gepast. Lopende spellen en inzet blijven bewaard na herstart. Willekeur gebruikt Node's `crypto.randomInt`.
 
 ## Aanpassen
 
-- **`content.json`**: naam, kleurenstijl via `.env`, welkomsttekst, gangregels, rangen en 8-ball-antwoorden. De voorbeeldregels zijn eigen Legion-afspraken. Vul actuele officiële Future RP-regels of een link zelf in; deze bot beweert niet dat de voorbeelden officiële serverregels zijn.
+- **`content.json`**: naam, kleurenstijl via `.env`, welkomsttekst, gangregels, rangen en 8-ball-antwoorden. De voorbeeldregels zijn eigen Bakarov-afspraken. Vul actuele officiële Future RP-regels of een link zelf in; deze bot beweert niet dat de voorbeelden officiële serverregels zijn.
 - **`.env`**: kleur, drempel voor warns, startcoins, daily, maximale inzet en blackjacktijd.
 - **`guilds.json`**: de twee guilds, `ticketsEnabled`, het paneelkanaal en eventuele handmatig ingestelde rol-/kanaal-ID's. Laat de rol-/categorie-/logvelden leeg als je `/inrichten` gebruikt. Niet-lege waarden in dit bestand hebben na herstart voorrang op opgeslagen instellingen.
 - **`gameChannelId` per guild**: vul een kanaal-ID in om games en economie tot dat kanaal te beperken.
@@ -184,7 +190,7 @@ Ticketnamen gebruiken de Discord-gebruikersnaam: `sollicitatie-gebruikersnaam`, 
 
 Bij een tunnelstoring bewaart de bot het volledige transcript alvast lokaal. Zodra de verbinding terug is, verschijnen de bestanden en knop in Discord en wordt het kanaal verwijderd. Verwijder ticketkanalen niet zelf voordat de export is opgeslagen: Discord kan hun berichtgeschiedenis daarna niet teruggeven.
 
-## Legion-dashboard en persoonlijke invites
+## Bakarov-dashboard en persoonlijke invites
 
 Gebruik `/dashboard` als leiding om het dashboard te openen. Je kunt beide beschikbare guilds selecteren en tickets, sollicitaties, transcripts, warns, leden, coins, informatie en instellingen beheren. De inlogknop is privé, eenmalig en twee minuten geldig; de sessie duurt dertig minuten. Ieder verzoek controleert de actuele Discord-leidingrechten voor die guild.
 
@@ -194,4 +200,4 @@ Aannemen stuurt automatisch een groene DM met een gebruikersgebonden, eenmalige 
 
 Ticket- en sollicitatie-embeds volgen automatisch groen, oranje of rood van de sollicitatiestatus. Definitief aangenomen is groen; afgewezen of gesloten is rood.
 
-Voor verhuizen naar FPS.ms of andere Linux x64-bot-hosting: gebruik **Legion-FPS-ms.zip** en lees [HOSTING.md](HOSTING.md). Dit pakket heeft `index.js` rechtstreeks in de hoofdmap en een Linux-tunnelclient. Maak `.env` van `.env.hosting.example` en neem de volledige `data/`-map mee. Het algemene ZIP-bestand bevat code en instructies, geen private instellingen of databases.
+Voor verhuizen naar FPS.ms of andere Linux x64-bot-hosting: gebruik **Bakarov-FPS-ms.zip** en lees [HOSTING.md](HOSTING.md). Dit pakket heeft `index.js` rechtstreeks in de hoofdmap en een Linux-tunnelclient. Maak `.env` van `.env.hosting.example` en neem de volledige `data/`-map mee. Het algemene ZIP-bestand bevat code en instructies, geen private instellingen of databases.

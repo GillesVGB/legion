@@ -167,7 +167,7 @@ test('leidingcontrole gebruikt de rollen van de huidige guild', () => {
   const perms = new PermissionsBitField();
   const interaction = { memberPermissions: perms, member: { roles: { cache: new Map([['staff-a', {}]]) } } };
   requireStaff(interaction, { staffRoleIds: ['staff-a'] });
-  assert.throws(() => requireStaff(interaction, { staffRoleIds: ['staff-b'] }), /Alleen de Legion-leiding/);
+  assert.throws(() => requireStaff(interaction, { staffRoleIds: ['staff-b'] }), /Alleen de Bakarov-leiding/);
   requireStaff({ memberPermissions: new PermissionsBitField(P.Administrator) }, { staffRoleIds: [] });
 });
 

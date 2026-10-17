@@ -24,7 +24,7 @@ const leadIds=[ACTOR,'100000000000000080','100000000000000081'];
 async function castThree(f,id,choices=['approve','approve','approve']){let result;for(let i=0;i<3;i++)result=await decidePromotion(f.main,f.guild,f.guild.members.cache.get(leadIds[i]),id,choices[i]);return result;}
 function seedVotes(f,id,choices=['approve','approve','approve']){for(let i=0;i<3;i++)f.main.store.db.prepare('INSERT INTO promotion_votes(proposal_id,voter_id,response,updated_at) VALUES(?,?,?,?)').run(id,leadIds[i],choices[i],Date.now()+i);}
 function interaction(f,user=ACTOR,guild=f.guild) {const member=guild.members.cache.get(user);return{guild,guildId:guild.id,channelId:f.main.config.logChannelId,channel:guild.channels.cache.get(f.main.config.logChannelId),client:f.client,user:member.user,member,memberPermissions:member.permissions,editReply:async()=>{},reply:async()=>{},deferReply:async()=>{}};}
-const future=()=>({date:missionDay(Date.now()+2*86400000),time:'20:30',location:'Legion HQ'});
+const future=()=>({date:missionDay(Date.now()+2*86400000),time:'20:30',location:'Bakarov HQ'});
 async function planning(t){const f=fixture(t);const item=await createActivity(f.main,interaction(f),future());const activity=activityById(f.main,item.id),message=f.guild.channels.cache.get(activity.channel_id).posted.get(activity.message_id);return{...f,activity,message};}
 async function react(f,emoji,user=OTHER,added=true){const reaction=f.message.reactions.cache.get(emoji),member=f.guild.members.cache.get(user);if(added)reaction.users.cache.set(user,member.user);else reaction.users.cache.delete(user);await handlePlanningReaction(f.main,reaction,member.user,added);return reaction;}
 

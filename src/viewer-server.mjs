@@ -2,17 +2,19 @@ import { createServer } from 'node:http';
 import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawn } from 'node:child_process';
+import {logo} from './branding.mjs';
 
 const assets = new Map([
   ['page', ['page.html', 'text/html; charset=utf-8']],
   ['/viewer.css', ['viewer.css', 'text/css; charset=utf-8']],
   ['/viewer.js', ['viewer.js', 'text/javascript; charset=utf-8']]
 ].map(([key, [file, type]]) => [key, { type, body: readFileSync(new URL(`viewer-assets/${file}`, import.meta.url)) }]));
+assets.set('/dashboard/logo.webp',{body:logo,type:'image/webp'});
 const headers = {
   'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff',
   'X-Robots-Tag': 'noindex, nofollow, noarchive', 'X-Frame-Options': 'DENY',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
-  'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-src 'self'; img-src data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+  'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 };
 
 export async function createTranscriptServer(contexts, port = 0, dashboard, host = '127.0.0.1') {
@@ -91,7 +93,7 @@ export async function startTranscriptViewer(config, contexts, onReady, dashboard
         ctx.store.queueTranscriptLinks();
       }
     }
-    console.log(`Legion dashboard bereikbaar: ${origin}`);
+    console.log(`Bakarov dashboard bereikbaar: ${origin}`);
     Promise.resolve().then(() => onReady?.()).catch(error => console.error(`Dashboard bereikbaar; achtergrondtaken worden opnieuw geprobeerd (${error.code ?? error.name}).`));
   };
   setOrigin('');
@@ -99,7 +101,7 @@ export async function startTranscriptViewer(config, contexts, onReady, dashboard
   // Bot-Hosting verzorgt HTTPS; het interne HTTP-proces luistert op SERVER_PORT.
   if (config.dashboardPublicURL) {
     const origin = config.dashboardPublicURL;
-    console.log(`Legion dashboard luistert op hostingpoort ${port}: ${origin}`);
+    console.log(`Bakarov dashboard luistert op hostingpoort ${port}: ${origin}`);
     let failures = 0, lastError;
     const probe = async () => {
       if (stopped) return;
@@ -180,7 +182,7 @@ export async function startTranscriptViewer(config, contexts, onReady, dashboard
       const origin = neutralTunnelURL(log);
       if (!origin || discovered) return;
       discovered = true;
-      console.log(`Legion transcriptverbinding start: ${origin}`);
+      console.log(`Bakarov transcriptverbinding start: ${origin}`);
       probe(origin);
     };
     candidate.stdout.on('data', read); candidate.stderr.on('data', read);

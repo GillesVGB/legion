@@ -50,7 +50,7 @@ export function auditPresentation(item,snapshot=null){
   }
   if(item.actor_id)result.fields.push({name:'Door',value:`<@${item.actor_id}>`});
   for(const [key,value] of Object.entries(details)){if(!labels[key]||key==='interaction'||value==='[afgeschermd]')continue;const rendered=detailValue(key,value);if(rendered)result.fields.push({name:labels[key],value:rendered.slice(0,1000)});}
-  if(!result.fields.length)result.fields.push({name:'Uitgevoerd door',value:'Legion / Discord'});
+  if(!result.fields.length)result.fields.push({name:'Uitgevoerd door',value:'Bakarov / Discord'});
   return result;
 }
 const length=card=>{const data=card.toJSON();return(data.title?.length||0)+(data.description?.length||0)+(data.footer?.text?.length||0)+(data.fields||[]).reduce((n,item)=>n+item.name.length+item.value.length,0);};
@@ -68,7 +68,7 @@ export function auditPayloads(ctx,rows,jobId){
   const groups=[];let group=[],size=0;
   for(const card of cards){if(group.length&&(group.length===10||size+length(card)+100>5800)){groups.push(group);group=[];size=0;}group.push(card);size+=length(card)+100;}
   if(group.length)groups.push(group);
-  return groups.map((items,index)=>({embeds:items.map(card=>card.setFooter({text:`Legion • Log ${jobId} • ${index+1}/${groups.length}`}).toJSON())}));
+  return groups.map((items,index)=>({embeds:items.map(card=>card.setFooter({text:`Bakarov • Log ${jobId} • ${index+1}/${groups.length}`}).toJSON())}));
 }
 export function dashboardAuditItem(ctx,guild,item){
   const saved=ctx.store.db.prepare('SELECT snapshot FROM message_audit WHERE audit_id=?').get(item.id),presentation=auditPresentation(item,saved?JSON.parse(saved.snapshot):null);

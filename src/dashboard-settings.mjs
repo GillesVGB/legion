@@ -1,5 +1,6 @@
 import { assertUser } from './errors.mjs';
 import {validateOperations,applyOperations} from './feature-settings.mjs';
+import {migrateBrandSettings} from './branding.mjs';
 
 const limits = { warnThreshold: [1,100], startingCoins: [0,1000000], dailyCoins: [1,10000], maxBet: [2,100000] };
 const strings = { gangName: 40, serverName: 60, coinName: 40, tagline: 500, information: 3000, applicationIntro: 500, ticketIntro: 500 };
@@ -44,7 +45,15 @@ export function applyDashboardSettings(ctx, value) {
 }
 export function loadDashboardSettings(ctx) {
   const saved = ctx.store.setting('dashboard-config');
-  if (saved) applyDashboardSettings(ctx, JSON.parse(saved));
+  const migrated=migrateBrandSettings(ctx,JSON.parse(saved||'{}'));
+  applyDashboardSettings(ctx,migrated);
+  if(ctx.store.setting('branding:version')!=='bakarov-1')ctx.store.transaction(()=>{
+    if(saved)ctx.store.setSetting('dashboard-config',JSON.stringify(migrated));
+    for(const table of ['activities','promotions','absence_requests','gangpot_claims','activity_check_sessions']){
+      ctx.store.db.prepare(`UPDATE ${table} SET dirty=1,next_attempt=0 WHERE status IN ('open','pending','approving')`).run();
+    }
+    ctx.store.setSetting('branding:version','bakarov-1');
+  });
 }
 export function saveDashboardSettings(ctx, value, actor) {
   const previous = JSON.parse(ctx.store.setting('dashboard-config') || '{}');

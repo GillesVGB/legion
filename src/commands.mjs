@@ -1,17 +1,17 @@
 import { SlashCommandBuilder, PermissionFlagsBits, ChannelType } from 'discord.js';
 
 const cmd = (name, description) => new SlashCommandBuilder().setName(name).setDescription(description).setDMPermission(false);
-const userOption = option => option.setName('lid').setDescription('Het Legion-lid').setRequired(true);
+const userOption = option => option.setName('lid').setDescription('Het Bakarov-lid').setRequired(true);
 const reasonOption = option => option.setName('reden').setDescription('Reden, maximaal 500 tekens').setRequired(true).setMaxLength(500);
-const betOption = (maxBet, required = true) => option => option.setName('inzet').setDescription('Aantal fictieve Legion-coins (blackjack: even aantal)').setMinValue(2).setMaxValue(maxBet).setRequired(required);
+const betOption = (maxBet, required = true) => option => option.setName('inzet').setDescription('Aantal fictieve Bakarov-coins (blackjack: even aantal)').setMinValue(2).setMaxValue(maxBet).setRequired(required);
 
 export function commands(maxBet, ticketsEnabled = true) {
   const result = [
-    cmd('help', 'Bekijk alle Legion-commands'),
-    cmd('info', 'Informatie over Legion en Future RP'),
-    cmd('regels', 'Lees de door Legion ingestelde regels'),
-    cmd('rangen', 'Bekijk de rangvolgorde van Legion'),
-    cmd('dashboard', 'Open het privé Legion-dashboard (alleen leiding)'),
+    cmd('help', 'Bekijk alle Bakarov-commands'),
+    cmd('info', 'Informatie over Bakarov en Future RP'),
+    cmd('regels', 'Lees de door Bakarov ingestelde regels'),
+    cmd('rangen', 'Bekijk de rangvolgorde van Bakarov'),
+    cmd('dashboard', 'Open het privé Bakarov-dashboard (alleen leiding)'),
     cmd('botstatus','Bekijk verbinding, uptime en acties die op herhaling wachten (leiding)'),
     cmd('lidinfo','Bekijk check-ins, afmeldingen en gangwarns van een lid (leiding)').addUserOption(userOption),
     cmd('vangstenboek','Bekijk je visverzameling en wekelijkse challenges'),
@@ -24,17 +24,17 @@ export function commands(maxBet, ticketsEnabled = true) {
         .addStringOption(o=>o.setName('tot').setDescription('Einddatum DD-MM-JJJJ').setRequired(true).setMaxLength(10)).addStringOption(reasonOption))
       .addSubcommand(s=>s.setName('status').setDescription('Bekijk je eigen aanvragen en vrijgestelde weken'))
       .addSubcommand(s=>s.setName('vrijstellen').setDescription('Geef een gebruiker vrijstelling voor één gangpotweek (Lead)')
-        .addUserOption(o=>o.setName('gebruiker').setDescription('Legion-lid').setRequired(true))
+        .addUserOption(o=>o.setName('gebruiker').setDescription('Bakarov-lid').setRequired(true))
         .addStringOption(o=>o.setName('termijn').setDescription('Zaterdag van de week: DD-MM-JJJJ').setRequired(true).setMaxLength(10)).addStringOption(reasonOption))
       .addSubcommand(s=>s.setName('vrijstelling-intrekken').setDescription('Trek een specifieke weekvrijstelling in (Lead)')
-        .addUserOption(o=>o.setName('gebruiker').setDescription('Legion-lid').setRequired(true))
+        .addUserOption(o=>o.setName('gebruiker').setDescription('Bakarov-lid').setRequired(true))
         .addStringOption(o=>o.setName('termijn').setDescription('Zaterdag van de week: DD-MM-JJJJ').setRequired(true).setMaxLength(10)).addStringOption(reasonOption)),
     cmd('uitnodiging', 'Bekijk je persoonlijke uitnodiging na een aangenomen sollicitatie'),
     cmd('inrichten', 'Maak privecategorieen en een logkanaal voor deze guild')
       .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
       .addRoleOption(o => o.setName('leiding').setDescription('Rol die warns, tickets en sollicitaties beheert').setRequired(true))
       .addRoleOption(o => o.setName('leden').setDescription('Optionele ledenrol voor aangenomen sollicitanten')),
-    cmd('setup', 'Plaats of ververs een Legion-paneel in deze guild')
+    cmd('setup', 'Plaats of ververs een Bakarov-paneel in deze guild')
       .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
       .addStringOption(o => o.setName('paneel').setDescription('Kies een paneel').setRequired(true).addChoices(
         { name: ticketsEnabled ? 'Tickets en solliciteren samen' : 'Solliciteren en informatie', value: 'alles' },
@@ -48,13 +48,13 @@ export function commands(maxBet, ticketsEnabled = true) {
         .addStringOption(o => o.setName('id').setDescription('Warn-ID uit /gangwarn bekijken').setRequired(true).setMaxLength(12))
         .addStringOption(reasonOption)),
     cmd('mijnwarns', 'Bekijk alleen je eigen gangwarns'),
-    cmd('solliciteren', 'Open direct een prive sollicitatieticket met de Legion-template'),
+    cmd('solliciteren', 'Open direct een prive sollicitatieticket met de Bakarov-template'),
     cmd('sollicitatiestatus', 'Bekijk privé je sollicitatiestatus en plek in de binnenkomstvolgorde'),
-    cmd('planning', 'Plaats een planning in het vaste Legion-planningkanaal (alleen leiding)')
+    cmd('planning', 'Plaats een planning in het vaste Bakarov-planningkanaal (alleen leiding)')
       .addStringOption(o=>o.setName('datum').setDescription('DD-MM-JJJJ, deze avond of morgenavond').setRequired(true).setMaxLength(32).setAutocomplete(true))
       .addStringOption(o=>o.setName('tijd').setDescription('Belgische tijd: UU:MM, bijvoorbeeld 20:30').setRequired(true).setMaxLength(5))
       .addStringOption(o=>o.setName('afspreekpunt').setDescription('Waar verzamelen we?').setRequired(true).setMaxLength(160)),
-    cmd('planning-overzicht','Bekijk de komende Legion-activiteiten'),
+    cmd('planning-overzicht','Bekijk de komende Bakarov-activiteiten'),
     cmd('activiteitencheck','Start een check-in; niet op tijd bevestigen geeft automatisch een gangwarn (leiding)')
       .addStringOption(o=>o.setName('datum').setDescription('Deadline: DD-MM-JJJJ, deze avond of morgenavond').setRequired(true).setMaxLength(32).setAutocomplete(true))
       .addStringOption(o=>o.setName('tijd').setDescription('Deadline in Belgische tijd: UU:MM').setRequired(true).setMaxLength(5))
@@ -92,15 +92,15 @@ export function commands(maxBet, ticketsEnabled = true) {
     cmd('ticket', 'Open of sluit je prive ticket')
       .addSubcommand(s => s.setName('openen').setDescription('Open direct een prive ticket'))
       .addSubcommand(s => s.setName('sluiten').setDescription('Sluit het ticket in dit kanaal met bevestiging')),
-    cmd('saldo', 'Bekijk je fictieve Legion-coins'),
-    cmd('daily', 'Claim elke 24 uur gratis Legion-coins'),
+    cmd('saldo', 'Bekijk je fictieve Bakarov-coins'),
+    cmd('daily', 'Claim elke 24 uur gratis Bakarov-coins'),
     cmd('fish', 'Ga vissen: een mooie vangst of een kreeft die je bijt?'),
     cmd('leaderboard', 'De tien rijkste spelers in deze guild'),
     cmd('blackjack', 'Speel blackjack, of hervat zonder inzet').addIntegerOption(betOption(maxBet, false)),
     cmd('coinflip', 'Raad kop of munt met fictieve coins').addIntegerOption(betOption(maxBet))
       .addStringOption(o => o.setName('keuze').setDescription('Kop of munt?').setRequired(true).addChoices({ name: 'Kop', value: 'kop' }, { name: 'Munt', value: 'munt' })),
     cmd('dobbel', 'Gooi maximaal zes dobbelstenen').addIntegerOption(o => o.setName('aantal').setDescription('Aantal dobbelstenen').setMinValue(1).setMaxValue(6)),
-    cmd('8ball', 'Vraag de magische Legion-bal om advies').addStringOption(o => o.setName('vraag').setDescription('Wat wil je weten?').setRequired(true).setMaxLength(200)),
+    cmd('8ball', 'Vraag de magische Bakarov-bal om advies').addStringOption(o => o.setName('vraag').setDescription('Wat wil je weten?').setRequired(true).setMaxLength(200)),
     cmd('steenpapier', 'Steen, papier, schaar tegen de bot').addStringOption(o => o.setName('keuze').setDescription('Jouw keuze').setRequired(true)
       .addChoices({ name: 'Steen', value: 'steen' }, { name: 'Papier', value: 'papier' }, { name: 'Schaar', value: 'schaar' }))
   ];

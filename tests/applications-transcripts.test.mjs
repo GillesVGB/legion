@@ -15,7 +15,7 @@ const memory = options => new Store({ ...config, ...options }, ':memory:');
 const stepAnswers = step => Object.fromEntries(applicationSteps[step].map(field => [field.id, field.id === 'age' ? '18' : `${field.label} antwoord`]));
 
 test('de sollicitatie bevat exact de twaalf opgegeven vragen in drie Discord-formulieren', () => {
-  assert.deepEqual(applicationFields.map(field => field.label), ['Naam', 'Leeftijd', 'Playtime', 'Voertuigen', 'Geld', 'Wapens', 'OW-ervaring', 'Motivatie', '3 goede eigenschappen', '3 minder goede eigenschappen', 'Waarom kies je voor Legion?', 'Wat kunnen wij van jou verwachten?']);
+  assert.deepEqual(applicationFields.map(field => field.label), ['Naam', 'Leeftijd', 'Playtime', 'Voertuigen', 'Geld', 'Wapens', 'OW-ervaring', 'Motivatie', '3 goede eigenschappen', '3 minder goede eigenschappen', 'Waarom kies je voor Bakarov?', 'Wat kunnen wij van jou verwachten?']);
   assert.deepEqual(applicationSteps.map(step => step.length), [5, 5, 2]);
   for (let step = 0; step < 3; step++) {
     const modal = applicationModal({ id: 'test', step, revision: step, answers: {} }).toJSON();
@@ -23,7 +23,7 @@ test('de sollicitatie bevat exact de twaalf opgegeven vragen in drie Discord-for
     assert.ok(modal.components.every(row => row.components[0].label.length <= 45));
   }
   const text = applicationText({});
-  assert.ok(text.startsWith('## Legion — Sollicitatie'));
+  assert.ok(text.startsWith('## Bakarov — Sollicitatie'));
   assert.ok(text.includes('Bedankt voor je tijd en moeite. We nemen je sollicitatie zo snel mogelijk door.'));
 });
 
@@ -96,7 +96,7 @@ test('berichten worden over meerdere paginas volledig en chronologisch opgehaald
 
 test('transcripts bevatten antwoorden, bijlagen en veilige HTML zonder uitvoerbare gebruikerscode', () => {
   const dossier = { kind: 'application', id: 'abc', owner_id: 'member', closed_by: 'staff', closed_at: 1000, status: 'accepted', payload: Object.fromEntries(applicationFields.map(field => [field.id, 'Voorbeeld'])) };
-  const documents = transcriptDocuments({ id: 'guild', name: 'Legion' }, { id: 'channel', name: 'sollicitatie' }, dossier, [{ id: '1', created: 999, author: '<script>alert(1)</script>', authorId: 'member', content: '<img src=x onerror=alert(1)>', embeds: [], attachments: [{ name: 'bewijs.png', url: 'https://cdn.discordapp.com/test' }] }]);
+  const documents = transcriptDocuments({ id: 'guild', name: 'Bakarov' }, { id: 'channel', name: 'sollicitatie' }, dossier, [{ id: '1', created: 999, author: '<script>alert(1)</script>', authorId: 'member', content: '<img src=x onerror=alert(1)>', embeds: [], attachments: [{ name: 'bewijs.png', url: 'https://cdn.discordapp.com/test' }] }]);
   assert.ok(documents.text.includes('OW-ervaring')); assert.ok(documents.text.includes('bewijs.png'));
   assert.ok(documents.html.includes('&lt;script&gt;')); assert.ok(!documents.html.includes('<script>'));
   assert.ok(!documents.html.includes('<img src=x')); assert.ok(documents.html.includes('Content-Security-Policy'));
@@ -111,7 +111,7 @@ test('mislukte transcriptuploads hervatten zonder reeds verstuurde bestanden te 
   const store = memory(); t.after(() => store.close());
   const dossier = store.reserveCase('ticket', 'member', { subject: 'Vraag' });
   store.bindCase(dossier.id, 'source'); store.openCase(dossier.id, 'intro'); store.closeCase(dossier.id, 'closed', 'staff');
-  const guild = { id: config.guildId, name: 'Legion', members: { me: { id: 'bot' } } };
+  const guild = { id: config.guildId, name: 'Bakarov', members: { me: { id: 'bot' } } };
   let uploads = 0; let sourceReads = 0; const posted = [];
   const source = { id: 'source', name: 'ticket', isTextBased: () => true, messages: { fetch: async () => { sourceReads++; return new Collection(); } } };
   const target = { id: config.ticketTranscriptChannelId, guildId: config.guildId, guild,

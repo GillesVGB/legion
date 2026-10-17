@@ -31,11 +31,12 @@ import {publishAbsencePanel,handleAbsencePanel,handleAbsenceSelection} from './a
 import {handleMemberOverview} from './member-overview.mjs';
 import {runMaintenanceJobs} from './maintenance.mjs';
 import {recordMessageEvent} from './message-logs.mjs';
+import {syncBotBranding} from './branding.mjs';
 import { quiet, isStaff, requireStaff, requireAdmin, requireTickets, configureGuild, publishPanel,
   createCase, requestCaseDecision, decideCase, startInterview, cleanupInterviews, cleanupClosedCases, warningMessage, staffLogChannel, warnLogChannel, writeWarnLog, reconcileCases } from './service.mjs';
 
 const base = loadConfig();
-console.log(`Legion versie ${JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version}: dashboard ${base.dashboardPublicURL ? 'via hostingadres' : 'via tunnel'}.`);
+console.log(`Bakarov versie ${JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version}: dashboard ${base.dashboardPublicURL ? 'via hostingadres' : 'via tunnel'}.`);
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMessageReactions], partials:[Partials.Message,Partials.Channel,Partials.Reaction,Partials.User], allowedMentions: quiet });
 const locks = new Locks();
 const contexts = new Map();
@@ -65,7 +66,7 @@ const dashboard = new Dashboard({ client, contexts, locks });
 function requireGames(ctx, interaction) {
   const { config } = ctx;
   assertUser(!config.gameChannelId || interaction.channelId === config.gameChannelId, `Gebruik deze functie in <#${config.gameChannelId}>.`);
-  assertUser(!config.gamesMembersOnly || interaction.member?.roles?.cache?.has(config.memberRoleId) || isStaff(interaction, config), 'Deze games zijn alleen voor Legion-leden.');
+  assertUser(!config.gamesMembersOnly || interaction.member?.roles?.cache?.has(config.memberRoleId) || isStaff(interaction, config), 'Deze games zijn alleen voor Bakarov-leden.');
 }
 function cooldown(interaction) {
   const now = Date.now();
@@ -104,7 +105,7 @@ async function handleWarn(ctx, interaction) {
     const member = await interaction.guild.members.fetch(user.id).catch(() => null);
     assertUser(member && !user.bot, 'Kies een echt lid dat in deze guild zit.');
     assertUser(user.id !== interaction.user.id, 'Je kunt jezelf geen gangwarn geven.');
-    assertUser(!config.memberRoleId || member.roles.cache.has(config.memberRoleId), 'Dit lid heeft geen Legion-ledenrol.');
+    assertUser(!config.memberRoleId || member.roles.cache.has(config.memberRoleId), 'Dit lid heeft geen Bakarov-ledenrol.');
     // Een gewone leidingrol kan geen administrator of hoger/even hoog stafflid waarschuwen.
     if (!interaction.memberPermissions.has('Administrator')) {
       const actor = await interaction.guild.members.fetch(interaction.user.id);
@@ -112,8 +113,8 @@ async function handleWarn(ctx, interaction) {
     }
     const { id, count } = store.addWarn(user.id, interaction.user.id, reason);
     const threshold = count >= config.warnThreshold ? `\n⚠️ **Drempel bereikt: ${count}/${config.warnThreshold} actieve warns. De leiding moet dit beoordelen.**` : '';
-    const logged = await writeWarnLog(ctx, interaction.guild, 'Legion | Gangwarn gegeven', `Lid: <@${user.id}>\nDoor: <@${interaction.user.id}>\nID: \`${id}\`\nReden: ${safeText(reason)}\nActieve warns: **${count}**${threshold}`);
-    const dm = await user.send({ embeds: [embed(config, 'Legion | Gangwarn', `Guild: **${safeText(interaction.guild.name)}**\nReden: ${safeText(reason)}\nActieve warns: **${count}**\nID: \`${id}\`\nNeem contact op met de leiding als je hierover vragen hebt.`)], allowedMentions: quiet }).then(() => true).catch(() => false);
+    const logged = await writeWarnLog(ctx, interaction.guild, 'Bakarov | Gangwarn gegeven', `Lid: <@${user.id}>\nDoor: <@${interaction.user.id}>\nID: \`${id}\`\nReden: ${safeText(reason)}\nActieve warns: **${count}**${threshold}`);
+    const dm = await user.send({ embeds: [embed(config, 'Bakarov | Gangwarn', `Guild: **${safeText(interaction.guild.name)}**\nReden: ${safeText(reason)}\nActieve warns: **${count}**\nID: \`${id}\`\nNeem contact op met de leiding als je hierover vragen hebt.`)], allowedMentions: quiet }).then(() => true).catch(() => false);
     await interaction.editReply({ content: `Gangwarn \`${id}\` opgeslagen voor <@${user.id}>. Actieve warns: **${count}**.${threshold}${dm ? '' : '\nDM niet afgeleverd; het lid kan /mijnwarns gebruiken.'}${logged ? '' : '\nDiscord-log mislukt; de gebeurtenis is lokaal opgeslagen.'}`, allowedMentions: quiet });
   } else {
     const id = interaction.options.getString('id', true).trim().toLowerCase();
@@ -138,14 +139,14 @@ async function games(ctx, interaction) {
   }
   if (name === 'leaderboard') {
     const top = store.leaderboard();
-    return interaction.reply({ allowedMentions: quiet, embeds: [embed(config, '🏆 Legion | Leaderboard', top.length ? top.map((entry, i) => `**${i + 1}.** <@${entry.user_id}> — **${entry.balance}** ${coins}`).join('\n') : 'Nog geen spelers. Begin met /daily.')] });
+    return interaction.reply({ allowedMentions: quiet, embeds: [embed(config, '🏆 Bakarov | Leaderboard', top.length ? top.map((entry, i) => `**${i + 1}.** <@${entry.user_id}> — **${entry.balance}** ${coins}`).join('\n') : 'Nog geen spelers. Begin met /daily.')] });
   }
   cooldown(interaction);
   if (name === 'fish') {
     await interaction.deferReply();
     const { caught, change, balance } = store.fish(user, randomInt(100));
     const earnings = change > 0 ? `Je verdient **${change} ${coins}**!` : caught.coins < 0 ? `Je verliest **${-change} ${coins}**.${change !== caught.coins ? ' Je saldo kan niet onder nul komen.' : ''}` : 'Je verdient deze keer geen coins.';
-    return interaction.editReply({ embeds: [embed(config, `${caught.icon} Legion | ${caught.title}`, `<@${user}> gaat vissen...\n\n${caught.text}\n\n**Zeldzaamheid:** ${caught.rarity}\n${earnings}\n**Nieuw saldo:** ${balance} ${coins}`).setColor({ good: 0x22C55E, bad: 0xEF4444, neutral: 0x5865F2 }[caught.kind])], allowedMentions: quiet });
+    return interaction.editReply({ embeds: [embed(config, `${caught.icon} Bakarov | ${caught.title}`, `<@${user}> gaat vissen...\n\n${caught.text}\n\n**Zeldzaamheid:** ${caught.rarity}\n${earnings}\n**Nieuw saldo:** ${balance} ${coins}`).setColor({ good: 0x22C55E, bad: 0xEF4444, neutral: 0x5865F2 }[caught.kind])], allowedMentions: quiet });
   }
   if (name === 'blackjack') {
     await interaction.deferReply();
@@ -163,28 +164,28 @@ async function games(ctx, interaction) {
     // Geen mutatie voordat Discord het antwoord heeft bevestigd.
     await interaction.deferReply();
     const result = store.coinflip(user, bet, guess, randomInt(2) === 0 ? 'kop' : 'munt');
-    return interaction.editReply({ embeds: [embed(config, '🪙 Legion | Coinflip', `<@${user}> koos **${guess}**. De munt landt op **${result.coin}**.\n${result.won ? `Je wint **${bet}** coins!` : `Je verliest **${bet}** coins.`}\nSaldo: **${result.balance} ${coins}**.`)], allowedMentions: quiet });
+    return interaction.editReply({ embeds: [embed(config, '🪙 Bakarov | Coinflip', `<@${user}> koos **${guess}**. De munt landt op **${result.coin}**.\n${result.won ? `Je wint **${bet}** coins!` : `Je verliest **${bet}** coins.`}\nSaldo: **${result.balance} ${coins}**.`)], allowedMentions: quiet });
   }
   if (name === 'dobbel') {
     const amount = interaction.options.getInteger('aantal') ?? 1;
     const dice = Array.from({ length: amount }, () => randomInt(1, 7));
-    return interaction.reply({ embeds: [embed(config, '🎲 Legion | Dobbelstenen', `<@${user}> gooit: **${dice.join(' · ')}**\nTotaal: **${dice.reduce((a, b) => a + b, 0)}**`)], allowedMentions: quiet });
+    return interaction.reply({ embeds: [embed(config, '🎲 Bakarov | Dobbelstenen', `<@${user}> gooit: **${dice.join(' · ')}**\nTotaal: **${dice.reduce((a, b) => a + b, 0)}**`)], allowedMentions: quiet });
   }
   if (name === '8ball') {
     const answers = config.content.eightBallAnswers;
-    return interaction.reply({ embeds: [embed(config, '🔮 Legion | 8-ball', `**${safeText(interaction.options.getString('vraag', true))}**\n\n${answers[randomInt(answers.length)]}`)], allowedMentions: quiet });
+    return interaction.reply({ embeds: [embed(config, '🔮 Bakarov | 8-ball', `**${safeText(interaction.options.getString('vraag', true))}**\n\n${answers[randomInt(answers.length)]}`)], allowedMentions: quiet });
   }
   const guess = interaction.options.getString('keuze', true);
   const chosen = ['steen', 'papier', 'schaar'][randomInt(3)];
   const beats = { steen: 'schaar', papier: 'steen', schaar: 'papier' };
-  return interaction.reply({ embeds: [embed(config, '✂️ Legion | Steen, papier, schaar', `<@${user}>: **${guess}**\nBot: **${chosen}**\n\n${guess === chosen ? 'Gelijkspel!' : beats[guess] === chosen ? 'Je wint!' : 'De bot wint!'}`)], allowedMentions: quiet });
+  return interaction.reply({ embeds: [embed(config, '✂️ Bakarov | Steen, papier, schaar', `<@${user}>: **${guess}**\nBot: **${chosen}**\n\n${guess === chosen ? 'Gelijkspel!' : beats[guess] === chosen ? 'Je wint!' : 'De bot wint!'}`)], allowedMentions: quiet });
 }
 
 async function handleCommand(ctx, interaction) {
   const { config } = ctx;
   const name = interaction.commandName;
   if (name === 'help') {
-    return interaction.reply({ ...privateReply, embeds: [embed(config, 'Legion | Commands', [
+    return interaction.reply({ ...privateReply, embeds: [embed(config, 'Bakarov | Commands', [
       `**Algemeen:** /info, /regels, /rangen, /mijnwarns${config.ticketsEnabled?', /solliciteren, /sollicitatiestatus':''}`,
       ...(!config.ticketsEnabled ? ['**Gang:** /planning, /planning-overzicht, /planning-annuleren, /activiteitencheck, /activiteitencheck-stop, /promotie, /gangpot, /afwezig, /afmelden'] : []),
       ...(config.ticketsEnabled ? ['**Tickets:** /ticket openen, /ticket sluiten'] : []),
@@ -210,7 +211,7 @@ async function handleCommand(ctx, interaction) {
     requireStaff(interaction, config);
     await interaction.deferReply(privateReply);
     const url = dashboard.issueLogin(interaction.user.id, interaction.guildId);
-    return interaction.editReply({ allowedMentions: quiet, content: 'Open je privé Legion-dashboard. De inloglink is twee minuten geldig en werkt één keer.',
+    return interaction.editReply({ allowedMentions: quiet, content: 'Open je privé Bakarov-dashboard. De inloglink is twee minuten geldig en werkt één keer.',
       components: [row(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel('Dashboard openen').setURL(url))] });
   }
   if (name === 'uitnodiging') {
@@ -223,7 +224,7 @@ async function handleCommand(ctx, interaction) {
     const link = notice.invite_code && notice.expires_at > Date.now() ? `https://discord.gg/${notice.invite_code}` : notice.status === 'joined' ? `https://discord.com/channels/${notice.target_guild_id}/${config.admission.inviteChannelId}` : null;
     assertUser(link, 'Je uitnodiging wordt nog voorbereid. Probeer over een minuut opnieuw of vraag de leiding.');
     return interaction.editReply({ content: notice.status === 'joined' ? 'Je bent al lid van de gangserver.' : 'Deze uitnodiging werkt uitsluitend met jouw Discord-account en vervalt na één gebruik.',
-      components: [row(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(notice.status === 'joined' ? 'Gangserver openen' : 'Legion joinen').setURL(link))], allowedMentions: quiet });
+      components: [row(new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(notice.status === 'joined' ? 'Gangserver openen' : 'Bakarov joinen').setURL(link))], allowedMentions: quiet });
   }
   if (['gangwarn', 'mijnwarns'].includes(name)) return handleWarn(ctx, interaction);
   if (gameCommands.has(name)) return games(ctx, interaction);
@@ -362,9 +363,9 @@ client.on(Events.InteractionCreate, async interaction => {
   const activeContext=contexts.get(interaction.guildId);let interactionError;
   if(activeContext)recordInteraction(activeContext,interaction,'started');
   try {
-    assertUser(interaction.inGuild(), 'Gebruik deze bot in een Legion-guild.');
+    assertUser(interaction.inGuild(), 'Gebruik deze bot in een Bakarov-guild.');
     const ctx = contexts.get(interaction.guildId);
-    assertUser(ctx, 'Deze guild is niet ingesteld voor Legion.');
+    assertUser(ctx, 'Deze guild is niet ingesteld voor Bakarov.');
     assertUser(ctx.ready||interaction.commandName==='botstatus', 'De bot start nog op. Probeer over een paar seconden opnieuw.');
     if (interaction.isChatInputCommand()) await handleCommand(ctx, interaction);
     else if (interaction.isButton()) await handleButton(ctx, interaction);
@@ -384,13 +385,15 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 client.once(Events.ClientReady, async ready => {
-  console.log(`Legion is online als ${ready.user.tag}.`);
+  await syncBotBranding(client,contexts).catch(error=>console.error(`Bakarov botprofiel bijwerken mislukt (${error.code??error.name}); wordt bij de volgende start opnieuw geprobeerd.`));
+  console.log(`Bakarov is online als ${ready.user.tag}.`);
   for (const [guildId, ctx] of contexts) {
     const guild = client.guilds.cache.get(guildId);
     if (!guild) { console.error(`Guild ${guildId}: nodig de bot eerst uit in deze guild.`); continue; }
     try {
       await syncCommands(ctx,guild).catch(error=>console.error(`Guild ${guildId}: commands bijwerken wacht op herstart (${error.code??error.name}).`));
       await guild.members.fetchMe();
+      if(/^legion(?:\s*\|.*)?$/i.test(guild.members.me.nickname||''))await guild.members.me.setNickname('Bakarov','Bakarov huisstijl').catch(error=>console.error(`Guild ${guildId}: botbijnaam bijwerken mislukt (${error.code??error.name}).`));
       await guild.roles.fetch();
       await refreshRecruitment(ctx, guild);
       await reconcileCases(ctx, guild);

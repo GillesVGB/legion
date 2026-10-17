@@ -5,7 +5,7 @@ import { refreshMembers } from './members.mjs';
 import {editIfChanged} from './message-updates.mjs';
 const writes = new WeakMap();
 const isRoster = (message, botId) => message?.author.id === botId && message.embeds?.length &&
-  message.embeds.every(card => /^Legion — Ledenlijst(?: \(vervolg\))?$/.test(card.title));
+  message.embeds.every(card => /^(?:Bakarov|Legion) — Ledenlijst(?: \(vervolg\))?$/.test(card.title));
 
 async function findRosterMessages(channel, botId) {
   const found = []; let before;
@@ -47,12 +47,12 @@ export function rosterCards(config, guild) {
     chunks.forEach((part, i) => fields.push({ name: `${safeText(role.name)} · ${members.length}${i ? ' (vervolg)' : ''}`.slice(0, 250), value: part }));
   }
   const cards = [];
-  let card = embed(config, 'Legion — Ledenlijst', `**${total} leden** verdeeld over de gangrangen.\nElk lid staat bij zijn hoogste rang. De lijst werkt automatisch bij.`);
+  let card = embed(config, 'Bakarov — Ledenlijst', `**${total} leden** verdeeld over de gangrangen.\nElk lid staat bij zijn hoogste rang. De lijst werkt automatisch bij.`);
   let size = 400, count = 0;
   for (const field of fields) {
     const length = field.name.length + field.value.length;
     if (size + length > 5500 || count >= 25) {
-      cards.push(card); card = embed(config, 'Legion — Ledenlijst (vervolg)', 'Automatisch bijgewerkt.'); size = 200; count = 0;
+      cards.push(card); card = embed(config, 'Bakarov — Ledenlijst (vervolg)', 'Automatisch bijgewerkt.'); size = 200; count = 0;
     }
     card.addFields(field); size += length; count++;
   }

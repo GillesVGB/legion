@@ -1,3 +1,4 @@
+import {canonicalBrandText} from './branding.mjs';
 import {randomBytes} from 'node:crypto';
 import {embed,safeText} from './ui.mjs';
 import {quiet,staffLogChannel} from './service.mjs';
@@ -43,8 +44,8 @@ export async function flushAuditLogs(ctx,guild,now=Date.now()){
         const history=delivered.length<payloads.length?await channel.messages.fetch({limit:100}):null;
         for(let part=0;part<payloads.length;part++){
           if(delivered[part])continue;
-          const marker=`Legion • Log ${job.id} • ${part+1}/${payloads.length}`,legacy=`Legion • Log ${job.id}`;
-          let posted=[...(history?.values()||[])].find(item=>item.author.id===guild.members.me.id&&item.embeds?.some(card=>card.footer?.text===marker||(part===0&&card.footer?.text===legacy)));
+          const marker=`Bakarov • Log ${job.id} • ${part+1}/${payloads.length}`,legacy=`Bakarov • Log ${job.id}`;
+          let posted=[...(history?.values()||[])].find(item=>item.author.id===guild.members.me.id&&item.embeds?.some(card=>canonicalBrandText(card.footer?.text)===marker||(part===0&&canonicalBrandText(card.footer?.text)===legacy)));
           if(!posted)posted=await channel.send({...payloads[part],nonce:`al:${job.id}:${part}:${channel.id.slice(-4)}`,enforceNonce:true,allowedMentions:quiet});
           delivered[part]=posted.id;ctx.store.db.prepare('UPDATE audit_deliveries SET message_ids=?,last_error=NULL WHERE id=?').run(JSON.stringify(delivered),job.id);
         }

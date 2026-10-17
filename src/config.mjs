@@ -19,8 +19,8 @@ export function loadConfig(env = process.env, requireDiscord = true) {
   };
   const token = (env.DISCORD_TOKEN ?? '').trim();
   if (requireDiscord && (!token || token.includes('VUL_HIER'))) errors.push('DISCORD_TOKEN: vul je eigen bot-token in je lokale .env in.');
-  const color = env.EMBED_COLOR || '#B91C1C';
-  if (!/^#[\da-f]{6}$/i.test(color)) errors.push('EMBED_COLOR: gebruik bijvoorbeeld #B91C1C.');
+  const color = !env.EMBED_COLOR || /^#b91c1c$/i.test(env.EMBED_COLOR) ? '#D6A51A' : env.EMBED_COLOR;
+  if (!/^#[\da-f]{6}$/i.test(color)) errors.push('EMBED_COLOR: gebruik bijvoorbeeld #D6A51A.');
   const hostingPath = resolve(ROOT, 'hosting.json');
   const hosting = existsSync(hostingPath) ? JSON.parse(readFileSync(hostingPath, 'utf8')) : {};
   const hostedURL = String(env.SERVER_PORT || '') === String(hosting.port) ? hosting.dashboardURL : '';

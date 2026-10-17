@@ -2,17 +2,21 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, ModalBuilde
 import { handValue, showCards } from './cards.mjs';
 import { applicationSteps, applicationIntro, applicationThanks, applicationGuidance, applicationTemplate } from './application.mjs';
 import { recruitmentState, applicationWaitingNotice } from './recruitment.mjs';
+import {brandLogoURL} from './branding.mjs';
 
 export const safeText = value => escapeMarkdown(String(value)).replaceAll('@', '@\u200b');
 export const row = (...buttons) => new ActionRowBuilder().addComponents(...buttons);
 export const button = (id, label, style = ButtonStyle.Secondary) => new ButtonBuilder().setCustomId(id).setLabel(label).setStyle(style);
 export function embed(config, title, description) {
-  return new EmbedBuilder().setColor(config.color).setTitle(title).setDescription(description)
+  const card=new EmbedBuilder().setColor(config.color).setTitle(title).setDescription(description)
     .setFooter({ text: `${config.content.gangName} • ${config.content.serverName}` }).setTimestamp();
+  const logo=brandLogoURL(config);
+  if(logo)card.setThumbnail(logo);
+  return card;
 }
 export function panel(config, type = 'alles', recruitment) {
   const content = config.content;
-  if(config.guildId==='1555685630640652338')return{embeds:[embed(config,`${content.gangName} | Informatie`,`${content.tagline}\n\nSollicitaties en tickets worden in de Legion-communityserver geopend. Gebruik hier /gangpot, /planning en /afwezig voor gangzaken.`)],components:[]};
+  if(config.guildId==='1555685630640652338')return{embeds:[embed(config,`${content.gangName} | Informatie`,`${content.tagline}\n\nSollicitaties en tickets worden in de Bakarov-communityserver geopend. Gebruik hier /gangpot, /planning en /afwezig voor gangzaken.`)],components:[]};
   if (type === 'info') return { embeds: [embed(config, `${content.gangName} | Informatie`, `${content.tagline}\n\n${content.information}`)], components: [] };
   const combined = type === 'alles';
   const title = combined ? `${content.gangName} | Welkom bij de familie` : type === 'tickets' ? `${content.gangName} | Tickets` : `${content.gangName} | Solliciteren`;
@@ -32,13 +36,13 @@ export function panel(config, type = 'alles', recruitment) {
 const input = (id, label, style, maxLength, placeholder) => new TextInputBuilder()
   .setCustomId(id).setLabel(label).setStyle(style).setRequired(true).setMaxLength(maxLength).setPlaceholder(placeholder);
 export function ticketModal() {
-  return new ModalBuilder().setCustomId('ticket:submit').setTitle('Legion | Ticket openen').addComponents(
+  return new ModalBuilder().setCustomId('ticket:submit').setTitle('Bakarov | Ticket openen').addComponents(
     new ActionRowBuilder().addComponents(input('subject', 'Onderwerp', TextInputStyle.Short, 100, 'Waar wil je het over hebben?')),
     new ActionRowBuilder().addComponents(input('details', 'Toelichting', TextInputStyle.Paragraph, 1000, 'Beschrijf je vraag of probleem.')));
 }
 export function applicationModal(draft = { id: 'preview', step: 0, revision: 0, answers: {} }) {
   const modal = new ModalBuilder().setCustomId(`application:submit:${draft.id}:${draft.step}:${draft.revision}`)
-    .setTitle(`Legion | Solliciteren ${draft.step + 1}/3`);
+    .setTitle(`Bakarov | Solliciteren ${draft.step + 1}/3`);
   for (const field of applicationSteps[draft.step]) {
     const component = input(field.id, field.label, field.paragraph ? TextInputStyle.Paragraph : TextInputStyle.Short, field.max, field.placeholder);
     if (draft.answers[field.id]) component.setValue(draft.answers[field.id]);
@@ -47,7 +51,7 @@ export function applicationModal(draft = { id: 'preview', step: 0, revision: 0, 
   return modal;
 }
 export function applicationProgress(config, draft) {
-  return { embeds: [embed(config, 'Legion — Sollicitatie', `Deel **${draft.step}/3** is opgeslagen. Klik hieronder om de volgende vragen in te vullen.\n\nJe kunt binnen 24 uur verdergaan met /solliciteren.`)], components: [row(
+  return { embeds: [embed(config, 'Bakarov — Sollicitatie', `Deel **${draft.step}/3** is opgeslagen. Klik hieronder om de volgende vragen in te vullen.\n\nJe kunt binnen 24 uur verdergaan met /solliciteren.`)], components: [row(
     button(`application:continue:${draft.id}:${draft.step}:${draft.revision}`, `Verder met deel ${draft.step + 1}/3`, ButtonStyle.Primary)
   )] };
 }
@@ -63,7 +67,7 @@ export function caseMessages(config, dossier, recruitment) {
   config = { ...config, color: dossier.status === 'accepted' ? 0x22C55E : ['rejected','closed'].includes(dossier.status) ? 0xEF4444 : recruitment?.color ?? (config.recruitment ? 0xF59E0B : 0x22C55E) };
   if (dossier.kind === 'application' && dossier.payload.template) return [{
     content: `<@${dossier.owner_id}> Vul de template hieronder in en plaats je antwoorden in dit kanaal.`,
-    embeds: [withApplicationWaitingNotice(embed(config, 'Legion — Sollicitatie', applicationTemplate), recruitment)],
+    embeds: [withApplicationWaitingNotice(embed(config, 'Bakarov — Sollicitatie', applicationTemplate), recruitment)],
     components: [applicationControls(dossier)]
   }];
   if (dossier.kind !== 'application' || !Object.hasOwn(dossier.payload, 'age')) {
@@ -72,7 +76,7 @@ export function caseMessages(config, dossier, recruitment) {
     return [message];
   }
   return applicationSteps.map((fields, step) => {
-    const card = embed(config, 'Legion — Sollicitatie', step === 0 ? `${applicationIntro}\n\nLid: <@${dossier.owner_id}> • Dossier: \`${dossier.id}\`` : step === 2 ? applicationThanks : 'Legion — Sollicitatie (vervolg)');
+    const card = embed(config, 'Bakarov — Sollicitatie', step === 0 ? `${applicationIntro}\n\nLid: <@${dossier.owner_id}> • Dossier: \`${dossier.id}\`` : step === 2 ? applicationThanks : 'Bakarov — Sollicitatie (vervolg)');
     for (const field of fields) {
       const value = safeText(dossier.payload[field.id]);
       for (let offset = 0, part = 0; offset < value.length; part++) {
@@ -99,8 +103,8 @@ export function caseMessage(config, dossier) {
     ['RP-naam', dossier.payload.name], ['Ervaring', dossier.payload.experience],
     ['Motivatie', dossier.payload.motivation], ['Beschikbaarheid', dossier.payload.availability], ['Regels', dossier.payload.rules]
   ] : dossier.payload.subject ? [['Onderwerp', dossier.payload.subject], ['Toelichting', dossier.payload.details ?? 'Bespreek je vraag hieronder.']] : [];
-  const card = embed(config, applicant ? '🛡️ Legion | Sollicitatie' : '📩 Legion | Ticket',
-    `Lid: <@${dossier.owner_id}>\nDossier: \`${dossier.id}\`\n\n${applicant ? 'Bespreek dit dossier in dit privé kanaal.' : 'Welkom! Typ je vraag of probleem hieronder. De Legion-leiding helpt je zo snel mogelijk.'}`);
+  const card = embed(config, applicant ? '🛡️ Bakarov | Sollicitatie' : '📩 Bakarov | Ticket',
+    `Lid: <@${dossier.owner_id}>\nDossier: \`${dossier.id}\`\n\n${applicant ? 'Bespreek dit dossier in dit privé kanaal.' : 'Welkom! Typ je vraag of probleem hieronder. De Bakarov-leiding helpt je zo snel mogelijk.'}`);
   for (const [name, value] of info) card.addFields({ name, value: safeText(value).slice(0, 1024) });
   return {
     embeds: [card], components: [applicant ? applicationControls(dossier) : row(button(`ticket:askclose:${dossier.id}`, 'Ticket sluiten', ButtonStyle.Danger))]

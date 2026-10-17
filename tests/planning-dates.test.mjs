@@ -42,8 +42,8 @@ test('morgenavond wordt als concrete datum opgeslagen en een voorbij tijdstip sc
   const ctx=f.contexts.values().next().value,guild=f.guilds.get(ctx.config.guildId),member=guild.members.cache.get(ACTOR);
   const interaction={guild,guildId:guild.id,channelId:ctx.config.logChannelId,user:member.user,member,memberPermissions:member.permissions};
   const now=Date.parse('2026-10-09T20:00:00Z');
-  await assert.rejects(createActivity(ctx,interaction,{date:'deze avond',time:'20:30',location:'Legion HQ'},now),/toekomst/);
-  const result=await createActivity(ctx,interaction,{date:'morgenavond',time:'20:30',location:'Legion HQ'},now);
+  await assert.rejects(createActivity(ctx,interaction,{date:'deze avond',time:'20:30',location:'Bakarov HQ'},now),/toekomst/);
+  const result=await createActivity(ctx,interaction,{date:'morgenavond',time:'20:30',location:'Bakarov HQ'},now);
   assert.equal(activityById(ctx,result.id).starts_at,Date.parse('2026-10-10T18:30:00Z'));
   assert.ok(result.posted.content.includes('**Datum:** Morgenavond (10/10/2026)'));assert.equal(result.posted.embeds.length,0);
 });
@@ -54,9 +54,9 @@ test('het gekozen avondlabel blijft bij bijwerken en herstarten bewaard; vaste d
   const config={...source.config,dataDir:folder};const first=new Store(config),ctx={...source,config,store:first};
   const interaction={guild,guildId:guild.id,channelId:config.logChannelId,user:member.user,member,memberPermissions:member.permissions};
   const now=Date.parse('2026-10-09T12:00:00Z');
-  const tonight=await createActivity(ctx,interaction,{date:'deze avond',time:'20:30',location:'Legion HQ'},now);
-  const tomorrow=await createActivity(ctx,interaction,{date:'morgenavond',time:'20:30',location:'Legion HQ'},now);
-  const explicit=await createActivity(ctx,interaction,{date:'12-10-2026',time:'20:30',location:'Legion HQ'},now);
+  const tonight=await createActivity(ctx,interaction,{date:'deze avond',time:'20:30',location:'Bakarov HQ'},now);
+  const tomorrow=await createActivity(ctx,interaction,{date:'morgenavond',time:'20:30',location:'Bakarov HQ'},now);
+  const explicit=await createActivity(ctx,interaction,{date:'12-10-2026',time:'20:30',location:'Bakarov HQ'},now);
   assert.ok(tonight.posted.content.includes('**Datum:** Deze avond (09/10/2026)'));
   assert.ok(explicit.posted.content.includes('**Datum:** 12/10/2026\n'));
   first.close();const second=new Store(config);ctx.store=second;
@@ -71,7 +71,7 @@ test('oude planningen zonder avondlabel worden zonder verlies gemigreerd',t=>{
   const source=f.contexts.values().next().value,folder=mkdtempSync(join(tmpdir(),'legion-planning-migration-')),config={...source.config,dataDir:folder};
   const old=new Store(config);
   old.db.exec('ALTER TABLE activities DROP COLUMN date_label; PRAGMA user_version=7;');
-  old.db.prepare('INSERT INTO activities(id,title,description,location,starts_at,ends_at,creator_id,channel_id) VALUES(?,?,?,?,?,?,?,?)').run('0123456789ab','Oude planning','','Legion HQ',Date.parse('2026-10-12T18:30:00Z'),Date.parse('2026-10-12T20:30:00Z'),ACTOR,config.planningChannelId);
+  old.db.prepare('INSERT INTO activities(id,title,description,location,starts_at,ends_at,creator_id,channel_id) VALUES(?,?,?,?,?,?,?,?)').run('0123456789ab','Oude planning','','Bakarov HQ',Date.parse('2026-10-12T18:30:00Z'),Date.parse('2026-10-12T20:30:00Z'),ACTOR,config.planningChannelId);
   old.close();
   const upgraded=new Store(config),ctx={...source,config,store:upgraded};
   t.after(()=>{upgraded.close();assert.ok(folder.startsWith(join(tmpdir(),'legion-planning-migration-')));rmSync(folder,{recursive:true,force:true});});

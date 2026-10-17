@@ -14,10 +14,10 @@ const snapshot=(f,id)=>JSON.parse(f.ctx.store.db.prepare('SELECT snapshot FROM m
 const size=card=>(card.title?.length||0)+(card.description?.length||0)+(card.footer?.text?.length||0)+(card.fields||[]).reduce((n,item)=>n+item.name.length+item.value.length,0);
 
 test('verwijderde berichten tonen hun tekst, auteur, kanaal en bijlagen met een Nederlandse titel',async t=>{
-  const f=fixture(t),item=message(f,'Hallo Legion!\nIk ben erbij.');item.attachments.set('file',{name:'foto.png',url:'https://cdn.discordapp.com/attachments/1/2/foto.png',size:123});
+  const f=fixture(t),item=message(f,'Hallo Bakarov!\nIk ben erbij.');item.attachments.set('file',{name:'foto.png',url:'https://cdn.discordapp.com/attachments/1/2/foto.png',size:123});
   const id=recordMessageEvent(f.ctx,'message.delete',item);await flushAuditLogs(f.ctx,f.guild,NOW);
   const cards=[...f.channel.posted.values()].flatMap(value=>value.embeds),text=JSON.stringify(cards);
-  assert.ok(cards.some(card=>card.title==='🗑️ Bericht verwijderd'));assert.ok(text.includes('Hallo Legion!')&&text.includes('Ik ben erbij.')&&text.includes(OTHER)&&text.includes(item.channelId)&&text.includes('foto.png'));
+  assert.ok(cards.some(card=>card.title==='🗑️ Bericht verwijderd'));assert.ok(text.includes('Hallo Bakarov!')&&text.includes('Ik ben erbij.')&&text.includes(OTHER)&&text.includes(item.channelId)&&text.includes('foto.png'));
   assert.equal(snapshot(f,id).after.text,item.content);assert.ok(!text.includes('"user":'));
 });
 test('bewerkte berichten tonen de oude en nieuwe tekst; een onbekende oude inhoud wordt niet verzonnen',t=>{

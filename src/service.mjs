@@ -8,14 +8,15 @@ import { refreshRecruitment, requireApplicationsOpen, requireRecruitmentSpace, a
 import { deliverAcceptance } from './admissions.mjs';
 import { requireOpenCase, recoverGuildCases } from './case-recovery.mjs';
 import {editIfChanged} from './message-updates.mjs';
+import {canonicalBrandText,brandLogoURL} from './branding.mjs';
 
 export const quiet = { parse: [], repliedUser: false };
 export const isAdmin = interaction => interaction.memberPermissions?.has(P.Administrator) ?? false;
 export const isStaff = (interaction, config) => isAdmin(interaction) || config.staffRoleIds.some(id =>
   interaction.member?.roles?.cache?.has(id) ?? interaction.member?.roles?.includes?.(id));
-export function requireStaff(interaction, config) { assertUser(isStaff(interaction, config), 'Alleen de Legion-leiding mag deze actie uitvoeren.'); }
+export function requireStaff(interaction, config) { assertUser(isStaff(interaction, config), 'Alleen de Bakarov-leiding mag deze actie uitvoeren.'); }
 export function requireAdmin(interaction) { assertUser(isAdmin(interaction), 'Alleen een Discord-administrator mag de bot inrichten.'); }
-export function requireTickets(config) { assertUser(config.ticketsEnabled, 'Tickets zijn alleen beschikbaar in de ticketguild van Legion.'); }
+export function requireTickets(config) { assertUser(config.ticketsEnabled, 'Tickets zijn alleen beschikbaar in de ticketguild van Bakarov.'); }
 
 export function privateOverwrites(guild, config, owner) {
   const allow = [P.ViewChannel, P.SendMessages, P.ReadMessageHistory, P.EmbedLinks, P.AttachFiles];
@@ -121,28 +122,28 @@ export async function configureGuild(ctx, interaction) {
   if (memberRole) config.memberRoleId = memberRole.id;
   save();
   for (const [key, name] of [
-    ...(config.ticketsEnabled ? [['ticketCategoryId', 'LEGION | TICKETS']] : []),
-    ['applicationCategoryId', 'LEGION | SOLLICITATIES']
+    ...(config.ticketsEnabled ? [['ticketCategoryId', 'BAKAROV | TICKETS']] : []),
+    ['applicationCategoryId', 'BAKAROV | SOLLICITATIES']
   ]) {
     const existing = config[key] ? await guild.channels.fetch(config[key]).catch(() => null) : null;
     assertUser(!existing || existing.type === ChannelType.GuildCategory, `${key} moet een categorie zijn.`);
     if (!existing) {
       const created = await guild.channels.create({ name, type: ChannelType.GuildCategory,
-        permissionOverwrites: privateOverwrites(guild, config), reason: 'Legion-bot inrichten' });
+        permissionOverwrites: privateOverwrites(guild, config), reason: 'Bakarov-bot inrichten' });
       config[key] = created.id;
       save();
     }
   }
   if (!config.logChannelId || !await guild.channels.fetch(config.logChannelId).catch(() => null)) {
-    const channel = await guild.channels.create({ name: 'legion-logs', type: ChannelType.GuildText,
-      permissionOverwrites: privateOverwrites(guild, config), reason: 'Privé Legion-logkanaal' });
+    const channel = await guild.channels.create({ name: 'bakarov-logs', type: ChannelType.GuildText,
+      permissionOverwrites: privateOverwrites(guild, config), reason: 'Privé Bakarov-logkanaal' });
     config.logChannelId = channel.id;
     save();
   }
   await staffLogChannel(guild, config);
   if (config.panelChannelId) await publishPanel(ctx, guild, config.panelChannelId);
   ctx.store.audit('guild.configure', interaction.user.id, { staffRole: staffRole.id, memberRole: config.memberRoleId });
-  await interaction.editReply({ content: `Legion is ingericht in deze guild.\nLeiding: <@&${staffRole.id}>\nSollicitaties: <#${config.applicationCategoryId}>${config.ticketsEnabled ? `\nTickets: <#${config.ticketCategoryId}>` : ''}\nLogs: <#${config.logChannelId}>\n${config.panelChannelId ? `Paneel: <#${config.panelChannelId}>` : 'Plaats het paneel met /setup paneel:alles in het gewenste kanaal.'}`, allowedMentions: quiet });
+  await interaction.editReply({ content: `Bakarov is ingericht in deze guild.\nLeiding: <@&${staffRole.id}>\nSollicitaties: <#${config.applicationCategoryId}>${config.ticketsEnabled ? `\nTickets: <#${config.ticketCategoryId}>` : ''}\nLogs: <#${config.logChannelId}>\n${config.panelChannelId ? `Paneel: <#${config.panelChannelId}>` : 'Plaats het paneel met /setup paneel:alles in het gewenste kanaal.'}`, allowedMentions: quiet });
 }
 
 export async function createCase(ctx, interaction, kind, payload) {
@@ -168,8 +169,8 @@ export async function createCase(ctx, interaction, kind, payload) {
   try {
     channel = await interaction.guild.channels.create({ name: caseChannelName(kind, interaction.user),
       type: ChannelType.GuildText, parent: parent.id,
-      topic: `Legion dossier:${dossier.id} | ${kind} | eigenaar:${interaction.user.id}`,
-      permissionOverwrites: privateOverwrites(interaction.guild, config, interaction.user.id), reason: 'Legion privé dossier' });
+      topic: `Bakarov dossier:${dossier.id} | ${kind} | eigenaar:${interaction.user.id}`,
+      permissionOverwrites: privateOverwrites(interaction.guild, config, interaction.user.id), reason: 'Bakarov privé dossier' });
     store.bindCase(dossier.id, channel.id);
     const message = await postCaseMessages(channel, config, dossier, ctx.recruitment);
     store.openCase(dossier.id, message.id);
@@ -180,7 +181,7 @@ export async function createCase(ctx, interaction, kind, payload) {
     // Na een geslaagde creatie blijft het dossier geldig als alleen de reactie mislukt.
     if (store.caseById(dossier.id)?.status === 'open') throw error;
     if (channel) {
-      const deleted = await channel.delete('Onvolledig Legion-dossier opruimen').then(() => true).catch(() => false);
+      const deleted = await channel.delete('Onvolledig Bakarov-dossier opruimen').then(() => true).catch(() => false);
       if (!deleted) throw new UserError(`Het dossier is deels aangemaakt: <#${channel.id}>. Vraag de leiding om dit te controleren; na herstart probeert de bot het te herstellen.`);
     }
     store.closeCase(dossier.id, 'failed', interaction.user.id);
@@ -228,12 +229,12 @@ export async function startInterview(ctx, interaction, id) {
         permissionOverwrites: [{ id: guild.id, deny: [P.ViewChannel, P.Connect] },
           { id: guild.members.me.id, allow: [...allow, P.ManageChannels, P.ManageRoles] },
           ...ctx.config.staffRoleIds.map(role => ({ id: role, allow })), { id: dossier.owner_id, allow }],
-        reason: `Legion sollicitatiegesprek ${id}` });
+        reason: `Bakarov sollicitatiegesprek ${id}` });
     }
     assertUser(channel.guildId === guild.id && channel.type === ChannelType.GuildVoice, 'Het gesprekskanaal hoort niet bij deze guild.');
     ctx.store.bindInterview(id, channel.id, interaction.user.id);
     await interaction.channel.send({ content: `<@${dossier.owner_id}>`,
-      embeds: [embed(ctx.config, 'Legion — Sollicitatiegesprek', `De leiding wil een gesprek met je starten.\n\n**Spraakkanaal:** <#${channel.id}>\n**Gestart door:** <@${interaction.user.id}>\n\nAlleen jij en de leiding hebben toegang. Jullie kunnen ook hier verder praten.`).setColor(0xF59E0B)],
+      embeds: [embed(ctx.config, 'Bakarov — Sollicitatiegesprek', `De leiding wil een gesprek met je starten.\n\n**Spraakkanaal:** <#${channel.id}>\n**Gestart door:** <@${interaction.user.id}>\n\nAlleen jij en de leiding hebben toegang. Jullie kunnen ook hier verder praten.`).setColor(0xF59E0B)],
       components: [row(new ButtonBuilder().setLabel('Gesprek openen').setStyle(ButtonStyle.Link).setURL(`https://discord.com/channels/${guild.id}/${channel.id}`))],
       allowedMentions: { parse: [], users: [dossier.owner_id] } });
   }
@@ -250,7 +251,7 @@ export async function cleanupInterviews(ctx, guild) {
           (channel.name.startsWith('gesprek-') && channel.parentId === ctx.config.applicationCategoryId &&
             channel.permissionOverwrites.cache.has(dossier.owner_id) && channel.permissionOverwrites.cache.has(guild.members.me.id));
         assertUser(channel.guildId === guild.id && channel.type === ChannelType.GuildVoice && owned, 'Onverwacht gesprekskanaal; opruimen gestopt.');
-        await channel.delete('Legion sollicitatie afgehandeld');
+        await channel.delete('Bakarov sollicitatie afgehandeld');
       }
       ctx.store.endInterview(interview.case_id);
     } catch (error) { console.error(`Guild ${guild.id}: gesprek opruimen wacht op herhaling (${error.code ?? error.name}).`); }
@@ -280,7 +281,7 @@ export async function decideCase(ctx, interaction, id, decision) {
       requireRecruitmentSpace(ctx);
     }
     if (Object.hasOwn(dossier.payload, 'age')) assertUser(parseAge(dossier.payload.age) !== null && parseAge(dossier.payload.age) >= (config.recruitment?.minimumAge ?? 16), 'Deze sollicitant voldoet niet aan de minimale leeftijd.');
-    await member.roles.add(role, `Legion sollicitatie ${dossier.id} geaccepteerd`);
+    await member.roles.add(role, `Bakarov sollicitatie ${dossier.id} geaccepteerd`);
   }
   const status = decision === 'close' ? 'closed' : decision === 'accept' ? 'accepted' : 'rejected';
   // Sluiten faalt als de bot geen kanaalrechten heeft; het dossier blijft dan open.
@@ -313,10 +314,10 @@ export async function removeClosedCase(ctx, client, dossier, beforeDelete) {
     const channel = await guild.channels.fetch(dossier.channel_id).catch(error => { if (error.code === 10003) return null; throw error; });
     if (channel) {
       if (delivery?.state === 'unavailable') { ctx.store.retryCaseCleanup(dossier.id); return false; }
-      assertUser(channel.guildId === ctx.config.guildId && channel.type === ChannelType.GuildText && channel.topic?.includes(`dossier:${dossier.id} |`), 'Het kanaal hoort niet bij dit Legion-dossier.');
+      assertUser(channel.guildId === ctx.config.guildId && channel.type === ChannelType.GuildText && channel.topic?.includes(`dossier:${dossier.id} |`), 'Het kanaal hoort niet bij dit Bakarov-dossier.');
       if (!delivery) await saveLocalTranscript(ctx, client, dossier, channel);
       if (beforeDelete) await beforeDelete();
-      await channel.delete(`Legion dossier ${dossier.id}: transcript opgeslagen`);
+      await channel.delete(`Bakarov dossier ${dossier.id}: transcript opgeslagen`);
     }
     ctx.store.finishCaseCleanup(dossier.id);
     return true;
@@ -344,11 +345,11 @@ export async function reconcileCases(ctx, guild) {
     const owner = await guild.members.fetch(dossier.owner_id).catch(() => null);
     if (owner) {
       const name = caseChannelName(dossier.kind, owner.user);
-      if (channel.name !== name) await channel.setName(name, 'Legion ticketnaam met gebruikersnaam');
+      if (channel.name !== name) await channel.setName(name, 'Bakarov ticketnaam met gebruikersnaam');
       const interview = ctx.store.interview(dossier.id);
       const voice = interview ? channels.get(interview.channel_id) : null;
       if (voice?.type === ChannelType.GuildVoice && voice.guildId === guild.id && voice.name !== caseChannelName('interview', owner.user)) {
-        await voice.setName(caseChannelName('interview', owner.user), 'Legion gespreksnaam met gebruikersnaam');
+        await voice.setName(caseChannelName('interview', owner.user), 'Bakarov gespreksnaam met gebruikersnaam');
       }
     }
     if (dossier.status === 'creating') {
@@ -360,8 +361,12 @@ export async function reconcileCases(ctx, guild) {
     } else {
       const original = await channel.messages.fetch(dossier.message_id).catch(() => null);
       if (original?.author.id === guild.members.me.id) {
-        await original.edit({ embeds: original.embeds.map((card, index) => {
+        await editIfChanged(original,{ embeds: original.embeds.map((card, index) => {
           const updated = EmbedBuilder.from(card).setColor(ctx.recruitment?.color ?? 0x22C55E);
+          if(card.title)updated.setTitle(canonicalBrandText(card.title));
+          updated.setFooter({text:`${ctx.config.content.gangName} • ${ctx.config.content.serverName}`});
+          const logo=brandLogoURL(ctx.config);if(logo)updated.setThumbnail(logo);
+          if(dossier.kind==='application'&&dossier.payload.template&&index===0)updated.setDescription(caseMessages(ctx.config,dossier,ctx.recruitment)[0].embeds[0].data.description);
           return dossier.kind === 'application' && index === 0 ? withApplicationWaitingNotice(updated, ctx.recruitment) : updated;
         }),
           ...(dossier.kind === 'application' ? { components: [applicationControls(dossier)] } : {}) });
@@ -373,7 +378,7 @@ export async function reconcileCases(ctx, guild) {
 
 export function warningMessage(config, store, user) {
   const warnings = store.warnings(user).slice(0, 15);
-  const card = embed(config, 'Legion | Gangwarns', `Lid: <@${user}>\nActieve warns: **${store.warnCount(user)}**\n\n${warnings.length ? 'Hieronder de meest recente 15 warns. Ingetrokken warns blijven in de historie.' : 'Dit lid heeft geen gangwarns.'}`);
+  const card = embed(config, 'Bakarov | Gangwarns', `Lid: <@${user}>\nActieve warns: **${store.warnCount(user)}**\n\n${warnings.length ? 'Hieronder de meest recente 15 warns. Ingetrokken warns blijven in de historie.' : 'Dit lid heeft geen gangwarns.'}`);
   // Embed-maximaal 6000 tekens: toon compacte redenen, volledige tekst staat in audit/log.
   for (const warning of warnings) card.addFields({ name: `${warning.removed_at ? 'Ingetrokken' : 'Actief'} • ${warning.id}`,
     value: `${safeText(warning.reason).slice(0, 100)}\nDoor <@${warning.actor_id}> • <t:${Math.floor(warning.created_at / 1000)}:d>${warning.removed_at ? `\nIngetrokken door <@${warning.removed_by}>: ${safeText(warning.removed_reason).slice(0, 40)}` : ''}` });

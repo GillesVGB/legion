@@ -18,7 +18,7 @@ export function inviteTargets(csv) {
 }
 export async function removeInvite(rest, code) {
   if (!code) return;
-  await rest.delete(Routes.invite(code), { reason: 'Legion persoonlijke uitnodiging afgehandeld' }).catch(error => { if (error.code !== 10006) throw error; });
+  await rest.delete(Routes.invite(code), { reason: 'Bakarov persoonlijke uitnodiging afgehandeld' }).catch(error => { if (error.code !== 10006) throw error; });
 }
 async function verifyTargets(rest, code, userId) {
   const data = await rest.get(Routes.inviteTargetUsers(code));
@@ -28,7 +28,7 @@ async function verifyTargets(rest, code, userId) {
 export async function createPersonalInvite(rest, { channelId, guildId, userId, roleId, maxAge = 86400 }) {
   assertUser([channelId, guildId, userId, ...(roleId ? [roleId] : [])].every(id => snowflake.test(id)), 'Controleer de instellingen van de persoonlijke uitnodiging.');
   assertUser(Number.isInteger(maxAge) && maxAge >= 300 && maxAge <= 604800, 'De uitnodiging moet tussen 5 minuten en 7 dagen geldig zijn.');
-  const invite = await rest.post(Routes.channelInvites(channelId), { reason: 'Legion aangenomen sollicitant: persoonlijke eenmalige uitnodiging',
+  const invite = await rest.post(Routes.channelInvites(channelId), { reason: 'Bakarov aangenomen sollicitant: persoonlijke eenmalige uitnodiging',
     body: { max_uses: 1, max_age: maxAge, unique: true, temporary: false, target_user_ids: [userId], ...(roleId ? { role_ids: [roleId] } : {}) } });
   try {
     assertUser(invite.guild?.id === guildId && invite.max_uses === 1 && invite.code, 'Discord gaf geen geldige eenmalige uitnodiging terug.');
@@ -89,9 +89,9 @@ async function deliverUnlocked(ctx, client, caseId) {
       link = `https://discord.gg/${notice.invite_code}`;
     }
     if(store.acceptance(caseId).status==='revoked'){await removeInvite(client.rest,store.acceptance(caseId).invite_code);store.clearAcceptanceInvite(caseId);return store.acceptance(caseId);}
-    const card = embed(config, 'Je bent aangenomen bij Legion!',
-      `Gefeliciteerd, je sollicitatie is **aangenomen**. Welkom bij Legion!\n\n${present ? 'Je staat al in de gangserver. Je kunt hem hieronder openen.' : 'Klik hieronder om de gangserver te joinen. Deze uitnodiging werkt alleen met jouw Discord-account, kan één keer worden gebruikt en vervalt daarna.\n\nGeldig tot: <t:' + Math.floor(notice.expires_at / 1000) + ':F>.'}`).setColor(0x22C55E);
-    const message = await recipient.user.send({ embeds: [card], components: [row(new ButtonBuilder().setLabel(present ? 'Gangserver openen' : 'Legion joinen').setStyle(ButtonStyle.Link).setURL(link))],
+    const card = embed(config, 'Je bent aangenomen bij Bakarov!',
+      `Gefeliciteerd, je sollicitatie is **aangenomen**. Welkom bij Bakarov!\n\n${present ? 'Je staat al in de gangserver. Je kunt hem hieronder openen.' : 'Klik hieronder om de gangserver te joinen. Deze uitnodiging werkt alleen met jouw Discord-account, kan één keer worden gebruikt en vervalt daarna.\n\nGeldig tot: <t:' + Math.floor(notice.expires_at / 1000) + ':F>.'}`).setColor(0x22C55E);
+    const message = await recipient.user.send({ embeds: [card], components: [row(new ButtonBuilder().setLabel(present ? 'Gangserver openen' : 'Bakarov joinen').setStyle(ButtonStyle.Link).setURL(link))],
       allowedMentions: quiet, nonce: createHash('sha256').update(`${config.guildId}:${caseId}:${notice.invite_code || 'member'}`).digest('hex').slice(0, 24), enforceNonce: true });
     store.acceptanceSent(caseId, message.id, Boolean(present));
     return store.acceptance(caseId);

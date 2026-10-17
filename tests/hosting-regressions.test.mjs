@@ -115,7 +115,7 @@ test('ledenlijst blijft bij restarts en gelijktijdige updates dezelfde embed; al
   await publishRoster({ ...ctx, rosterRecovered: false }, guild);
   assert.equal(sent, 1); assert.equal(JSON.parse(ctx.store.setting('roster:messages'))[0], id);
   const duplicate = decorate(await originalSend({ embeds: [{ toJSON: () => ({ title: 'Legion — Ledenlijst' }) }] }));
-  const foreign = decorate(await originalSend({ embeds: [{ toJSON: () => ({ title: 'Legion — Ledenlijst' }) }] })); foreign.author = { id: OTHER_ID };
+  const foreign = decorate(await originalSend({ embeds: [{ toJSON: () => ({ title: 'Bakarov — Ledenlijst' }) }] })); foreign.author = { id: OTHER_ID };
   ctx.store.setSetting('roster:messages', '[]');
   await publishRoster({ ...ctx, rosterRecovered: false }, guild);
   assert.equal(sent, 1); assert.equal(deleted, 1); assert.equal(channel.posted.has(duplicate.id), false); assert.equal(channel.posted.has(foreign.id), true);

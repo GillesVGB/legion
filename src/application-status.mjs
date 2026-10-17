@@ -16,7 +16,7 @@ export function applicationStatusMessage(ctx,dossier) {
   if(queue)text+=`\n**Binnenkomstvolgorde:** plek ${queue.position} van ${queue.total} open sollicitaties.\nDe leiding bepaalt de volgorde van beoordeling.${applicationWaitingNotice(ctx.recruitment)?`\n\n⏳ ${applicationWaitingNotice(ctx.recruitment)}`:''}`;
   if(dossier.status==='accepted')text+='\nJe bent aangenomen! Bekijk je DM of gebruik /uitnodiging voor toegang tot de gangserver.';
   const color=dossier.status==='accepted'?0x22C55E:['rejected','closed','failed'].includes(dossier.status)?0xEF4444:ctx.recruitment?.color??0xF59E0B;
-  return {embeds:[embed(ctx.config,'Legion — Jouw sollicitatie',text).setColor(color)],allowedMentions:quiet};
+  return {embeds:[embed(ctx.config,'Bakarov — Jouw sollicitatie',text).setColor(color)],allowedMentions:quiet};
 }
 export async function showApplicationStatus(ctx,interaction,id) {
   const dossier=id?ctx.store.caseById(id):ctx.store.decodeCase(ctx.store.db.prepare("SELECT * FROM cases WHERE kind='application' AND owner_id=? ORDER BY (status='open') DESC,created_at DESC LIMIT 1").get(interaction.user.id));

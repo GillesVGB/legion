@@ -29,6 +29,7 @@ import {memberOverview} from './member-overview.mjs';
 import {backupSummary,createDataBackup} from './backups.mjs';
 import {releaseVersion} from './release-announcements.mjs';
 import {dashboardAuditItem} from './audit-format.mjs';
+import {logo} from './branding.mjs';
 
 const secret = () => randomBytes(32).toString('base64url');
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -38,6 +39,7 @@ const assets = new Map([
   ['/dashboard/app.js', ['app.js', 'text/javascript; charset=utf-8']],
   ['/dashboard/style.css', ['style.css', 'text/css; charset=utf-8']]
 ].map(([path, [file, type]]) => [path, { body: readFileSync(new URL(`dashboard-assets/${file}`, import.meta.url)), type }]));
+assets.set('/dashboard/logo.webp',{body:logo,type:'image/webp'});
 const security = {
   'Cache-Control': 'private, no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY', 'X-Robots-Tag': 'noindex, nofollow, noarchive',
@@ -95,7 +97,7 @@ export class Dashboard {
   }
   async authorized(session, guildId) {
     const ctx = this.contexts.get(guildId), guild = this.client.guilds.cache.get(guildId);
-    failure(ctx && guild, 404, 'Deze guild hoort niet bij Legion.');
+    failure(ctx && guild, 404, 'Deze guild hoort niet bij Bakarov.');
     failure(ctx.ready && this.client.isReady(), 503, 'De bot start nog op.');
     let member;
     try { member = await guild.members.fetch({ user: session.userId, force: true }); }
@@ -220,7 +222,7 @@ export class Dashboard {
       const target = await guild.members.fetch({user,force:true});
       assertUser(!target.user.bot && (member.permissions.has(P.Administrator) || (!target.permissions.has(P.Administrator) && member.roles.highest.comparePositionTo(target.roles.highest) > 0)), 'Je kunt geen bot, administrator of lid met een gelijke/hogere rang waarschuwen.');
       const result = store.addWarn(user,actor,why);
-      const logged = await writeWarnLog(ctx,guild,'Legion | Gangwarn gegeven', `Lid: <@${user}>\nDoor: <@${actor}>\nID: \`${result.id}\`\nReden: ${safeText(why)}\nActieve warns: **${result.count}**${result.count>=config.warnThreshold?'\n⚠️ De ingestelde warn-drempel is bereikt.':''}`);
+      const logged = await writeWarnLog(ctx,guild,'Bakarov | Gangwarn gegeven', `Lid: <@${user}>\nDoor: <@${actor}>\nID: \`${result.id}\`\nReden: ${safeText(why)}\nActieve warns: **${result.count}**${result.count>=config.warnThreshold?'\n⚠️ De ingestelde warn-drempel is bereikt.':''}`);
       await target.user.send({content:`Je hebt een gangwarn ontvangen in **${safeText(guild.name)}**.\nReden: ${safeText(why)}\nActieve warns: **${result.count}**\nID: \`${result.id}\``,allowedMentions:{parse:[]}}).catch(()=>{});
       return { message:`Gangwarn gegeven.${logged ? '' : ' De log staat lokaal opgeslagen.'}` };
     }
@@ -286,7 +288,7 @@ export class Dashboard {
       if(path==='/'){ response.writeHead(302,{...security,Location:'/dashboard'});response.end();return true; }
       const asset=assets.get(path==='/dashboard/'?'/dashboard':path);
       if(asset){ failure(['GET','HEAD'].includes(request.method),405,'Alleen lezen toegestaan.'); response.writeHead(200,{...security,'Content-Type':asset.type});response.end(request.method==='HEAD'?undefined:asset.body);return true; }
-      if(request.method==='POST') failure(request.headers.origin===this.currentOrigin(),403,'Dit verzoek komt niet van het Legion-dashboard.');
+      if(request.method==='POST') failure(request.headers.origin===this.currentOrigin(),403,'Dit verzoek komt niet van het Bakarov-dashboard.');
       if(path==='/api/dashboard/login'){
         failure(request.method==='POST',405,'Gebruik POST.');
         const body=await bodyJSON(request); failure(/^[A-Za-z0-9_-]{43}$/.test(body.code),401,'Ongeldige inloglink.');

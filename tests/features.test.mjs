@@ -33,7 +33,7 @@ test('een kanaal verdwijnt pas na een volledig opgeslagen transcript en herstel 
   store.bindCase(dossier.id, 'source'); store.openCase(dossier.id, 'intro');
   const closed = store.closeCase(dossier.id, 'closed', 'staff');
   let deleted = 0;
-  const channel = { guildId: config.guildId, type: 0, topic: `Legion dossier:${dossier.id} | ticket`, delete: async () => { deleted++; } };
+  const channel = { guildId: config.guildId, type: 0, topic: `Bakarov dossier:${dossier.id} | ticket`, delete: async () => { deleted++; } };
   const guild = { channels: { fetch: async () => channel } };
   const client = { guilds: { cache: new Map([[config.guildId, guild]]) } };
   const ctx = { config, store };

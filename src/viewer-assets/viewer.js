@@ -40,6 +40,6 @@ document.querySelector('#print').addEventListener('click', () => { frame.content
 document.querySelector('#download').addEventListener('click', () => {
   if (!source) return;
   const url = URL.createObjectURL(new Blob([source], { type: 'text/html;charset=utf-8' }));
-  const link = document.createElement('a'); link.href = url; link.download = 'legion-transcript.html'; link.click();
+  const link = document.createElement('a'); link.href = url; link.download = 'bakarov-transcript.html'; link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 });

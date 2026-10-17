@@ -6,7 +6,7 @@ import {operationSettings} from './feature-settings.mjs';
 import {quiet} from './service.mjs';
 export function fishBookMessage(ctx,user,now=Date.now()){
   const book=ctx.store.fishBook(user,now),settings=operationSettings(ctx).fishing;
-  const card=embed(ctx.config,'Legion — Vangstenboek',`<@${user}> · Week vanaf ${book.week}\nVis met /fish om je verzameling en weekchallenges uit te breiden. Nieuwe challenges starten maandag om 00:00 Belgische tijd. De beloningen zijn fictieve Discord-coins.`);
+  const card=embed(ctx.config,'Bakarov — Vangstenboek',`<@${user}> · Week vanaf ${book.week}\nVis met /fish om je verzameling en weekchallenges uit te breiden. Nieuwe challenges starten maandag om 00:00 Belgische tijd. De beloningen zijn fictieve Discord-coins.`);
   if(settings.collectionEnabled)for(const caught of catches.filter(item=>item.kind==='good')){const item=book.collection.find(item=>item.catch_id===caught.id);card.addFields({name:`${caught.icon} ${caught.title}`,value:`${caught.rarity} · ${item?`${item.amount}× gevangen`:'Nog niet gevonden'}`});}
   if(settings.weeklyEnabled){card.addFields({name:'🎣 Weekchallenge',value:`${book.progress.total}/${book.settings.target} goede vangsten · ${book.settings.reward} coins${book.claimed.includes('total')?' · ✅ ontvangen':''}`},{name:'💎 Zeldzame vangsten',value:`${book.progress.rare}/${book.settings.rare_target} zeldzame/legendarische vangsten · ${book.settings.rare_reward} coins${book.claimed.includes('rare')?' · ✅ ontvangen':''}`});}
   const available=settings.weeklyEnabled&&((book.progress.total>=book.settings.target&&!book.claimed.includes('total'))||(book.progress.rare>=book.settings.rare_target&&!book.claimed.includes('rare')));

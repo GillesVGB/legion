@@ -1,3 +1,4 @@
+import {canonicalBrandText} from './branding.mjs';
 import {randomBytes} from 'node:crypto';
 import {ActionRowBuilder,StringSelectMenuBuilder,MessageFlags,ButtonStyle} from 'discord.js';
 import {assertUser} from './errors.mjs';
@@ -14,11 +15,11 @@ const shift=(date,days)=>missionDay(Date.parse(date+'T12:00:00Z')+days*86400000)
 export async function publishAbsencePanel(ctx,guild){
   if(!ctx.config.absencePanelChannelId)return;
   return serializeCommunity(`${guild.id}:absence-panel`,async()=>{
-    const channel=await communityChannel(guild,ctx.config.absencePanelChannelId),key=`absence:panel:${channel.id}`,marker='Legion • Afmeldingen';
+    const channel=await communityChannel(guild,ctx.config.absencePanelChannelId),key=`absence:panel:${channel.id}`,marker='Bakarov • Afmeldingen';
     let message=ctx.store.setting(key)?await channel.messages.fetch(ctx.store.setting(key)).catch(error=>{if(error.code===10008)return null;throw error;}):null;
-    if(!message){const history=await channel.messages.fetch({limit:100});message=[...history.values()].find(item=>item.author.id===guild.members.me.id&&item.embeds?.some(card=>card.footer?.text===marker));}
+    if(!message){const history=await channel.messages.fetch({limit:100});message=[...history.values()].find(item=>item.author.id===guild.members.me.id&&item.embeds?.some(card=>canonicalBrandText(card.footer?.text)===marker));}
     assertUser(!message||message.author.id===guild.members.me.id,'Het afmeldpaneel hoort niet bij deze bot.');
-    const payload={embeds:[embed(ctx.config,'Legion — Afmelden & afwezigheid','Kun je niet deelnemen? Kies hieronder wat je wilt melden.\n\n**📅 Afmelden voor planning**\nKies de activiteit waarvoor je afwezig bent. Een rode reactie is pas een geldige afmelding na goedkeuring van Lead.\n\n**🌴 Afwezigheid melden**\nKies een begin- en einddatum voor langere afwezigheid, zoals vakantie. Lead beoordeelt de aanvraag en eventuele gangpotvrijstelling voor de genoemde weken.\n\nJe maakt je keuzes privé via dit paneel. Een aanvraag geeft pas toestemming nadat Lead deze heeft goedgekeurd.').setFooter({text:marker})],components:[row(button('absencepanel:planning','📅 Afmelden voor planning',ButtonStyle.Primary),button('absencepanel:range','🌴 Afwezigheid melden',ButtonStyle.Secondary))],allowedMentions:quiet};
+    const payload={embeds:[embed(ctx.config,'Bakarov — Afmelden & afwezigheid','Kun je niet deelnemen? Kies hieronder wat je wilt melden.\n\n**📅 Afmelden voor planning**\nKies de activiteit waarvoor je afwezig bent. Een rode reactie is pas een geldige afmelding na goedkeuring van Lead.\n\n**🌴 Afwezigheid melden**\nKies een begin- en einddatum voor langere afwezigheid, zoals vakantie. Lead beoordeelt de aanvraag en eventuele gangpotvrijstelling voor de genoemde weken.\n\nJe maakt je keuzes privé via dit paneel. Een aanvraag geeft pas toestemming nadat Lead deze heeft goedgekeurd.').setFooter({text:marker})],components:[row(button('absencepanel:planning','📅 Afmelden voor planning',ButtonStyle.Primary),button('absencepanel:range','🌴 Afwezigheid melden',ButtonStyle.Secondary))],allowedMentions:quiet};
     const posted=message?await editIfChanged(message,payload):await channel.send({...payload,nonce:`ap:${channel.id}`,enforceNonce:true});ctx.store.setSetting(key,posted.id);ctx.store.setSetting('absence:panel:error','');return posted;
   });
 }

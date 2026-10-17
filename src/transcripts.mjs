@@ -1,3 +1,4 @@
+import {canonicalBrandText} from './branding.mjs';
 import { AttachmentBuilder, ButtonBuilder, ButtonStyle, PermissionFlagsBits as P, GatewayIntentBits } from 'discord.js';
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync, renameSync } from 'node:fs';
@@ -22,7 +23,7 @@ export function messageRecord(message) {
 
 export function transcriptDocuments(guild, channel, dossier, messages) {
   const metadata = [
-    `${dossier.kind === 'application' ? 'Legion — Sollicitatie' : 'Legion — Vraag / ticket'} | ${statusLabel(dossier.status)}`,
+    `${dossier.kind === 'application' ? 'Bakarov — Sollicitatie' : 'Bakarov — Vraag / ticket'} | ${statusLabel(dossier.status)}`,
     `Guild: ${guild.name} (${guild.id})`, `Kanaal: ${channel.name} (${channel.id})`,
     `Dossier: ${dossier.id} | Aanvrager: ${dossier.owner_id}`,
     `Afgehandeld door: ${dossier.closed_by} | Afgehandeld op: ${new Date(dossier.closed_at).toISOString()}`,
@@ -137,12 +138,12 @@ async function deliverTranscript(ctx, client, caseId, validateDestination) {
     }
     for (let part = delivery.message_ids.length; part < delivery.chunks.length; part++) {
       const file = delivery.chunks[part];
-      const marker = `Legion dossier ${caseId} | bestand ${part + 1}/${delivery.chunks.length}`;
+      const marker = `Bakarov dossier ${caseId} | bestand ${part + 1}/${delivery.chunks.length}`;
       const recent = await destination.messages.fetch({ limit: 100 });
-      const previous = recent.find(message => message.author.id === client.user.id && message.embeds.some(card => card.footer?.text === marker));
+      const previous = recent.find(message => message.author.id === client.user.id && message.embeds.some(card => canonicalBrandText(card.footer?.text) === marker));
       let message = previous;
       if (!message) {
-        const card = embed(config, dossier.kind === 'application' ? 'Legion — Sollicitatietranscript' : 'Legion — Vragentranscript',
+        const card = embed(config, dossier.kind === 'application' ? 'Bakarov — Sollicitatietranscript' : 'Bakarov — Vragentranscript',
           `Status: **${statusLabel(dossier.status)}**\nAanvrager: <@${dossier.owner_id}>\nGuild: **${safeText(destination.guild.name)}**\nDossier: \`${caseId}\`\nKanaal: <#${dossier.channel_id}>\nAfgehandeld door: <@${dossier.closed_by}>`).setFooter({ text: marker });
         message = await destination.send({ embeds: [card], components, files: [new AttachmentBuilder(Buffer.from(file.content, 'utf8'), { name: file.name })],
           allowedMentions, nonce: createHash('sha256').update(`${config.guildId}:${caseId}:${part}`).digest('hex').slice(0, 24), enforceNonce: true });

@@ -1,10 +1,10 @@
 import {missionDay} from './mission-definitions.mjs';
 export function fishWeek(now=Date.now()){const day=missionDay(now),date=new Date(day+'T12:00:00Z'),offset=(date.getUTCDay()+6)%7;return missionDay(date.getTime()-offset*86400000);}
 export const catches = [
-  { weight: 25, kind: 'good', icon: '🐟', title: 'Een mooie vangst!', text: 'Je haalt een dikke zalm uit het water. De barbecue van Legion is geregeld!' },
+  { weight: 25, kind: 'good', icon: '🐟', title: 'Een mooie vangst!', text: 'Je haalt een dikke zalm uit het water. De barbecue van Bakarov is geregeld!' },
   { weight: 15, kind: 'good', icon: '🦞', title: 'Kreeft gevangen!', text: 'Je vangt een kreeft en houdt hem nét ver genoeg van je vingers. Lekker voor het avondeten.' },
   { weight: 10, kind: 'good', icon: '💍', title: 'Schat gevonden!', text: 'Tussen het zeewier vind je een glimmende ring. Vandaag heb jij geluk!' },
-  { weight: 5, kind: 'good', icon: '🏆', title: 'Legendarische vangst!', text: 'Je vist een kist met een gouden Legion-trofee op. De hele gang wil met je op de foto.' },
+  { weight: 5, kind: 'good', icon: '🏆', title: 'Legendarische vangst!', text: 'Je vist een kist met een gouden Bakarov-trofee op. De hele gang wil met je op de foto.' },
   { weight: 5, kind: 'good', icon: '🐠', title: 'Bijzondere vis!', text: 'Een kleurrijke vis springt aan je haak. Je maakt een foto en laat hem weer vrij.' },
   { weight: 15, kind: 'bad', icon: '🦞', title: 'AUW! Een kreeft!', text: 'Een kreeft beet je in je vinger! Je laat je hengel vallen en de kreeft loopt er met je aas vandoor.' },
   { weight: 10, kind: 'bad', icon: '🥾', title: 'Een oude laars...', text: 'Je dacht dat je beet had, maar vist een stinkende laars op. Zelfs de vissen lachen je uit.' },
