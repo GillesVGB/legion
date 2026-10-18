@@ -74,7 +74,7 @@ export function activityMessage(ctx,activity,now=Date.now()) {
   content+=`\n### Kom voorbereid\n${safeText(operationSettings(ctx).planning.preparation)}\n\n### Laat weten of je erbij bent\n`;
   content+=attendanceChoices.map(choice=>`${choice.emoji}: ${choice.label} — **${responses.filter(item=>item.response===choice.id).length}**`).join('\n');
   if(operationSettings(ctx).planning.requireApproval){
-    content+='\n\nEen rode reactie is een afmeldingsaanvraag. Alleen een goedgekeurde afmelding telt als toestemming om afwezig te zijn. Gebruik /afmelden planning reden voor je toelichting.';
+    content+='\n\nEen rode reactie is een afmeldingsaanvraag. Alleen een goedgekeurde afmelding telt als toestemming om afwezig te zijn. Geef je reden via /afmelden of het afmeldpaneel. Duidelijke redenen kan de bot goedkeuren.';
     const absences=activityAbsences(ctx,activity);let remaining=1700-content.length;
     for(const item of absences){const line=`\n${item.status==='approved'?'✅ Afwezig (goedgekeurd)':item.status==='pending'?'⏳ Afmelding wacht op Lead':'❌ Afmelding afgewezen'}: <@${item.user_id}>`;if(remaining<line.length)break;content+=line;remaining-=line.length;}
   }

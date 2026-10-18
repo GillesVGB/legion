@@ -1,7 +1,7 @@
 import {assertUser} from './errors.mjs';
 export const featureDefaults={
   gangpot:{weeklyAmount:25000,deadlineTime:'23:59',remindersEnabled:true,fridayTime:'18:00',saturdayTime:'18:00',leadReminderEnabled:true,leadTime:'20:00'},
-  planning:{requireApproval:true,duration:120,title:'Gangactiviteit',preparation:'Zorg dat je volledig bent geheald. Tank je voertuig helemaal vol. Neem repairkits en de benodigde spullen mee. Sta op tijd klaar en volg de aanwijzingen van de leiding.'},
+  planning:{requireApproval:true,autoApproveAbsences:true,duration:120,title:'Gangactiviteit',preparation:'Zorg dat je volledig bent geheald. Tank je voertuig helemaal vol. Neem repairkits en de benodigde spullen mee. Sta op tijd klaar en volg de aanwijzingen van de leiding.'},
   fishing:{collectionEnabled:true,weeklyEnabled:true,target:25,rareTarget:3,reward:750,rareReward:400},
   activityCheck:{remindersEnabled:true,reminderMinutes:60},backups:{enabled:true,keep:5},monthlyReports:{enabled:true,sendTime:'09:00'},weeklyReports:{enabled:true,sendTime:'09:00'},
   absence:{maxDays:90},logs:{enabled:true,batchSize:15},recruitment:{capacity:25,limitedAt:20,minimumAge:16},admission:{inviteMaxAgeSeconds:86400}

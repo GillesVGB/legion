@@ -122,7 +122,7 @@ test('changelog wordt één keer per versie geplaatst en herstelt een verstuurd 
 
 test('Bakarov start bij 2.0.0; bestaande botupdates worden in hetzelfde bericht hernummerd en herstarts dupliceren niets',async t=>{
   const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.updateChannelId);
-  assert.equal(renamedVersions['1.9.0'],'2.0.0');assert.ok(releaseNotes['2.0.0']);assert.equal(releaseNotes['1.9.0'],undefined);assert.equal(releaseVersion,'2.3.1');
+  assert.equal(renamedVersions['1.9.0'],'2.0.0');assert.ok(releaseNotes['2.0.0']);assert.equal(releaseNotes['1.9.0'],undefined);assert.equal(releaseVersion,'2.4.0');
   const older=[];
   for(const version of ['1.9.0','1.12.0']){
     const message=await channel.send({embeds:[new EmbedBuilder().setTitle(`Bakarov — Botupdate ${version}`).setDescription('Bestaande wijziging.').setFooter({text:`Bakarov • Botupdate ${version}`})]});
@@ -182,6 +182,9 @@ test('planningknop in afmeldembed laat het lid een planning kiezen en maakt geen
   const panel=await publishAbsencePanel(f.ctx,f.guild);let reply;const base={guild:f.guild,user:f.guild.members.cache.get(OTHER).user,channelId:panel.channelId,message:panel,deferReply:async()=>{},deferUpdate:async()=>{},editReply:async value=>{reply=value;}};
   await handleAbsencePanel(f.ctx,{...base,customId:'absencepanel:planning'},SAT);assert.equal(reply.components[0].toJSON().components[0].options[0].value,created.id);
   await handleAbsenceSelection(f.ctx,{...base,customId:`absplan:choose:${OTHER}`,values:[created.id]},SAT);
+  assert.equal(f.ctx.store.db.prepare('SELECT * FROM absence_requests WHERE activity_id=? AND user_id=?').get(created.id,OTHER),undefined);
+  await handleAbsenceSelection(f.ctx,{...base,customId:`absreason:choose:${OTHER}:${created.id}`,values:['other']},SAT);assert.match(reply.content,/reden/);
+  await createAbsence(f.ctx,f.guild,OTHER,{activityId:created.id,reason:'Andere verplichtingen'},SAT);
   assert.equal(f.ctx.store.db.prepare('SELECT status FROM absence_requests WHERE activity_id=? AND user_id=?').get(created.id,OTHER).status,'pending');
   assert.equal(f.ctx.store.db.prepare('SELECT response FROM activity_rsvps WHERE activity_id=? AND user_id=?').get(created.id,OTHER).response,'no');
 });

@@ -7,6 +7,7 @@ import {logo} from './branding.mjs';
 const assets = new Map([
   ['page', ['page.html', 'text/html; charset=utf-8']],
   ['/viewer.css', ['viewer.css', 'text/css; charset=utf-8']],
+  ['/transcript-branding.js', ['transcript-branding.js', 'text/javascript; charset=utf-8']],
   ['/viewer.js', ['viewer.js', 'text/javascript; charset=utf-8']]
 ].map(([key, [file, type]]) => [key, { type, body: readFileSync(new URL(`viewer-assets/${file}`, import.meta.url)) }]));
 assets.set('/dashboard/logo.webp',{body:logo,type:'image/webp'});

@@ -10,7 +10,7 @@ import {communityChannel,serializeCommunity,updateCommunityPost} from './communi
 import {refreshMembers} from './members.mjs';
 import {planningTime} from './activities.mjs';
 import {missionDay} from './mission-definitions.mjs';
-import {exemptionFor} from './absence.mjs';
+import {exemptionFor,syncAbsenceExemptions} from './absence.mjs';
 import {syncGangpotReminders} from './gangpot-reminders.mjs';
 import {editIfChanged} from './message-updates.mjs';
 import {gangpotIntroduction,syncGangpotMemberships,recordGangpotMembership,recoverAcceptedMemberships} from './gangpot-membership.mjs';
@@ -97,7 +97,7 @@ function reconcileDebt(ctx,period,user,actor,now){
       ctx.store.db.prepare('UPDATE warnings SET removed_at=?,removed_by=?,removed_reason=? WHERE id=?').run(now,actor,reason,warning.id);
       ctx.store.db.prepare('UPDATE gangpot_dues SET warn_cleared_by_payment=? WHERE period_id=? AND user_id=?').run(introduction?0:1,period.id,user);
       ctx.store.audit('warn.remove',actor,{id:warning.id,user,reason});
-      if(introduction)ctx.store.db.prepare("UPDATE gangpot_notifications SET log_id=COALESCE(log_id,'skipped'),dm_id=COALESCE(dm_id,'skipped'),last_error=NULL WHERE warn_id=? AND kind IN ('issue','restore')").run(warning.id);
+      ctx.store.db.prepare("UPDATE gangpot_notifications SET log_id=COALESCE(log_id,'skipped'),dm_id=COALESCE(dm_id,'skipped'),last_error=NULL WHERE warn_id=? AND kind IN ('issue','restore')").run(warning.id);
       queueNotice(ctx,user,period,warning.id,'revoke',`De gangpotwarn voor termijn ${period.id} is ingetrokken: ${introduction?'dit is je instapweek. Je betaalplicht begint bij de volgende volledige termijn':exempt?'je bent vrijgesteld':'je betaling is tijdig bevestigd'}.`);
     }
     return;
@@ -345,7 +345,7 @@ export async function syncGangpot(ctx,client,now=Date.now(),contexts=new Map()){
         if(gangpotIntroduction(ctx,user,period))reconcileGangpotDebt(ctx,debt.period_id,user,guild.members.me.id,now);
       }
     });
-    ensurePeriod(ctx,guild,now);enforcePeriods(ctx,guild,now);
+    ensurePeriod(ctx,guild,now);syncAbsenceExemptions(ctx,guild.members.me.id,now);enforcePeriods(ctx,guild,now);
     await deliverNotices(ctx,guild,client,now);
     await publishClaims(ctx,guild,now);
     await publishGangpot(ctx,guild,now);

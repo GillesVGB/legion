@@ -1,3 +1,4 @@
+import {rebrandTranscript} from './transcript-branding.js';
 const status = document.querySelector('#status');
 const frame = document.querySelector('#transcript');
 const tools = document.querySelector('#tools');
@@ -17,7 +18,9 @@ if (id) {
     let clear;
     try { clear = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: decode(envelope.iv), additionalData: new TextEncoder().encode(id) }, key, decode(envelope.data)); }
     catch { throw new Error('De toegangssleutel klopt niet. Open de originele knop in Discord.'); }
-    source = new TextDecoder().decode(clear);
+    let logo='';
+    try{const image=await fetch('/dashboard/logo.webp',{credentials:'omit',redirect:'error'});if(image.ok){const bytes=new Uint8Array(await image.arrayBuffer());let binary='';for(let offset=0;offset<bytes.length;offset+=32768)binary+=String.fromCharCode(...bytes.subarray(offset,offset+32768));logo='data:image/webp;base64,'+btoa(binary);}}catch{}
+    source = rebrandTranscript(new TextDecoder().decode(clear),logo);
     frame.srcdoc = source;
     frame.hidden = false; tools.hidden = false;
     status.textContent = 'Transcript geopend. Je kunt zoeken, downloaden of bewaren als PDF.';

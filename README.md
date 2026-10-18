@@ -1,8 +1,16 @@
 # Bakarov — Discord-bot voor Future RP
 
+## Afmeldingen en transcripts — 2.4.0
+
+Planningsafmeldingen gelden uitsluitend voor de gekozen activiteit, nooit als gangpotvrijstelling. Geef een reden via het paneel of `/afmelden planning reden`. Duidelijke redenen zoals school, training, hobby, gym of een kapotte pc kan de bot herkennen en goedkeuren. De bot controleert niet of de opgegeven reden waar is; twijfelgevallen blijven bij Lead. Lead kan een botgoedkeuring intrekken en automatische goedkeuring uitschakelen via Modules instellen.
+
+Alleen een door Lead goedgekeurde afwezigheidsperiode geeft gangpotvrijstelling voor de betrokken weken. Ontbrekende vrijstellingen worden vóór de betaalcontrole hersteld; gekoppelde automatische betaalwarns worden ingetrokken met groene log en DM. Een door Lead ingetrokken vrijstelling blijft ingetrokken.
+
+De transcriptviewer past de Bakarov-naam, het logo en de zwart-gouden huisstijl ook toe op bestaande opgeslagen gesprekken. Oorspronkelijke berichten en namen blijven bewaard. Nieuwe HTML-exports hebben de nieuwe huisstijl. Reeds gedownloade bestanden of Discord-bijlagen veranderen niet vanzelf; via de viewer kun je een vernieuwde HTML downloaden.
+
 ## Bakarov-versies en correctie van aannamewarns — 2.3.1
 
-Vanaf de rename naar Bakarov begint de versiereeks bij **2.0.0**. De latere updates zijn doorgerekend: overzichten en bezwaren 2.1.x, Discord-login 2.2.x en instapvrijstelling 2.3.x. De huidige versie is **2.3.1**.
+Vanaf de rename naar Bakarov begint de versiereeks bij **2.0.0**. De latere updates zijn doorgerekend: overzichten en bezwaren 2.1.x, Discord-login 2.2.x en instapvrijstelling 2.3.x. De huidige versie is **2.4.0**.
 
 Bij de gangpotcontrole gebruikt de bot nu ook de opgeslagen aangenomen sollicitaties uit de community-guild als bewijs van toetreding. Een bestaande automatische gangpotwarn uit de instapweek wordt ingetrokken met een groene melding in het ingestelde gangwarnkanaal en een DM. Een herstart geeft geen dubbele intrekking. Bestaande verplichtingen van eerdere gangleden, handmatige warns en latere volledige betaaltermijnen worden niet kwijtgescholden. Bewaar de volledige `data/`-map van beide guilds.
 
@@ -140,7 +148,7 @@ Nieuwe commands worden bij het starten automatisch geregistreerd: 32 in de hoofd
 
 ## Hoe de systemen werken
 
-**Afmeldpaneel.** In hoofdserverkanaal `1555685636017758248` verschijnt automatisch één embed met twee knoppen: **Afmelden voor planning** en **Afwezigheid melden**. Beide workflows werken volledig via die embed met privé keuzelijsten. Voor planning kies je een open activiteit. Voor langere afwezigheid kies je begin- en einddatum en een reden. De bot bewaart je datumkeuzes maximaal 30 minuten, controleert dat ze bij jouw account horen en biedt opnieuw kiezen aan. Lead beoordeelt de aanvraag in het bestaande privé leidinglog. Een rode planningreactie maakt een afmeldingsaanvraag; zij is pas geldig na Lead-goedkeuring. De planning blijft een gewoon tekstbericht met vier emoji-reacties. Met `/afmelden` kun je je reden uitgebreider toelichten. Goedgekeurde vakantie verschijnt automatisch op planningen binnen de gekozen datums.
+**Afmeldpaneel.** In hoofdserverkanaal `1555685636017758248` verschijnt automatisch één embed met twee knoppen: **Afmelden voor planning** en **Afwezigheid melden**. Beide workflows werken volledig via die embed met privé keuzelijsten. Voor planning kies je een open activiteit. Voor langere afwezigheid kies je begin- en einddatum en een reden. De bot bewaart je datumkeuzes maximaal 30 minuten, controleert dat ze bij jouw account horen en biedt opnieuw kiezen aan. Lead beoordeelt de aanvraag in het bestaande privé leidinglog. Een rode planningreactie maakt een aanvraag zonder reden; geef eerst je reden op. De bot kan duidelijke redenen goedkeuren en Lead beoordeelt twijfelgevallen. De planning blijft een gewoon tekstbericht met vier emoji-reacties. Met `/afmelden` kun je je reden uitgebreider toelichten. Goedgekeurde vakantie verschijnt automatisch op planningen binnen de gekozen datums.
 
 **Vrijstellingen.** Een goedgekeurde vakantieaanvraag geeft gangpotvrijstelling voor de in de aanvraag genoemde weken. De bot toont die weken vooraf aan Lead. Lead kan ook afzonderlijke weken vrijstellen of intrekken via Discord of het dashboard. Vrijstelling boekt geen geld bij of af. Een later toegekende vrijstelling kan de automatische gangpotwarn voor die specifieke week intrekken; intrekken van de vrijstelling herstelt zo nodig dezelfde warn. Andere gangwarns blijven intact. Een losse afmelding voor een planning geeft geen gangpotvrijstelling.
 

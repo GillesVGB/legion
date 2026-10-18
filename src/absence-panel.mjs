@@ -1,3 +1,4 @@
+import {planningReasons} from './absence-reasons.mjs';
 import {canonicalBrandText} from './branding.mjs';
 import {randomBytes} from 'node:crypto';
 import {ActionRowBuilder,StringSelectMenuBuilder,MessageFlags,ButtonStyle} from 'discord.js';
@@ -19,7 +20,7 @@ export async function publishAbsencePanel(ctx,guild){
     let message=ctx.store.setting(key)?await channel.messages.fetch(ctx.store.setting(key)).catch(error=>{if(error.code===10008)return null;throw error;}):null;
     if(!message){const history=await channel.messages.fetch({limit:100});message=[...history.values()].find(item=>item.author.id===guild.members.me.id&&item.embeds?.some(card=>canonicalBrandText(card.footer?.text)===marker));}
     assertUser(!message||message.author.id===guild.members.me.id,'Het afmeldpaneel hoort niet bij deze bot.');
-    const payload={embeds:[embed(ctx.config,'Bakarov — Afmelden & afwezigheid','Kun je niet deelnemen? Kies hieronder wat je wilt melden.\n\n**📅 Afmelden voor planning**\nKies de activiteit waarvoor je afwezig bent. Een rode reactie is pas een geldige afmelding na goedkeuring van Lead.\n\n**🌴 Afwezigheid melden**\nKies een begin- en einddatum voor langere afwezigheid, zoals vakantie. Lead beoordeelt de aanvraag en eventuele gangpotvrijstelling voor de genoemde weken.\n\nJe maakt je keuzes privé via dit paneel. Een aanvraag geeft pas toestemming nadat Lead deze heeft goedgekeurd.').setFooter({text:marker})],components:[row(button('absencepanel:planning','📅 Afmelden voor planning',ButtonStyle.Primary),button('absencepanel:range','🌴 Afwezigheid melden',ButtonStyle.Secondary))],allowedMentions:quiet};
+    const payload={embeds:[embed(ctx.config,'Bakarov — Afmelden & afwezigheid','Kun je niet deelnemen? Kies hieronder wat je wilt melden.\n\n**📅 Afmelden voor planning**\nKies de activiteit waarvoor je afwezig bent. Geef altijd een reden op. School, training, hobby, gym, werk of een kapotte pc kan de bot automatisch goedkeuren. Twijfelgevallen beoordeelt Lead.\n\n**🌴 Afwezigheid melden**\nKies een begin- en einddatum voor langere afwezigheid, zoals vakantie. Lead beoordeelt de aanvraag en eventuele gangpotvrijstelling voor de genoemde weken.\n\nJe maakt je keuzes privé via dit paneel. Een planningsafmelding geldt alleen voor de gekozen activiteit. Een goedgekeurde afwezigheidsperiode geeft gangpotvrijstelling voor de bijbehorende weken.').setFooter({text:marker})],components:[row(button('absencepanel:planning','📅 Afmelden voor planning',ButtonStyle.Primary),button('absencepanel:range','🌴 Afwezigheid melden',ButtonStyle.Secondary))],allowedMentions:quiet};
     const posted=message?await editIfChanged(message,payload):await channel.send({...payload,nonce:`ap:${channel.id}`,enforceNonce:true});ctx.store.setSetting(key,posted.id);ctx.store.setSetting('absence:panel:error','');return posted;
   });
 }
@@ -48,7 +49,7 @@ export async function handleAbsencePanel(ctx,interaction,now=Date.now()){
   if(kind==='planning'){
     const items=ctx.store.db.prepare("SELECT * FROM activities WHERE status='open' AND ends_at>? ORDER BY starts_at LIMIT 25").all(now);
     if(!items.length)return interaction.editReply({content:'Er zijn nog geen open planningen.',components:[]});
-    return interaction.editReply({content:'Kies de planning waarvoor je je wilt afmelden. Lead moet de aanvraag goedkeuren.',components:[select(`absplan:choose:${interaction.user.id}`,'Kies een planning',items.map(item=>({label:item.title.slice(0,80),description:new Date(item.starts_at).toLocaleString('nl-BE',{timeZone:'Europe/Brussels'}).slice(0,100),value:item.id})))]});
+    return interaction.editReply({content:'Kies de planning waarvoor je je wilt afmelden. Daarna geef je de reden op.',components:[select(`absplan:choose:${interaction.user.id}`,'Kies een planning',items.map(item=>({label:item.title.slice(0,80),description:new Date(item.starts_at).toLocaleString('nl-BE',{timeZone:'Europe/Brussels'}).slice(0,100),value:item.id})))]});
   }
   assertUser(kind==='range','Onbekende afmeldkeuze.');const id=randomBytes(6).toString('hex');ctx.store.db.prepare("INSERT INTO absence_drafts(id,user_id,stage,expires) VALUES(?,?,'start-month',?) ON CONFLICT(user_id) DO UPDATE SET id=excluded.id,stage='start-month',revision=0,month=NULL,start_date=NULL,end_date=NULL,page=0,expires=excluded.expires").run(id,interaction.user.id,now+1800000);
   return interaction.editReply(absenceDraftMessage(ctx,ctx.store.db.prepare('SELECT * FROM absence_drafts WHERE id=?').get(id),now));
@@ -56,8 +57,15 @@ export async function handleAbsencePanel(ctx,interaction,now=Date.now()){
 export async function handleAbsenceSelection(ctx,interaction,now=Date.now()){
   requireGangPot(ctx);const [type,action,id,revision]=interaction.customId.split(':');
   if(type==='absplan'){
-    assertUser(id===interaction.user.id,'Deze keuzes horen bij een ander lid.');await interaction.deferUpdate();const item=await createAbsence(ctx,interaction.guild,id,{activityId:interaction.values[0],reason:'Afmelding aangevraagd via het planningpaneel. Het lid kan toelichten met /afmelden.'},now);await syncAbsences(ctx,interaction.guild,now);
-    return interaction.editReply({content:item.status==='approved'?'Je afmelding is al goedgekeurd.':`Je afmelding \`${item.id}\` wacht op goedkeuring van Lead.`,components:[]});
+    assertUser(id===interaction.user.id,'Deze keuzes horen bij een ander lid.');
+    const activity=ctx.store.db.prepare("SELECT * FROM activities WHERE id=? AND status='open' AND ends_at>?").get(interaction.values[0],now);assertUser(activity,'Deze planning is niet meer open.');await interaction.deferUpdate();
+    return interaction.editReply({content:'Waarom kun je niet deelnemen? Kies je werkelijke reden. Staat die er niet bij, kies dan Andere reden en licht toe via /afmelden.',components:[select(`absreason:choose:${id}:${activity.id}`,'Kies je reden',[...Object.entries(planningReasons).map(([value,label])=>({value,label})),{value:'other',label:'Andere reden: zelf toelichten'}])]});
+  }
+  if(type==='absreason'){
+    assertUser(id===interaction.user.id,'Deze keuzes horen bij een ander lid.');const value=interaction.values?.[0];assertUser(value==='other'||Object.hasOwn(planningReasons,value),'Kies een geldige reden.');await interaction.deferUpdate();
+    if(value==='other')return interaction.editReply({content:`Geef je reden op met /afmelden planning:${revision} reden:jouw uitleg. Zonder reden is je afmelding niet goedgekeurd.`,components:[]});
+    const item=await createAbsence(ctx,interaction.guild,id,{activityId:revision,reason:planningReasons[value]},now);await syncAbsences(ctx,interaction.guild,now);
+    return interaction.editReply({content:item.status==='approved'?'Je planningsafmelding is goedgekeurd. Dit geldt alleen voor deze activiteit.':`Afmelding ${item.id} met reden opgeslagen. Lead beoordeelt je aanvraag.`,components:[]});
   }
   return serializeCommunity(`${ctx.config.guildId}:absence-draft:${id}`,async()=>{
     const draft=ctx.store.db.prepare('SELECT * FROM absence_drafts WHERE id=?').get(id);assertUser(draft&&draft.user_id===interaction.user.id&&draft.expires>now,'Deze afmelding is verlopen of hoort bij iemand anders. Klik opnieuw op de embed.');assertUser(draft.revision===Number(revision),'Deze keuze is verouderd. Gebruik de nieuwste keuzelijst.');await interaction.deferUpdate();

@@ -1,4 +1,10 @@
 {
+  "2.4.0": [
+    "Planningsafmeldingen vereisen een reden. Duidelijke redenen zoals school, training, hobby, gym of een kapotte pc kan de bot automatisch goedkeuren; twijfelgevallen blijven bij Lead. Instelbaar in het dashboard.",
+    "Planningsafmeldingen en afwezigheidsperiodes blijven gescheiden. Alleen een goedgekeurde afwezigheidsperiode geeft gangpotvrijstelling. Ontbrekende vrijstellingen en bijbehorende automatische betaalwarns worden hersteld, met log en DM.",
+    "Het dashboard toont beide soorten afmeldingen apart. Lead kan een automatische planningsgoedkeuring alsnog intrekken.",
+    "Nieuwe en bestaande transcripts in de viewer krijgen de zwart-gouden Bakarov-huisstijl en het logo. Oorspronkelijke berichten blijven behouden."
+  ],
   "2.3.1": [
     "De Bakarov-rename is versie 2.0.0. Alle latere Bakarov-versies zijn vanaf dat punt opnieuw genummerd.",
     "Recent aangenomen sollicitanten worden ook aan hun opgeslagen aanname gekoppeld. Een onterechte automatische gangpotwarn uit hun instapweek wordt ingetrokken, met een groene melding in het gangwarnkanaal en een DM.",
