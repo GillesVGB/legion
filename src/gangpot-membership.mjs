@@ -42,3 +42,38 @@ export function syncGangpotMemberships(ctx,guild,windowAt,now=Date.now()){
     ctx.store.setSetting('gangpot:membership-initialized','1');
   });
 }
+
+// Accepted community applications are additional proof for older members whose
+// role-grant event was missed. Read both stores; only mutate the main guild store.
+export function recoverAcceptedMemberships(ctx,guild,contexts,windowAt,now=Date.now()){
+  const accepted=new Map(),affected=new Set();
+  for(const source of contexts.values()){
+    if(source.config.guildId===ctx.config.guildId||source.config.admission?.targetGuildId!==ctx.config.guildId)continue;
+    const rows=source.store.db.prepare(`SELECT c.owner_id,MIN(c.closed_at) AS accepted_at FROM cases c
+      JOIN acceptance_notifications n ON n.case_id=c.id AND n.owner_id=c.owner_id AND n.target_guild_id=?
+      WHERE c.kind='application' AND c.status='accepted' AND c.closed_at IS NOT NULL AND c.closed_at<=? GROUP BY c.owner_id`).all(ctx.config.guildId,now);
+    for(const row of rows)accepted.set(row.owner_id,Math.min(accepted.get(row.owner_id)??Infinity,row.accepted_at));
+  }
+  ctx.store.transaction(()=>{
+    for(const [user,at]of accepted){
+      const member=guild.members.cache.get(user);if(!eligible(ctx,member))continue;
+      const window=ctx.store.db.prepare('SELECT * FROM gangpot_periods WHERE starts_at<=? AND ends_at>? ORDER BY starts_at DESC LIMIT 1').get(at,at)||windowAt(at);
+      if(!window)continue;
+      const previous=ctx.store.db.prepare(`SELECT 1 FROM gangpot_dues d JOIN gangpot_periods p ON p.id=d.period_id
+        WHERE d.user_id=? AND p.starts_at<? AND d.enrolled_at<? LIMIT 1`).get(user,window.starts_at,at);
+      const existing=ctx.store.db.prepare('SELECT * FROM gangpot_memberships WHERE user_id=?').get(user);
+      if(previous||(existing&&['role','audit'].includes(existing.source)&&existing.started_at<window.starts_at))continue;
+      const joined=Number.isSafeInteger(member.joinedTimestamp)&&member.joinedTimestamp<=now?member.joinedTimestamp:0;
+      const roleAt=existing&&['role','audit'].includes(existing.source)?existing.started_at||0:0;
+      const started=Math.max(at,joined,roleAt),required=Math.max(existing?.required_from||0,firstRequired(ctx,started,windowAt));
+      if(!existing||required>existing.required_from){
+        ctx.store.db.prepare(`INSERT INTO gangpot_memberships(user_id,started_at,required_from,source) VALUES(?,?,?,'admission')
+          ON CONFLICT(user_id) DO UPDATE SET started_at=excluded.started_at,required_from=excluded.required_from,source='admission'`).run(user,started,required);
+        ctx.store.db.prepare('UPDATE gangpot_claims SET dirty=1,next_attempt=0 WHERE user_id=? AND period_id IN (SELECT id FROM gangpot_periods WHERE starts_at<?)').run(user,required);
+        ctx.store.audit('gangpot.membership.accepted',guild.members.me.id,{user,acceptedAt:at,requiredFrom:required});
+      }
+      affected.add(user);
+    }
+  });
+  return affected;
+}

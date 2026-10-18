@@ -1,29 +1,34 @@
 {
-  "1.12.0": [
+  "2.3.1": [
+    "De Bakarov-rename is versie 2.0.0. Alle latere Bakarov-versies zijn vanaf dat punt opnieuw genummerd.",
+    "Recent aangenomen sollicitanten worden ook aan hun opgeslagen aanname gekoppeld. Een onterechte automatische gangpotwarn uit hun instapweek wordt ingetrokken, met een groene melding in het gangwarnkanaal en een DM.",
+    "Alleen de gekoppelde gangpotwarn wordt gecorrigeerd; handmatige warns, andere overtredingen en betaalplichten uit volgende volledige termijnen blijven behouden."
+  ],
+  "2.3.0": [
     "Nieuwe gangleden zijn vrijgesteld in hun instapweek. De verplichte gangpotbijdrage begint bij de volgende volledige zaterdag–zaterdagtermijn; in de instapweek volgen geen automatische gangpotwarns of betaalherinneringen.",
     "De betaalstatus en het dashboard tonen de instapvrijstelling. De start van de betaalplicht blijft bewaard bij herstarts en wordt niet opnieuw vrijgesteld wanneer een ledenrol wordt weggehaald en teruggezet.",
     "Bestaande automatische gangpotwarns voor een aantoonbare instapweek worden ingetrokken met log en DM. Andere warns en eerdere betaalverplichtingen blijven behouden."
   ],
-  "1.11.1": [
+  "2.2.1": [
     "De loginpagina heeft een vernieuwd zwart-gouden Bakarov-thema: een omlijst logo, gouden Discord-knop en subtiele achtergrond. De pagina blijft compact en werkt op mobiel."
   ],
-  "1.11.0": [
+  "2.2.0": [
     "Nieuw: rechtstreeks aanmelden met je eigen Discord-account via een eenvoudige loginpagina met Discord-icoon.",
     "Alleen leden met de ingestelde Legion Lead-rol krijgen toegang. Administrator zonder deze rol geeft geen toegang; verloren rollen blokkeren ook bestaande sessies.",
     "De Discord-login gebruikt beveiligde, eenmalige browsergebonden aanmeldingen. Eenmalige OAuth2-configuratie op de hosting is nodig; /dashboard blijft als terugval beschikbaar."
   ],
-  "1.10.1": [
+  "2.1.1": [
     "Het automatische overzicht wordt voortaan iedere zondag om 09:00 Belgische tijd verstuurd, over de afgelopen zondag t/m zaterdag. De zaterdagse gangpotdeadline telt volledig mee.",
     "Nieuw: /weekoverzicht en Weekoverzicht in het dashboard. Verzendtijd en privékanaal zijn instelbaar; bestaande rapportage-instellingen worden meegenomen. Maandcijfers blijven op aanvraag beschikbaar.",
     "Het dashboardmenu kan scrollen, zodat alle pagina's bereikbaar blijven bij veel menu-items."
   ],
-  "1.10.0": [
+  "2.1.0": [
     "Nieuw: Bezwaar maken bij gangwarns. Leden geven zonder formulier uitleg via /bezwaar; Lead beoordeelt het privé in Discord of het dashboard. Goedkeuren trekt de warn in en de beslissing gaat per DM.",
     "Nieuw: automatisch maandoverzicht voor de leiding met activiteiten, planningreacties, check-ins, promoties en gangpotbijdragen. Standaard op de eerste dag om 09:00 Belgische tijd.",
     "Bekijk een maand met /maandoverzicht of via de nieuwe dashboardpagina. Verzending, tijd en een privé bestemmingskanaal zijn instelbaar.",
     "Bestaande automatische warns worden gecontroleerd op eerder goedgekeurde afwezigheid. Onterechte warns worden ingetrokken, ontbrekende gangpotvrijstellingen hersteld en de correctie wordt gelogd en per DM bevestigd. Handmatige warns blijven behouden."
   ],
-  "1.9.0": [
+  "2.0.0": [
     "Legion heet vanaf nu Bakarov: vernieuwde botteksten, commands, panelen en dashboard.",
     "Het Bakarov-logo en de zwart-gouden huisstijl zijn toegevoegd aan dashboard, embeds en nieuwe transcripts.",
     "De botnaam en profielfoto worden bij opstarten bijgewerkt. Bestaande gegevens en oude panelen blijven bruikbaar."

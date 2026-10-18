@@ -1,8 +1,8 @@
 # Bakarov op Bot-Hosting.net
 
-**Update 1.12.0:** nieuwe gangleden zijn vrijgesteld in hun instapweek en betalen vanaf de volgende volledige termijn. Behoud de bestaande `data/`-map; de eerste betaalplicht wordt daarin blijvend opgeslagen. Bij de eerste synchronisatie worden alleen aantoonbare automatische gangpotwarns uit een instapweek gecorrigeerd. Herstart na het ophalen van de update om deze regel op de hosting toe te passen.
+**Update 2.3.0:** nieuwe gangleden zijn vrijgesteld in hun instapweek en betalen vanaf de volgende volledige termijn. Behoud de bestaande `data/`-map; de eerste betaalplicht wordt daarin blijvend opgeslagen. Bij de eerste synchronisatie worden alleen aantoonbare automatische gangpotwarns uit een instapweek gecorrigeerd. Herstart na het ophalen van de update om deze regel op de hosting toe te passen.
 
-## Discord-inloggen instellen — 1.11.0
+## Discord-inloggen instellen — 2.2.0
 
 1. Open in Discord Developer Portal de applicatie met dezelfde `CLIENT_ID` als de bot, ga naar **OAuth2** en haal daar de **Client Secret** op. Dit is een ander geheim dan het bot-token.
 2. Zet die privé in je hostingvariabelen of bestaande `.env`: `DISCORD_CLIENT_SECRET=...`. Zet de echte waarde nooit in GitHub of in de voorbeeldbestanden. Is een secret gedeeld, reset die dan eerst in Developer Portal.
@@ -12,9 +12,9 @@
 De callback wordt automatisch opgebouwd uit het vaste dashboardadres. Bij een andere deployment registreer je het adres uit `DASHBOARD_PUBLIC_URL` met `/api/dashboard/oauth/callback` erachter. Gebruik voor OAuth een vast HTTPS-adres; een wisselend tunneladres moet telkens opnieuw worden geregistreerd. De login-knop gaat naar het vaste adres, ook wanneer je eerst een alias bezoekt. Bestaande `.env`, databases en bot-token blijven behouden. Zonder Client Secret start de bot gewoon en blijft `/dashboard` voor Lead beschikbaar.
 
 
-**Update 1.10.1:** het automatische overzicht is nu wekelijks, iedere zondag om 09:00 Belgische tijd over zondag t/m zaterdag. Maandcijfers worden alleen op aanvraag getoond. Haal de nieuwste code op en herstart de hosting; behoud `.env` en de volledige bestaande `data/`-map.
+**Update 2.1.1:** het automatische overzicht is nu wekelijks, iedere zondag om 09:00 Belgische tijd over zondag t/m zaterdag. Maandcijfers worden alleen op aanvraag getoond. Haal de nieuwste code op en herstart de hosting; behoud `.env` en de volledige bestaande `data/`-map.
 
-**Update 1.10.0:** behoud de bestaande `data/`-map en laat Git auto-pull de update ophalen bij een herstart. De bot controleert na starten automatisch eerdere warns tegenover al goedgekeurde afmeldingen; dit gebeurt op de hostingdatabase. Een lokaal uitgevoerde test wijzigt geen hostingwarns. De automatische overzichten volgen vanaf 1.10.1 het wekelijkse schema hierboven.
+**Update 2.1.0:** behoud de bestaande `data/`-map en laat Git auto-pull de update ophalen bij een herstart. De bot controleert na starten automatisch eerdere warns tegenover al goedgekeurde afmeldingen; dit gebeurt op de hostingdatabase. Een lokaal uitgevoerde test wijzigt geen hostingwarns. De automatische overzichten volgen vanaf 2.1.1 het wekelijkse schema hierboven.
 
 Voor de update naar Bakarov: haal de nieuwste code van `main` op en herstart één botinstantie. De opstartprocedure maakt eerst een gegevensback-up als automatische back-ups aanstaan. Behoud `.env` en de volledige `data/`-map, inclusief de bestanden met hun bestaande `legion-`-naam. Het logo staat in `src/branding-assets/`; neem die map ook mee als je handmatig uploadt. Het changelogbericht verschijnt eenmalig in het ingestelde updatekanaal.
 

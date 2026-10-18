@@ -1,29 +1,36 @@
 # Bakarov — Discord-bot voor Future RP
 
-## Gangpot voor nieuwe leden — 1.12.0
+## Bakarov-versies en correctie van aannamewarns — 2.3.1
+
+Vanaf de rename naar Bakarov begint de versiereeks bij **2.0.0**. De latere updates zijn doorgerekend: overzichten en bezwaren 2.1.x, Discord-login 2.2.x en instapvrijstelling 2.3.x. De huidige versie is **2.3.1**.
+
+Bij de gangpotcontrole gebruikt de bot nu ook de opgeslagen aangenomen sollicitaties uit de community-guild als bewijs van toetreding. Een bestaande automatische gangpotwarn uit de instapweek wordt ingetrokken met een groene melding in het ingestelde gangwarnkanaal en een DM. Een herstart geeft geen dubbele intrekking. Bestaande verplichtingen van eerdere gangleden, handmatige warns en latere volledige betaaltermijnen worden niet kwijtgescholden. Bewaar de volledige `data/`-map van beide guilds.
+
+
+## Gangpot voor nieuwe leden — 2.3.0
 
 De instapweek van een nieuw ganglid is vrijgesteld. De verplichte weekbijdrage begint bij de volgende volledige gangpottermijn. De instapweek geeft geen automatische gangpotwarn of betaalherinnering; een vrijwillige betaling blijft mogelijk. `/gangpot status` en het dashboard tonen de vrijstelling en startdatum. De eerste vastgelegde betaalplicht blijft bewaard bij herstarts; een ledenrol weghalen en teruggeven start geen nieuwe vrijstelling.
 
 Bij de update blijven bestaande betaalverplichtingen intact. Een vastgelegde roltoekenning of Discord-toetreding kan aantonen dat iemand pas in een termijn lid werd. Alleen de gekoppelde automatische gangpotwarn voor zo'n instapweek wordt dan ingetrokken, met log en DM. Zonder bewijs van nieuwe toetreding worden bestaande leden niet algemeen vrijgesteld. Nieuwe leden die de bot na een offline periode voor het eerst aantreft krijgen vanaf die registratie een instapweek. Discord levert geen historisch tijdstip van een roltoekenning; de bot legt nieuwe toekenningen daarom zelf vast.
 
 
-## Inloggen met Discord — 1.11.0
+## Inloggen met Discord — 2.2.0
 
 Open het dashboard en klik **Inloggen met Discord**. Je eigen Discord-account en je actuele **Legion Lead-rol** bepalen de toegang. In de hoofdserver is dat rol `1555685630707769382`; in de community is dat de ingestelde Lead-rol `1555726440933363761`. Je ziet alleen de servers waar je die rol hebt. Administrator zonder Lead-rol geeft geen toegang. Een verloren Lead-rol blokkeert ook een bestaande sessie.
 
 Stel eenmalig de private `DISCORD_CLIENT_SECRET` en de OAuth2-redirect in volgens **HOSTING.md**. De bot vraagt uitsluitend je Discord-identiteit op, geen e-mail of extra serverrechten. Discord-tokens blijven op de server, worden niet in de botdatabase bewaard en komen niet in de browser. De dashboardsessie blijft dertig minuten geldig. `/dashboard` opent dezelfde loginpagina; zonder OAuth-configuratie blijft de bestaande eenmalige Lead-link beschikbaar.
 
-## Wekelijks overzicht — 1.10.1
+## Wekelijks overzicht — 2.1.1
 
 Het automatische overzicht wordt **iedere zondag om 09:00 Belgische tijd** verstuurd naar het privé leidinglogkanaal. Het behandelt de afgelopen **zondag tot en met zaterdag**, inclusief de zaterdagse gangpotdeadline. De eerste rapportage behandelt de week waarin deze update start; gemiste weken worden na een storing alsnog verstuurd, eenmaal per week. Bij een installatie op zaterdag 17 oktober is het eerste overzicht dus zondag 18 oktober om 09:00, over 11 t/m 17 oktober.
 
 Gebruik `/weekoverzicht` of de dashboardpagina **Weekoverzicht** om tussentijds cijfers te bekijken. Een datum kiest de zondag–zaterdagweek waarin die datum valt. Via **Modules instellen → Weekoverzicht** kun je verzending en de tijd aanpassen; een administrator kan het privé bestemmingskanaal wijzigen. Eerdere tijd-, kanaal- en aan/uit-instellingen worden meegenomen. De automatische maandverzending wordt vervangen; `/maandoverzicht` en **Maandcijfers** blijven op aanvraag beschikbaar. Oude maandrapporten en overige botgegevens blijven behouden.
 
-## Maandoverzicht en correctie van eerdere warns — 1.10.0
+## Maandoverzicht en correctie van eerdere warns — 2.1.0
 
 **Bezwaar maken:** nieuwe gangwarnberichten en DM's hebben een knop **Bezwaar maken**. Alleen de eigenaar kan daarop een bezwaar voorbereiden. Daarna geeft het lid in de hoofdserver de uitleg via `/bezwaar uitleg:...`; er opent geen formulier. Voor een oudere warn kan dit ook via `/mijnwarns` of `/bezwaar uitleg:... id:...`. De uitleg en beoordelingsknoppen verschijnen in het privé leidinglogkanaal en op **Bezwaren** in het dashboard. Alleen een huidig Lead-lid mag beslissen; een Lead kan het eigen bezwaar niet beoordelen. Goedkeuren trekt uitsluitend de gekoppelde warn in, afwijzen laat die staan. Het lid krijgt de beslissing per DM. Een lopend bezwaar geeft geen uitstel, vrijstelling of tijdelijke verwijdering van de warn. Eén bezwaar per warn voorkomt dubbele dossiers; een tussentijds ingetrokken warn sluit het bezwaar automatisch.
 
-In de hoofdserver kan de leiding ook maandtotalen opvragen. Automatische verzending is vanaf 1.10.1 wekelijks, zoals hierboven beschreven. Het overzicht bevat activiteiten en planningreacties, check-ins en vrijstellingen, promoties en geldige gangpotboekingen. Planningreacties meten beschikbaarheid, geen daadwerkelijke aanwezigheid in FiveM. Geannuleerde activiteiten en teruggedraaide geldboekingen tellen niet mee in de bijbehorende totalen. Fictieve Discord-coins staan los van de gangpot.
+In de hoofdserver kan de leiding ook maandtotalen opvragen. Automatische verzending is vanaf 2.1.1 wekelijks, zoals hierboven beschreven. Het overzicht bevat activiteiten en planningreacties, check-ins en vrijstellingen, promoties en geldige gangpotboekingen. Planningreacties meten beschikbaarheid, geen daadwerkelijke aanwezigheid in FiveM. Geannuleerde activiteiten en teruggedraaide geldboekingen tellen niet mee in de bijbehorende totalen. Fictieve Discord-coins staan los van de gangpot.
 
 De wekelijkse verzending gebruikt standaard het bestaande **privé leidinglogkanaal**. Via **Modules instellen → Weekoverzicht** kunnen tijd en verzending worden aangepast; een administrator kan een ander privé overzichtkanaal kiezen. **Maandoverzicht** in het dashboard en `/maandoverzicht maand:2026-10` geven de leiding ook tussentijds inzage. De commandoreactie is privé.
 
@@ -33,7 +40,7 @@ Een Nederlandstalige bot met gangwarns, gangpotbetalingen, sollicitatietickets, 
 
 ![Bakarov](src/branding-assets/logo.webp)
 
-Versie **1.9.0** geeft de bot, het dashboard, de panelen en nieuwe transcripts de naam **Bakarov** en een zwart-gouden huisstijl met het aangeleverde logo. De bot werkt zijn Discord-naam en profielfoto bij de eerste start bij; bij een geweigerde profielwijziging volgt een melding in de console en een nieuwe poging bij de volgende start. Oude botbijnamen worden waar mogelijk aangepast.
+Versie **2.0.0** geeft de bot, het dashboard, de panelen en nieuwe transcripts de naam **Bakarov** en een zwart-gouden huisstijl met het aangeleverde logo. De bot werkt zijn Discord-naam en profielfoto bij de eerste start bij; bij een geweigerde profielwijziging volgt een melding in de console en een nieuwe poging bij de volgende start. Oude botbijnamen worden waar mogelijk aangepast.
 
 Bestaande dashboardteksten met de oude naam worden eenmalig bijgewerkt. Coins, warns, betalingen, afmeldingen en dossiers blijven bewaard. De databasebestanden houden bewust hun bestaande naam `legion-<guildId>.sqlite`; hernoem of verwijder die niet. Oude panelen, ledenlijsten en sollicitatieknoppen blijven herkenbaar. Eerder opgeslagen gesprekken en berichten van leden blijven historische gegevens. De bestaande GitHub-repository en het vaste hostingadres blijven bruikbaar.
 

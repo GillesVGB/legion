@@ -13,7 +13,7 @@ import {missionDay} from './mission-definitions.mjs';
 import {exemptionFor} from './absence.mjs';
 import {syncGangpotReminders} from './gangpot-reminders.mjs';
 import {editIfChanged} from './message-updates.mjs';
-import {gangpotIntroduction,syncGangpotMemberships,recordGangpotMembership} from './gangpot-membership.mjs';
+import {gangpotIntroduction,syncGangpotMemberships,recordGangpotMembership,recoverAcceptedMemberships} from './gangpot-membership.mjs';
 
 export function trackGangpotMembership(ctx,before,after,now=Date.now()){
   recordGangpotMembership(ctx,before,after,time=>gangpotWindow(ctx.config.gangpot,time),now);
@@ -331,13 +331,20 @@ async function deliverNotices(ctx,guild,client,now){
     }catch(error){ctx.store.db.prepare('UPDATE gangpot_notifications SET next_attempt=?,last_error=? WHERE id=?').run(now+60000,String(error.code||error.name),item.id);}
   }
 }
-export async function syncGangpot(ctx,client,now=Date.now()){
+export async function syncGangpot(ctx,client,now=Date.now(),contexts=new Map()){
   if(!ctx.config.gangpot)return;
   return serializeCommunity(`${ctx.config.guildId}:gangpot`,async()=>{
     const guild=client.guilds.cache.get(ctx.config.guildId);assertUser(guild,'De gangpot-hoofdserver is niet bereikbaar.');
     // Geen automatische straf op basis van een lege of verouderde ledencache.
     await refreshMembers(guild);migrateOpenTerms(ctx,guild,now);
     syncGangpotMemberships(ctx,guild,time=>gangpotWindow(ctx.config.gangpot,time),now);
+    const accepted=recoverAcceptedMemberships(ctx,guild,contexts,time=>gangpotWindow(ctx.config.gangpot,time),now);
+    ctx.store.transaction(()=>{
+      for(const user of accepted)for(const debt of ctx.store.db.prepare('SELECT period_id FROM gangpot_dues WHERE user_id=? AND warn_id IS NOT NULL').all(user)){
+        const period=periodById(ctx,debt.period_id);
+        if(gangpotIntroduction(ctx,user,period))reconcileGangpotDebt(ctx,debt.period_id,user,guild.members.me.id,now);
+      }
+    });
     ensurePeriod(ctx,guild,now);enforcePeriods(ctx,guild,now);
     await deliverNotices(ctx,guild,client,now);
     await publishClaims(ctx,guild,now);

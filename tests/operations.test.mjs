@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {PermissionsBitField,PermissionFlagsBits as P} from 'discord.js';
+import {PermissionsBitField,PermissionFlagsBits as P,EmbedBuilder} from 'discord.js';
 import {dashboardFixture,ACTOR,OTHER} from './dashboard-fixture.mjs';
 import {createAbsence,decideAbsence,setExemption,exemptionFor,activityAbsences,syncAbsences} from '../src/absence.mjs';
 import {syncGangpot,gangpotMembers,reportGangpotPayment,reviewGangpotPayment} from '../src/gangpot.mjs';
@@ -10,7 +10,7 @@ import {operationSettings} from '../src/feature-settings.mjs';
 import {Dashboard} from '../src/dashboard.mjs';
 import {Locks} from '../src/locks.mjs';
 import {recordInteraction,flushAuditLogs,cleanAudit} from '../src/audit-log.mjs';
-import {announceRelease,releaseVersion,releaseNotes} from '../src/release-announcements.mjs';
+import {announceRelease,releaseVersion,releaseNotes,renamedVersions} from '../src/release-announcements.mjs';
 import {botHealth} from '../src/bot-status.mjs';
 import {fishBookMessage,handleFishBookButton} from '../src/fish-book.mjs';
 import {commands} from '../src/commands.mjs';
@@ -118,6 +118,29 @@ test('changelog wordt één keer per versie geplaatst en herstelt een verstuurd 
   await announceRelease(f.ctx,f.guild);await announceRelease(f.ctx,f.guild);assert.equal(channel.posted.size,1);
   f.ctx.store.db.prepare('UPDATE release_announcements SET message_id=NULL WHERE version=?').run(releaseVersion);await announceRelease(f.ctx,f.guild);assert.equal(channel.posted.size,1);
   await announceRelease(f.ctx,f.guild,'9.9.9',['Een nieuwe verbetering.']);assert.equal(channel.posted.size,2);
+});
+
+test('Bakarov start bij 2.0.0; bestaande botupdates worden in hetzelfde bericht hernummerd en herstarts dupliceren niets',async t=>{
+  const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.updateChannelId);
+  assert.equal(renamedVersions['1.9.0'],'2.0.0');assert.ok(releaseNotes['2.0.0']);assert.equal(releaseNotes['1.9.0'],undefined);assert.equal(releaseVersion,'2.3.1');
+  const older=[];
+  for(const version of ['1.9.0','1.12.0']){
+    const message=await channel.send({embeds:[new EmbedBuilder().setTitle(`Bakarov — Botupdate ${version}`).setDescription('Bestaande wijziging.').setFooter({text:`Bakarov • Botupdate ${version}`})]});
+    f.ctx.store.db.prepare('INSERT INTO release_announcements(version,message_id) VALUES(?,?)').run(version,message.id);older.push([version,message]);
+  }
+  const human=await channel.send({embeds:[new EmbedBuilder().setTitle('Kopie').setFooter({text:'Bakarov • Botupdate 1.9.0'})]});human.author={id:OTHER};
+  await announceRelease(f.ctx,f.guild);
+  for(const [old,message]of older){assert.equal(message.embeds[0].title,`Bakarov — Botupdate ${renamedVersions[old]}`);assert.equal(f.ctx.store.db.prepare('SELECT message_id FROM release_announcements WHERE version=?').get(renamedVersions[old]).message_id,message.id);}
+  assert.equal(human.embeds[0].title,'Kopie');assert.equal(channel.posted.size,4);
+  await announceRelease(f.ctx,f.guild);assert.equal(channel.posted.size,4);
+});
+
+test('een mislukte versieaanpassing wordt opnieuw geprobeerd zonder de nieuwe changelog te blokkeren',async t=>{
+  const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.updateChannelId);
+  const older=await channel.send({embeds:[new EmbedBuilder().setTitle('Bakarov — Botupdate 1.9.0').setFooter({text:'Bakarov • Botupdate 1.9.0'})]}),edit=older.edit;
+  older.edit=async()=>{throw Object.assign(new Error('Tijdelijk'),{code:503});};
+  await announceRelease(f.ctx,f.guild);assert.equal(channel.posted.size,2);assert.equal(f.ctx.store.setting('release:renumber:error'),'503');
+  older.edit=edit;await announceRelease(f.ctx,f.guild);assert.equal(older.embeds[0].title,'Bakarov — Botupdate 2.0.0');assert.equal(channel.posted.size,2);assert.equal(f.ctx.store.setting('release:renumbered:2'),'1');
 });
 
 test('botstatus toont wachtende acties; sollicitatie- en ticketcreatie blijven uitsluitend in de community',t=>{

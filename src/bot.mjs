@@ -533,7 +533,7 @@ async function performMaintenance(){
     if(guild){
       if(ctx.config.gangpot)jobs.push(['warncorrecties',()=>syncAbsenceCorrections(ctx,guild)]);
       if(ctx.config.gangpot)jobs.push(['bezwaren',()=>syncWarnAppeals(ctx,guild)]);
-      if(ctx.config.gangpot)jobs.push(['gangpot',()=>syncGangpot(ctx,client)]);
+      if(ctx.config.gangpot)jobs.push(['gangpot',()=>syncGangpot(ctx,client,Date.now(),contexts)]);
       jobs.push(['afmeldingen',()=>syncAbsences(ctx,guild)]);
       if(ctx.config.absencePanelChannelId)jobs.push(['afmeldpaneel',()=>publishAbsencePanel(ctx,guild)]);
       jobs.push(['changelog',()=>announceRelease(ctx,guild)],['gesprekken',()=>cleanupInterviews(ctx,guild)],['check-ins',()=>syncActivityChecks(ctx,guild)],['planning',()=>syncActivities(ctx,guild)],['promoties',()=>syncPromotions(ctx,guild)]);

@@ -115,3 +115,49 @@ test('rol opnieuw geven vóór de eerste migratiesynchronisatie wist een bestaan
   await syncGangpot(f.ctx,f.client,MID);assert.equal(member(f).newMember,false);
   await syncGangpot(f.ctx,f.client,END);assert.equal(activeWarns(f).length,1);
 });
+
+function acceptNewcomer(f,{at=MID,status='accepted',target=f.ctx.config.guildId}={}){
+  const newcomer=f.guild.addMember(NEW,'Recent aangenomen',[f.role]);newcomer.joinedTimestamp=START-180*86400000;
+  const application=f.source.store.reserveCase('application',NEW,{template:true});
+  f.source.store.bindCase(application.id,'100000000000000188');f.source.store.openCase(application.id,'100000000000000189');f.source.store.closeCase(application.id,'accepted',ACTOR);
+  f.source.store.db.prepare('UPDATE cases SET closed_at=?,status=? WHERE id=?').run(at,status,application.id);
+  f.source.store.db.prepare('UPDATE acceptance_notifications SET target_guild_id=? WHERE case_id=?').run(target,application.id);
+  return application;
+}
+
+test('opgeslagen aanname corrigeert een oude instapwarn met groene kanaalmelding en DM, ook bij een inactieve oude inschrijving',async t=>{
+  const f=fixture(t);acceptNewcomer(f);
+  await syncGangpot(f.ctx,f.client,MID+1000);assert.equal(member(f).newMember,false);
+  await syncGangpot(f.ctx,f.client,END);const automatic=activeWarns(f)[0];assert.ok(automatic);
+  const manual=f.ctx.store.addWarnInside(NEW,ACTOR,'Andere gangafspraak overtreden.',END+1);
+  f.ctx.store.db.prepare('UPDATE gangpot_dues SET active=0 WHERE period_id=? AND user_id=?').run('2026-10-17',NEW);
+  await syncGangpot(f.ctx,f.client,END+1000,f.contexts);
+  assert.deepEqual(activeWarns(f).map(warn=>warn.id),[manual.id]);
+  assert.match(f.ctx.store.db.prepare('SELECT removed_reason FROM warnings WHERE id=?').get(automatic.id).removed_reason,/instapweek/);
+  const channel=f.guild.channels.cache.get(f.ctx.config.warnLogChannelId),corrections=[...channel.posted.values()].filter(post=>post.embeds.some(card=>card.color===0x22C55E&&card.description.includes(automatic.id)));
+  assert.equal(corrections.length,1);assert.ok(corrections[0].embeds[0].description.includes(`<@${NEW}>`));
+  const dmCount=()=>f.calls.filter(call=>call.method==='dm'&&call.user===NEW&&call.payload.embeds?.some(card=>card.toJSON().color===0x22C55E)).length;
+  assert.equal(dmCount(),1);await syncGangpot(f.ctx,f.client,END+2000,f.contexts);assert.equal(dmCount(),1);
+  assert.equal(f.ctx.store.db.prepare('SELECT source FROM gangpot_memberships WHERE user_id=?').get(NEW).source,'admission');
+  await syncGangpot(f.ctx,f.client,END+7*86400000,f.contexts);
+  assert.equal(activeWarns(f).length,2); // The manual warn and the next full-term gangpotwarn.
+});
+
+test('een aanname geeft oudere leden geen nieuwe instapweek en trekt handmatige warns niet in',async t=>{
+  const f=fixture(t);acceptNewcomer(f);
+  f.ctx.store.db.prepare("INSERT INTO gangpot_periods(id,starts_at,ends_at,weekly_amount,status) VALUES('2026-10-10',?,?,25000,'closed')").run(START-8*86400000,START-1000);
+  f.ctx.store.db.prepare("INSERT INTO gangpot_dues(period_id,user_id,enrolled_at,active) VALUES('2026-10-10',?,?,0)").run(NEW,START-7*86400000);
+  await syncGangpot(f.ctx,f.client,MID+1000);await syncGangpot(f.ctx,f.client,END,f.contexts);
+  assert.equal(activeWarns(f).length,1);assert.equal(member(f).newMember,false);
+  const warning=activeWarns(f)[0];f.ctx.store.db.prepare('UPDATE warnings SET actor_id=? WHERE id=?').run(ACTOR,warning.id);
+  f.ctx.store.db.prepare("DELETE FROM gangpot_dues WHERE period_id='2026-10-10'").run();
+  await syncGangpot(f.ctx,f.client,END+1000,f.contexts);assert.equal(activeWarns(f)[0].id,warning.id);
+});
+
+test('afgewezen aanvragen en aannames voor een andere server zijn geen bewijs voor een gangpot-intrekking',async t=>{
+  for(const input of [{status:'rejected'},{target:'999999999999999999'},{at:END+86400000}]){
+    const f=fixture(t);acceptNewcomer(f,input);
+    await syncGangpot(f.ctx,f.client,MID+1000);await syncGangpot(f.ctx,f.client,END,f.contexts);
+    assert.equal(activeWarns(f).length,1);assert.equal(member(f).newMember,false);
+  }
+});
