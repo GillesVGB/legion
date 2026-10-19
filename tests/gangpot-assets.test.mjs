@@ -14,7 +14,7 @@ test('items en zwartgeld blijven apart van gewoon geld, weekbetalingen en coins;
   assert.equal(assetBalance(f.ctx,'item',' REPAIRKITS '),5);assert.equal(gangpotAssets(f.ctx).blackMoney,25000);assert.equal(gangpotBalance(f.ctx),0);
   assert.equal(f.ctx.store.db.prepare('SELECT COUNT(*) AS n FROM gangpot_entries').get().n,0);assert.equal(f.ctx.store.wallet(OTHER).balance,before);
   assert.throws(()=>entry(f,{quantity:6}),/andere registratie/);assert.equal(gangpotAssets(f.ctx).history.length,2);
-  const card=gangpotTotalMessage(f.ctx,f.guild,NOW).embeds[0].data;assert.match(card.fields.find(field=>field.name==='Zwartgeld').value,/€25.000/);assert.match(card.fields.find(field=>field.name==='Items in de gangpot').value,/repairkits/);
+  const card=gangpotTotalMessage(f.ctx,f.guild,NOW).embeds[0].data;assert.match(card.description,/## Totaal zwartgeld gangpot: €25.000/);assert.match(card.description,/## Totaal witgeld gangpot: €0/);assert.match(card.description,/### 5 × repairkits/);
   assert.equal(gangpotMoney(25000),'€25.000');assert.doesNotMatch(card.description,/\$/);
 });
 test('opnames en correcties kunnen geen negatieve voorraad maken en behouden alle historische registraties',t=>{

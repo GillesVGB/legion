@@ -1,8 +1,14 @@
 # Bakarov — Discord-bot voor Future RP
 
+## Bestemming en gangpotoverzicht — 2.5.1
+
+De vaste bestemming voor de wekelijkse activiteitencheck is **mededelingen, 1555685632704249932**. De oude standaard in planning wordt eenmalig aangepast; latere eigen dashboardkeuzes blijven bewaard. Een bestaande open weekcheck wordt met hetzelfde check-ID opnieuw geplaatst. Opgeslagen bevestigingen en gemiste vinkjes uit het oude bericht blijven behouden. Het oude bericht verdwijnt pas nadat de vervanging en de nieuwe koppeling zijn opgeslagen. Bij een tijdelijke fout wordt de overdracht herhaald zonder dubbele check.
+
+De vaste gangpot-embed toont **Totaal witgeld**, **Totaal zwartgeld** en **Items** als grote koppen, met de actuele bedragen en aantallen. Het overzicht met betaalde weekbijdragen staat eronder. De titel en totalen passen zich aan de echte registraties aan; voorbeeldbedragen worden niet geboekt.
+
 ## Wekelijkse check en gangpotvoorraad — 2.5.0
 
-De automatische activiteitencheck heeft vanaf **vrijdag 23-10-2026 iedere vrijdag om 07:30 Belgische tijd** zijn deadline. De check wordt vooraf geopend in het planningkanaal en krijgt de reden **Wekelijkse activiteitencheck**. Bakarov wordt getagd en leden reageren met ✅. Na de deadline blijft de bestaande controle gelden: maximaal één gangwarn zonder tijdige bevestiging of goedgekeurde afwezigheidsperiode. De volgende weekcheck wordt daarna geopend. Een losse planningsafmelding geeft geen vrijstelling.
+De automatische activiteitencheck heeft vanaf **vrijdag 23-10-2026 iedere vrijdag om 07:30 Belgische tijd** zijn deadline. De check wordt vooraf geopend in mededelingen (`1555685632704249932`) en krijgt de reden **Wekelijkse activiteitencheck**. Bakarov wordt getagd en leden reageren met ✅. Na de deadline blijft de bestaande controle gelden: maximaal één gangwarn zonder tijdige bevestiging of goedgekeurde afwezigheidsperiode. De volgende weekcheck wordt daarna geopend. Een losse planningsafmelding geeft geen vrijstelling.
 
 De startdatum, deadline, reden, het kanaal en aan/uit zijn te wijzigen bij **Modules instellen → Activiteitencheck & herinneringen**. De weekdag volgt uit de startdatum. Annuleren met `/activiteitencheck-stop` stopt alleen de lopende check; zet de wekelijkse instelling uit om ook volgende checks te stoppen. Herstarts dupliceren geen weekcheck en gemiste, nog nooit gepubliceerde weken worden overgeslagen.
 
@@ -24,7 +30,7 @@ De transcriptviewer past de Bakarov-naam, het logo en de zwart-gouden huisstijl 
 
 ## Bakarov-versies en correctie van aannamewarns — 2.3.1
 
-Vanaf de rename naar Bakarov begint de versiereeks bij **2.0.0**. De latere updates zijn doorgerekend: overzichten en bezwaren 2.1.x, Discord-login 2.2.x en instapvrijstelling 2.3.x. De huidige versie is **2.5.0**.
+Vanaf de rename naar Bakarov begint de versiereeks bij **2.0.0**. De latere updates zijn doorgerekend: overzichten en bezwaren 2.1.x, Discord-login 2.2.x en instapvrijstelling 2.3.x. De huidige versie is **2.5.1**.
 
 Bij de gangpotcontrole gebruikt de bot nu ook de opgeslagen aangenomen sollicitaties uit de community-guild als bewijs van toetreding. Een bestaande automatische gangpotwarn uit de instapweek wordt ingetrokken met een groene melding in het ingestelde gangwarnkanaal en een DM. Een herstart geeft geen dubbele intrekking. Bestaande verplichtingen van eerdere gangleden, handmatige warns en latere volledige betaaltermijnen worden niet kwijtgescholden. Bewaar de volledige `data/`-map van beide guilds.
 

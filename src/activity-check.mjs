@@ -1,6 +1,6 @@
 import {warnAppealRow} from './warn-appeal-ui.mjs';
 import {canonicalBrandText} from './branding.mjs';
-import {randomBytes} from 'node:crypto';
+import {randomBytes,createHash} from 'node:crypto';
 import {MessageFlags,PermissionFlagsBits as P} from 'discord.js';
 import {assertUser,UserError} from './errors.mjs';
 import {embed,safeText} from './ui.mjs';
@@ -10,7 +10,7 @@ import {refreshMembers} from './members.mjs';
 import {planningTime,requirePlanningGuild} from './activities.mjs';
 import {missionDay} from './mission-definitions.mjs';
 import {queueFeatureNotice,deliverFeatureNotices} from './notices.mjs';
-import {operationSettings} from './feature-settings.mjs';
+import {operationSettings,WEEKLY_CHECK_CHANNEL_ID} from './feature-settings.mjs';
 
 const checkById=(ctx,id)=>ctx.store.db.prepare('SELECT * FROM activity_check_sessions WHERE id=?').get(id);
 const membersOf=(ctx,id)=>ctx.store.db.prepare('SELECT * FROM activity_check_members WHERE check_id=? ORDER BY user_id').all(id);
@@ -180,10 +180,10 @@ async function checkReactionUsers(message){
 }
 export async function handleActivityCheckReaction(ctx,reaction,user,added,now=Date.now()){
   if(!added||user.bot||reaction.emoji.name!=='✅'||ctx.config.guildId!=='1555685630640652338')return;
-  const check=ctx.store.db.prepare('SELECT * FROM activity_check_sessions WHERE message_id=? AND channel_id=?').get(reaction.message.id,reaction.message.channelId);if(!check)return;
+  const check=ctx.store.db.prepare('SELECT * FROM activity_check_sessions WHERE message_id=? AND channel_id=?').get(reaction.message.id,reaction.message.channelId)||checkById(ctx,ctx.store.setting(`activitycheck:moved-from:${reaction.message.channelId}:${reaction.message.id}`)||'');if(!check)return;
   if(check.status!=='open'||now>=check.deadline_at){await reaction.users.remove(user.id);return;}
   if(!ctx.store.db.prepare('SELECT 1 FROM activity_check_members WHERE check_id=? AND user_id=?').get(check.id,user.id))return;
-  try{await respondActivityCheck(ctx,reaction.message.guild,{id:user.id},check.id,{channelId:reaction.message.channelId,messageId:reaction.message.id},now);}
+  try{await respondActivityCheck(ctx,reaction.message.guild,{id:user.id},check.id,{channelId:check.channel_id,messageId:check.message_id},now);}
   catch(error){if(error instanceof UserError||error.code===10007||checkById(ctx,check.id)?.status!=='open')return;throw error;}
   await publishActivityCheck(ctx,reaction.message.guild,check.id).catch(()=>{});
 }
@@ -209,6 +209,7 @@ async function syncOpenCheckReactions(ctx,guild,id,now){
 }
 export async function syncActivityChecks(ctx,guild,now=Date.now()){
   if(ctx.config.guildId!=='1555685630640652338')return;
+  await cleanupMovedActivityChecks(ctx,guild,now);
   if(ctx.store.setting('activitycheck:layout')!=='2'){
     ctx.store.transaction(()=>{ctx.store.db.prepare("UPDATE activity_check_sessions SET dirty=1,next_attempt=0 WHERE status='open'").run();ctx.store.setSetting('activitycheck:layout','2');});
   }
@@ -228,6 +229,57 @@ export async function syncActivityChecks(ctx,guild,now=Date.now()){
   // A broken destination for the next week must not block logs/DMs of completed checks.
   await syncWeeklyActivityCheck(ctx,guild,now);
 }
+export async function cleanupMovedActivityChecks(ctx,guild,now=Date.now()){
+  for(const item of ctx.store.db.prepare("SELECT key,value FROM settings WHERE key LIKE 'activitycheck:move-cleanup:%'").all()){
+    let job;try{
+      job=JSON.parse(item.value);if(job.nextAttempt>now)continue;
+      const current=checkById(ctx,job.id);
+      if(current?.channel_id===job.channelId&&current?.message_id===job.messageId)continue;
+      const channel=await guild.channels.fetch(job.channelId).catch(error=>{if(error.code===10003)return null;throw error;});
+      const message=channel?await channel.messages.fetch(job.messageId).catch(error=>{if(error.code===10008)return null;throw error;}):null;
+      if(message){assertUser(message.author.id===guild.members.me.id&&message.embeds?.some(card=>canonicalBrandText(card.footer?.text)===marker(job.id)),'Het oude checkbericht hoort niet bij deze bot.');await message.delete();}
+      ctx.store.db.prepare('DELETE FROM settings WHERE key=?').run(item.key);
+    }catch(error){if(job)ctx.store.setSetting(item.key,JSON.stringify({...job,nextAttempt:now+60000,error:String(error.code||error.name)}));}
+  }
+}
+export async function moveActivityCheck(ctx,guild,id,channelId,now=Date.now()){
+  requirePlanningGuild(ctx);
+  return serializeCommunity(`${guild.id}:checkin:${id}`,async()=>{
+    const check=checkById(ctx,id);assertUser(check?.status==='open'&&now<check.deadline_at,'Deze activiteitencheck is niet meer open.');
+    if(check.channel_id===channelId){await cleanupMovedActivityChecks(ctx,guild,now);return check;}
+    const target=await communityChannel(guild,channelId);
+    assertUser(target.permissionsFor(guild.members.me)?.has([P.EmbedLinks,P.AddReactions,P.ManageMessages]),'Geef de bot Links insluiten, Reacties toevoegen en Berichten beheren in het nieuwe kanaal.');
+    const role=await guild.roles.fetch(ctx.config.memberRoleId);
+    assertUser(role&&(role.mentionable||target.permissionsFor(guild.members.me)?.has(P.MentionEveryone)),'De bot kan Bakarov niet taggen in het nieuwe kanaal.');
+    const fresh=await refreshMembers(guild),members=membersOf(ctx,id).map(item=>fresh.get(item.user_id)).filter(member=>eligible(ctx,member));
+    assertUser(members.every(member=>target.permissionsFor(member)?.has([P.ViewChannel,P.ReadMessageHistory])),'Alle opgenomen Bakarov-leden moeten het nieuwe kanaal kunnen bekijken.');
+    const source=await communityChannel(guild,check.channel_id),previous=check.message_id?await source.messages.fetch({message:check.message_id,force:true}):null;
+    assertUser(!check.message_id||previous?.author.id===guild.members.me.id,'Het oorspronkelijke checkbericht ontbreekt.');
+    const confirmed=previous?await checkReactionUsers(previous):new Set();
+    const saveResponses=users=>{for(const user of users)ctx.store.db.prepare("UPDATE activity_check_members SET status='responded',responded_at=? WHERE check_id=? AND user_id=? AND responded_at IS NULL").run(now,id,user);};
+    ctx.store.transaction(()=>saveResponses(confirmed));
+    // The old binding stays usable until the replacement and its ✅ are confirmed.
+    let replacement,before;
+    for(let page=0;page<10;page++){
+      const history=await target.messages.fetch({limit:100,...(before?{before}:{})});
+      replacement=[...history.values()].find(message=>message.author.id===guild.members.me.id&&message.embeds?.some(card=>canonicalBrandText(card.footer?.text)===marker(id)));
+      if(replacement||history.size<100)break;before=history.last().id;
+    }
+    replacement??=await target.send({...activityCheckMessage(ctx,check),nonce:createHash('sha256').update(`check-move:${id}:${channelId}`).digest('hex').slice(0,24),enforceNonce:true,allowedMentions:{parse:[],roles:[ctx.config.memberRoleId],users:[],repliedUser:false}});
+    if(!replacement.reactions.cache.get('✅')?.me)await replacement.react('✅');
+    const targetResponses=await checkReactionUsers(replacement);
+    const latestSourceResponses=previous?await checkReactionUsers(previous):new Set();
+    ctx.store.transaction(()=>{
+      saveResponses(targetResponses);
+      saveResponses(latestSourceResponses);
+      ctx.store.db.prepare('UPDATE activity_check_sessions SET channel_id=?,message_id=?,published_at=COALESCE(published_at,?),dirty=1,next_attempt=0,last_error=NULL WHERE id=?').run(channelId,replacement.id,now,id);
+      if(previous){ctx.store.setSetting(`activitycheck:move-cleanup:${id}:${previous.id}`,JSON.stringify({id,channelId:check.channel_id,messageId:previous.id}));ctx.store.setSetting(`activitycheck:moved-from:${check.channel_id}:${previous.id}`,id);}
+      ctx.store.audit('activitycheck.move',guild.members.me.id,{id,channel:channelId});
+    });
+    await cleanupMovedActivityChecks(ctx,guild,now);
+    return checkById(ctx,id);
+  });
+}
 export function weeklyCheckDeadline(ctx,now=Date.now()){
   const settings=operationSettings(ctx).activityCheck;if(!settings.weeklyEnabled)return null;
   let date=settings.weeklyStartDate,deadline=planningTime(date,settings.weeklyTime,now);
@@ -239,15 +291,16 @@ export async function syncWeeklyActivityCheck(ctx,guild,now=Date.now()){
   if(ctx.config.guildId!=='1555685630640652338')return;
   return serializeCommunity(`${guild.id}:weekly-checkin`,async()=>{
     const next=weeklyCheckDeadline(ctx,now);if(!next||next.deadline-now>7*86400000+3600000)return;
-    if(ctx.store.db.prepare('SELECT 1 FROM activity_check_occurrences WHERE deadline_date=?').get(next.date))return;
+    const settings=operationSettings(ctx).activityCheck,target=settings.weeklyChannelId||WEEKLY_CHECK_CHANNEL_ID;
+    const scheduled=ctx.store.db.prepare("SELECT c.* FROM activity_check_sessions c JOIN activity_check_occurrences o ON o.check_id=c.id WHERE o.deadline_date=?").get(next.date);
+    if(scheduled){if(scheduled.status==='open'&&scheduled.channel_id!==target)await moveActivityCheck(ctx,guild,scheduled.id,target,now);return;}
     const open=ctx.store.db.prepare("SELECT * FROM activity_check_sessions WHERE status='open'").get();
     if(open){
       // Reuse a manually started check with this exact deadline instead of duplicating it.
-      if(open.deadline_at===next.deadline){ctx.store.transaction(()=>{ctx.store.db.prepare('INSERT INTO activity_check_occurrences(deadline_date,check_id) VALUES(?,?)').run(next.date,open.id);ctx.store.db.prepare('UPDATE activity_check_sessions SET reason=?,dirty=1,next_attempt=0 WHERE id=?').run(operationSettings(ctx).activityCheck.weeklyReason,open.id);});}
+      if(open.deadline_at===next.deadline){ctx.store.transaction(()=>{ctx.store.db.prepare('INSERT INTO activity_check_occurrences(deadline_date,check_id) VALUES(?,?)').run(next.date,open.id);ctx.store.db.prepare('UPDATE activity_check_sessions SET reason=?,dirty=1,next_attempt=0 WHERE id=?').run(operationSettings(ctx).activityCheck.weeklyReason,open.id);});if(open.channel_id!==target)await moveActivityCheck(ctx,guild,open.id,target,now);}
       return;
     }
-    const settings=operationSettings(ctx).activityCheck;
-    await createCheck(ctx,guild,guild.members.me,{date:next.date,time:settings.weeklyTime,reason:settings.weeklyReason,channelId:settings.weeklyChannelId||ctx.config.planningChannelId,scheduleDate:next.date},now);
+    await createCheck(ctx,guild,guild.members.me,{date:next.date,time:settings.weeklyTime,reason:settings.weeklyReason,channelId:target,scheduleDate:next.date},now);
   });
 }
 export async function syncCheckReminders(ctx,guild,now=Date.now()){

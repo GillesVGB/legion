@@ -8,8 +8,9 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {Store} from '../src/store.mjs';
+const DESTINATION='1555685632704249932';
 const NOW=Date.parse('2026-10-20T10:00:00Z'),FIRST=Date.parse('2026-10-23T05:30:00Z');
-function fixture(t){const f=dashboardFixture();t.after(f.close);const ctx=f.contexts.values().next().value,guild=f.guilds.get(ctx.config.guildId),lead=guild.members.cache.get(ACTOR);guild.members.cache.get(OTHER).roles.cache.set(ctx.config.memberRoleId,guild.roles.cache.get(ctx.config.memberRoleId));const channel=guild.channels.cache.get(ctx.config.planningChannelId),permissions=channel.permissionsFor;channel.permissionsFor=member=>member.roles?.cache.has(ctx.config.memberRoleId)?new PermissionsBitField([P.ViewChannel,P.ReadMessageHistory]):permissions(member);return{...f,ctx,guild,lead};}
+function fixture(t){const f=dashboardFixture();t.after(f.close);const ctx=f.contexts.values().next().value,guild=f.guilds.get(ctx.config.guildId),lead=guild.members.cache.get(ACTOR);guild.members.cache.get(OTHER).roles.cache.set(ctx.config.memberRoleId,guild.roles.cache.get(ctx.config.memberRoleId));const channel=guild.channels.cache.get(ctx.config.planningChannelId),permissions=channel.permissionsFor;channel.permissionsFor=member=>member.roles?.cache.has(ctx.config.memberRoleId)?new PermissionsBitField([P.ViewChannel,P.ReadMessageHistory]):permissions(member);const target=guild.makeChannel(DESTINATION,'mededelingen'),targetPermissions=target.permissionsFor;target.permissionsFor=member=>member.roles?.cache.has(ctx.config.memberRoleId)?new PermissionsBitField([P.ViewChannel,P.ReadMessageHistory]):targetPermissions(member);return{...f,ctx,guild,lead};}
 test('weekcheck start met reden en vrijdagdeadline; dubbel onderhoud, herladen en annuleren dupliceren de week niet',async t=>{
   const f=fixture(t);t.mock.method(Date,'now',()=>NOW);loadDashboardSettings(f.ctx);
   await Promise.all([syncWeeklyActivityCheck(f.ctx,f.guild,NOW),syncWeeklyActivityCheck(f.ctx,f.guild,NOW)]);

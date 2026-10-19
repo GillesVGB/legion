@@ -1,4 +1,8 @@
 {
+  "2.5.1": [
+    "De wekelijkse activiteitencheck gebruikt voortaan mededelingen: kanaal 1555685632704249932. Een bestaande weekcheck in planning wordt veilig opnieuw geplaatst met behoud van deadline en opgeslagen bevestigingen.",
+    "De gangpot-embed toont Totaal witgeld, Totaal zwartgeld en Items groot en afzonderlijk. Itemaantallen staan prominent boven het betaaloverzicht."
+  ],
   "2.5.0": [
     "Wekelijkse activiteitencheck: vanaf vrijdag 23 oktober 2026 is de deadline iedere vrijdag om 07:30 Belgische tijd. De check staat vooraf open, tagt Bakarov en leden bevestigen met ✅. Reden: Wekelijkse activiteitencheck.",
     "De bot bewaart iedere weekcheck, hergebruikt een handmatige check met dezelfde deadline en maakt geen dubbele of achteraf gemiste weekchecks aan. Instellingen staan onder Modules instellen → Activiteitencheck & herinneringen.",

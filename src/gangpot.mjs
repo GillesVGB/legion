@@ -281,7 +281,11 @@ export function gangpotPaymentMessage(ctx,guild,now=Date.now()){
 export function gangpotTotalMessage(ctx,guild,now=Date.now()){
   const data=gangpotSummary(ctx,guild,now),period=data.period,active=data.members.filter(item=>item.active);
   const paid=active.filter(item=>item.paid>=period.weekly_amount);
-  const card=embed(ctx.config,'Bakarov — Totaal gangpot & betalingen',`## ${gangpotMoney(data.balance)}\nBevestigd in-game saldo: goedgekeurde betalingen en donaties, min uitgaven.${period?`\n\n**Termijn:** t/m zaterdag ${period.id}\n**Deadline:** <t:${Math.floor((period.ends_at-60000)/1000)}:F>\n**Deze week betaald:** ${paid.filter(item=>!item.exempt).length}/${active.filter(item=>!item.exempt).length} verplichte bijdragen.\n**Vrijgesteld:** ${active.filter(item=>item.exempt).length}, waarvan ${active.filter(item=>item.newMember).length} nieuwe leden.`:''}`).setColor(0x22C55E).setFooter({text:'Bakarov • Totaal gangpot'});
+  const itemLines=[];let inventoryLength=0;
+  for(const item of data.assets.items){const line=`### ${item.quantity.toLocaleString('nl-BE')} × ${safeText(item.name)}`;if(inventoryLength+line.length>1100)break;itemLines.push(line);inventoryLength+=line.length+1;}
+  if(itemLines.length<data.assets.items.length)itemLines.push('… Volledige voorraad in het dashboard.');
+  const inventory=itemLines.join('\n')||'Nog geen items geregistreerd.';
+  const card=embed(ctx.config,'Bakarov — Totaal gangpot & betalingen',`## Totaal witgeld gangpot: ${gangpotMoney(data.balance)}\n## Totaal zwartgeld gangpot: ${gangpotMoney(data.assets.blackMoney)}\n## Items\n${inventory}\n\nWitgeld: goedgekeurde betalingen en donaties, min uitgaven. Zwartgeld en items worden apart bijgehouden.${period?`\n\n**Termijn:** t/m zaterdag ${period.id}\n**Deadline:** <t:${Math.floor((period.ends_at-60000)/1000)}:F>\n**Deze week betaald:** ${paid.filter(item=>!item.exempt).length}/${active.filter(item=>!item.exempt).length} verplichte bijdragen.\n**Vrijgesteld:** ${active.filter(item=>item.exempt).length}, waarvan ${active.filter(item=>item.newMember).length} nieuwe leden.`:''}`).setColor(0x22C55E).setFooter({text:'Bakarov • Totaal gangpot'});
   let lines=[];let length=0,shown=0;
   for(const item of paid){const line=`${item.onTime>=period.weekly_amount?'✅':'🕒'} <@${item.user_id}> · ${gangpotMoney(item.paid)}`;if(length+line.length>3300)break;lines.push(line);length+=line.length+1;shown++;}
   if(!lines.length)lines=['Nog geen volledige weekbijdragen goedgekeurd.'];
@@ -289,9 +293,6 @@ export function gangpotTotalMessage(ctx,guild,now=Date.now()){
   let chunk='';const chunks=[];for(const line of lines){if(chunk.length+line.length+1>1000){chunks.push(chunk);chunk='';}chunk+=(chunk?'\n':'')+line;}if(chunk)chunks.push(chunk);
   chunks.forEach((value,index)=>card.addFields({name:index?'Betaald (vervolg)':'Wie heeft deze week betaald?',value}));
   if(paid.some(item=>item.onTime<period.weekly_amount))card.addFields({name:'🕒 Te laat goedgekeurd',value:'Het bedrag telt mee voor het saldo. Een bestaande gangwarn blijft staan.'});
-  card.addFields({name:'Zwartgeld',value:gangpotMoney(data.assets.blackMoney),inline:true});
-  const inventory=data.assets.items.map(item=>`${safeText(item.name)}: **${item.quantity.toLocaleString('nl-BE')}**`).join('\n')||'Nog geen items geregistreerd.';
-  card.addFields({name:'Items in de gangpot',value:inventory.length>1000?inventory.slice(0,950)+'\n… Volledige voorraad in het dashboard.':inventory});
   return{embeds:[card],components:[row(button('gangpot:status','Mijn betaalstatus'))],allowedMentions:quiet};
 }
 async function upsertGangpotPost(ctx,guild,channelId,key,payload,marker){
