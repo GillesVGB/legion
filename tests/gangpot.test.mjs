@@ -82,7 +82,7 @@ test('alleen een actuele Lead-rol kan goedkeuren; gelijktijdige vinkjes boeken p
   assert.equal(gangpotPaid(f.main,period(f),OTHER).on_time,25000);
   await syncGangpot(f.main,f.client,DEADLINE);
   const total=f.guild.channels.cache.get(f.main.config.gangpot.totalChannelId).posted.first(),info=f.guild.channels.cache.get(f.main.config.gangpot.infoChannelId).posted.first();
-  assert.ok(total.embeds[0].description.includes('$25.000')&&total.embeds[0].fields.some(field=>field.value.includes(`<@${OTHER}>`)));
+  assert.ok(total.embeds[0].description.includes('€25.000')&&total.embeds[0].fields.some(field=>field.value.includes(`<@${OTHER}>`)));
   assert.ok(!info.embeds[0].description.includes(`<@${OTHER}>`));assert.equal(info.embeds[0].fields,undefined);
   await syncGangpot(f.main,f.client,END);assert.equal(warns(f,OTHER).length,0);
 });
@@ -280,7 +280,7 @@ test('refresh en verwijderen vereisen leiding; het command selecteert de gebruik
   const total=f.guild.channels.cache.get(f.main.config.gangpot.totalChannelId),info=f.guild.channels.cache.get(f.main.config.gangpot.infoChannelId),ids=[total.posted.first().id,info.posted.first().id];
   total.posted.first().embeds[0].description='Verouderd';
   const refreshed=await handleGangpotCommand(f.main,command('refresh'));assert.ok(refreshed.content.includes('bijgewerkt'));
-  assert.ok(total.posted.first().embeds[0].description.includes('$25.000'));
+  assert.ok(total.posted.first().embeds[0].description.includes('€25.000'));
   const deleted=await handleGangpotCommand(f.main,command('betaling-verwijderen'));assert.ok(deleted.content.includes('verwijderd'));
   assert.equal(gangpotBalance(f.main),0);assert.deepEqual([total.posted.first().id,info.posted.first().id],ids);
   const schema=commands(10000,false).find(item=>item.name==='gangpot').options;
@@ -301,7 +301,7 @@ test('schema 9 migreert eerdere correcties naar ingetrokken betaalmeldingen en b
   const newClaim=claim(f,OTHER,25000,'new-payment-after-migration');
   const removalResult=removeGangpotPayment(f.main,removal(f),SAT+3000);
   f.main.store.close();f.main.store=new Store(f.main.config,path);
-  assert.equal(f.main.store.db.prepare('PRAGMA user_version').get().user_version,18);
+  assert.equal(f.main.store.db.prepare('PRAGMA user_version').get().user_version,19);
   assert.equal(f.main.store.db.prepare('SELECT id FROM gangpot_removals').get().id,removalResult.id);
   assert.ok(f.main.store.db.prepare('SELECT withdrawn_at FROM gangpot_claims WHERE id=?').get(newClaim.id).withdrawn_at);
 });

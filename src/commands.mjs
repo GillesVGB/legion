@@ -65,7 +65,8 @@ export function commands(maxBet, ticketsEnabled = true) {
     cmd('activiteitencheck','Start een check-in; niet op tijd bevestigen geeft automatisch een gangwarn (leiding)')
       .addStringOption(o=>o.setName('datum').setDescription('Deadline: DD-MM-JJJJ, deze avond of morgenavond').setRequired(true).setMaxLength(32).setAutocomplete(true))
       .addStringOption(o=>o.setName('tijd').setDescription('Deadline in Belgische tijd: UU:MM').setRequired(true).setMaxLength(5))
-      .addChannelOption(o=>o.setName('kanaal').setDescription('Standaard: het kanaal waarin je het commando gebruikt').addChannelTypes(ChannelType.GuildText)),
+      .addChannelOption(o=>o.setName('kanaal').setDescription('Standaard: het kanaal waarin je het commando gebruikt').addChannelTypes(ChannelType.GuildText))
+      .addStringOption(o=>o.setName('reden').setDescription('Reden van deze activiteitencheck').setMaxLength(300)),
     cmd('activiteitencheck-stop','Annuleer de lopende activiteitencheck zonder nieuwe gangwarns (leiding)'),
     cmd('planning-annuleren','Annuleer een planning (alleen leiding)')
       .addStringOption(o=>o.setName('id').setDescription('Planning-ID onderaan het bericht').setRequired(true).setMinLength(12).setMaxLength(12)),
@@ -84,6 +85,18 @@ export function commands(maxBet, ticketsEnabled = true) {
         .addUserOption(o=>o.setName('gebruiker').setDescription('De gebruiker van wie je de betaling wilt verwijderen').setRequired(true))
         .addStringOption(o=>o.setName('termijn').setDescription('Zaterdag: DD-MM-JJJJ; standaard huidige week').setMaxLength(10))
         .addStringOption(o=>o.setName('reden').setDescription('Waarom wordt de betaling verwijderd?').setMaxLength(500)))
+      .addSubcommand(s=>s.setName('item').setDescription('Voeg items toe of neem ze uit de gangpot (leiding)')
+        .addStringOption(o=>o.setName('naam').setDescription('Naam van het item').setRequired(true).setMaxLength(80))
+        .addIntegerOption(o=>o.setName('aantal').setDescription('Aantal items').setRequired(true).setMinValue(1).setMaxValue(100000000))
+        .addStringOption(o=>o.setName('actie').setDescription('Standaard toevoegen').addChoices({name:'Toevoegen',value:'in'},{name:'Opnemen',value:'out'}))
+        .addStringOption(o=>o.setName('notitie').setDescription('Van wie of waarvoor?').setMaxLength(500)))
+      .addSubcommand(s=>s.setName('zwartgeld').setDescription('Voeg in-game zwartgeld toe of neem het op (leiding)')
+        .addIntegerOption(o=>o.setName('bedrag').setDescription('Bedrag in euro').setRequired(true).setMinValue(1).setMaxValue(100000000))
+        .addStringOption(o=>o.setName('actie').setDescription('Standaard toevoegen').addChoices({name:'Toevoegen',value:'in'},{name:'Opnemen',value:'out'}))
+        .addStringOption(o=>o.setName('notitie').setDescription('Van wie of waarvoor?').setMaxLength(500)))
+      .addSubcommand(s=>s.setName('voorraad-correctie').setDescription('Trek een item- of zwartgeldregistratie in met behoud van historie (leiding)')
+        .addStringOption(o=>o.setName('id').setDescription('Registratie-ID').setRequired(true).setMinLength(12).setMaxLength(12))
+        .addStringOption(reasonOption))
       .addSubcommand(s=>s.setName('donatie').setDescription('Registreer extra in-game steun aan de gangpot (leiding)')
         .addIntegerOption(o=>o.setName('bedrag').setDescription('Ontvangen donatie').setRequired(true).setMinValue(1).setMaxValue(100000000))
         .addStringOption(o=>o.setName('notitie').setDescription('Van wie of waarvoor?').setMaxLength(500)))

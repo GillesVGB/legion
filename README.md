@@ -1,5 +1,19 @@
 # Bakarov — Discord-bot voor Future RP
 
+## Wekelijkse check en gangpotvoorraad — 2.5.0
+
+De automatische activiteitencheck heeft vanaf **vrijdag 23-10-2026 iedere vrijdag om 07:30 Belgische tijd** zijn deadline. De check wordt vooraf geopend in het planningkanaal en krijgt de reden **Wekelijkse activiteitencheck**. Bakarov wordt getagd en leden reageren met ✅. Na de deadline blijft de bestaande controle gelden: maximaal één gangwarn zonder tijdige bevestiging of goedgekeurde afwezigheidsperiode. De volgende weekcheck wordt daarna geopend. Een losse planningsafmelding geeft geen vrijstelling.
+
+De startdatum, deadline, reden, het kanaal en aan/uit zijn te wijzigen bij **Modules instellen → Activiteitencheck & herinneringen**. De weekdag volgt uit de startdatum. Annuleren met `/activiteitencheck-stop` stopt alleen de lopende check; zet de wekelijkse instelling uit om ook volgende checks te stoppen. Herstarts dupliceren geen weekcheck en gemiste, nog nooit gepubliceerde weken worden overgeslagen.
+
+Gangpotvoorraad voor de leiding:
+
+- `/gangpot item naam:repairkit aantal:5` voegt vijf repairkits toe. Gebruik `actie:Opnemen` voor een opname.
+- `/gangpot zwartgeld bedrag:25000` voegt €25.000 in-game zwartgeld toe. Ook hier kun je `actie:Opnemen` kiezen.
+- `/gangpot voorraad-correctie id:... reden:...` trekt een verkeerde registratie in met behoud van historie.
+
+Dezelfde functies staan bij **Gangpot → Zwartgeld & items** in het dashboard. Het vaste totaalbericht toont gewoon geld, zwartgeld en itemvoorraden apart. Alle geldbedragen gebruiken **€**; bestaande bedragen zijn niet omgerekend. Items en zwartgeld voldoen niet aan de verplichte weekbijdrage en beïnvloeden geen fun-coins. Alleen werkelijk ontvangen of opgenomen in-game middelen horen in deze administratie.
+
 ## Afmeldingen en transcripts — 2.4.0
 
 Planningsafmeldingen gelden uitsluitend voor de gekozen activiteit, nooit als gangpotvrijstelling. Geef een reden via het paneel of `/afmelden planning reden`. Duidelijke redenen zoals school, training, hobby, gym of een kapotte pc kan de bot herkennen en goedkeuren. De bot controleert niet of de opgegeven reden waar is; twijfelgevallen blijven bij Lead. Lead kan een botgoedkeuring intrekken en automatische goedkeuring uitschakelen via Modules instellen.
@@ -10,7 +24,7 @@ De transcriptviewer past de Bakarov-naam, het logo en de zwart-gouden huisstijl 
 
 ## Bakarov-versies en correctie van aannamewarns — 2.3.1
 
-Vanaf de rename naar Bakarov begint de versiereeks bij **2.0.0**. De latere updates zijn doorgerekend: overzichten en bezwaren 2.1.x, Discord-login 2.2.x en instapvrijstelling 2.3.x. De huidige versie is **2.4.0**.
+Vanaf de rename naar Bakarov begint de versiereeks bij **2.0.0**. De latere updates zijn doorgerekend: overzichten en bezwaren 2.1.x, Discord-login 2.2.x en instapvrijstelling 2.3.x. De huidige versie is **2.5.0**.
 
 Bij de gangpotcontrole gebruikt de bot nu ook de opgeslagen aangenomen sollicitaties uit de community-guild als bewijs van toetreding. Een bestaande automatische gangpotwarn uit de instapweek wordt ingetrokken met een groene melding in het ingestelde gangwarnkanaal en een DM. Een herstart geeft geen dubbele intrekking. Bestaande verplichtingen van eerdere gangleden, handmatige warns en latere volledige betaaltermijnen worden niet kwijtgescholden. Bewaar de volledige `data/`-map van beide guilds.
 

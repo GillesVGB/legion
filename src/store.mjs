@@ -228,6 +228,15 @@ export class Store {
         PRIMARY KEY(user_id,week,kind)
       );
     `);
+    const checkColumns=new Set(this.db.prepare('PRAGMA table_info(activity_check_sessions)').all().map(column=>column.name));
+    if(!checkColumns.has('reason'))this.db.exec("ALTER TABLE activity_check_sessions ADD COLUMN reason TEXT NOT NULL DEFAULT '';");
+    this.db.exec(`CREATE TABLE IF NOT EXISTS activity_check_occurrences (deadline_date TEXT PRIMARY KEY,check_id TEXT NOT NULL UNIQUE);
+      CREATE TABLE IF NOT EXISTS gangpot_assets (
+        id TEXT PRIMARY KEY,request_id TEXT NOT NULL UNIQUE,kind TEXT NOT NULL CHECK(kind IN ('blackmoney','item')),
+        name TEXT NOT NULL,quantity INTEGER NOT NULL CHECK(quantity>0),direction TEXT NOT NULL CHECK(direction IN ('in','out')),
+        actor_id TEXT NOT NULL,note TEXT NOT NULL DEFAULT '',created_at INTEGER NOT NULL,
+        voided_at INTEGER,voided_by TEXT,void_reason TEXT);
+      CREATE INDEX IF NOT EXISTS gangpot_assets_stock ON gangpot_assets(kind,name,voided_at);`);
     const gangpotColumns=new Set(this.db.prepare('PRAGMA table_info(gangpot_claims)').all().map(column=>column.name));
     for(const [name,type] of [['withdrawn_at','INTEGER'],['withdrawn_by','TEXT'],['withdraw_reason','TEXT']])if(!gangpotColumns.has(name))this.db.exec(`ALTER TABLE gangpot_claims ADD COLUMN ${name} ${type};`);
     if(previousSchema<10)this.db.exec(`UPDATE gangpot_claims SET
@@ -249,7 +258,7 @@ export class Store {
       CREATE INDEX IF NOT EXISTS check_member_history ON activity_check_members(user_id,check_id);
       CREATE INDEX IF NOT EXISTS notice_due_kind ON feature_notices(status,kind,next_attempt);
       CREATE INDEX IF NOT EXISTS check_deadline_due ON activity_check_sessions(status,deadline_at,next_attempt);
-      PRAGMA user_version = 18;
+      PRAGMA user_version = 19;
     `);
   }
 

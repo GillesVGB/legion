@@ -1,4 +1,10 @@
 {
+  "2.5.0": [
+    "Wekelijkse activiteitencheck: vanaf vrijdag 23 oktober 2026 is de deadline iedere vrijdag om 07:30 Belgische tijd. De check staat vooraf open, tagt Bakarov en leden bevestigen met ✅. Reden: Wekelijkse activiteitencheck.",
+    "De bot bewaart iedere weekcheck, hergebruikt een handmatige check met dezelfde deadline en maakt geen dubbele of achteraf gemiste weekchecks aan. Instellingen staan onder Modules instellen → Activiteitencheck & herinneringen.",
+    "Nieuw: items en in-game zwartgeld toevoegen, opnemen en corrigeren in de gangpot via Discord en dashboard. Gewoon geld, zwartgeld en itemvoorraden hebben aparte overzichten en een bewaarde historie.",
+    "Gangpotbedragen worden voortaan in euro weergegeven. Items en zwartgeld tellen niet als verplichte weekbijdrage en veranderen geen fun-coins."
+  ],
   "2.4.0": [
     "Planningsafmeldingen vereisen een reden. Duidelijke redenen zoals school, training, hobby, gym of een kapotte pc kan de bot automatisch goedkeuren; twijfelgevallen blijven bij Lead. Instelbaar in het dashboard.",
     "Planningsafmeldingen en afwezigheidsperiodes blijven gescheiden. Alleen een goedgekeurde afwezigheidsperiode geeft gangpotvrijstelling. Ontbrekende vrijstellingen en bijbehorende automatische betaalwarns worden hersteld, met log en DM.",

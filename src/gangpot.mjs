@@ -1,3 +1,4 @@
+import {gangpotAssets,recordGangpotAsset,voidGangpotAsset} from './gangpot-assets.mjs';
 import {warnAppealRow} from './warn-appeal-ui.mjs';
 import {canonicalBrandText} from './branding.mjs';
 import {randomBytes} from 'node:crypto';
@@ -21,7 +22,7 @@ export function trackGangpotMembership(ctx,before,after,now=Date.now()){
 
 const uid=()=>randomBytes(6).toString('hex');
 export const GANGPOT_LEAD_ROLE_ID='1555685630707769382';
-export const gangpotMoney=amount=>`$${Number(amount).toLocaleString('nl-BE')}`;
+export const gangpotMoney=amount=>`€${Number(amount).toLocaleString('nl-BE')}`;
 export function requireGangPot(ctx){assertUser(ctx.config.guildId==='1555685630640652338'&&ctx.config.gangpot,'De gangpot wordt alleen in de Bakarov-hoofdserver beheerd.');}
 const dayShift=(date,days)=>{const [y,m,d]=date.split('-').map(Number),value=new Date(Date.UTC(y,m-1,d+days,12));return`${value.getUTCFullYear()}-${String(value.getUTCMonth()+1).padStart(2,'0')}-${String(value.getUTCDate()).padStart(2,'0')}`;};
 const weekdayOf=date=>{const [y,m,d]=date.split('-').map(Number);return new Date(Date.UTC(y,m-1,d,12)).getUTCDay();};
@@ -137,7 +138,7 @@ export function gangpotPeriodId(value){
 }
 export function recordGangpotEntry(ctx,input,now=Date.now()){
   requireGangPot(ctx);
-  assertUser(['payment','donation','expense'].includes(input.kind)&&Number.isSafeInteger(input.amount)&&input.amount>0&&input.amount<=100000000,'Gebruik een geldig positief bedrag van maximaal 100 miljoen in-game dollars.');
+  assertUser(['payment','donation','expense'].includes(input.kind)&&Number.isSafeInteger(input.amount)&&input.amount>0&&input.amount<=100000000,'Gebruik een geldig positief bedrag van maximaal 100 miljoen in-game euro.');
   assertUser(typeof input.requestId==='string'&&input.requestId.length>=8&&input.requestId.length<=100,'Ongeldige betalingsregistratie.');
   return ctx.store.transaction(()=>recordEntryInside(ctx,input,now));
 }
@@ -204,7 +205,7 @@ export function gangpotSummary(ctx,guild,now=Date.now()){
   if(!ctx.config.gangpot)return null;
   const period=currentPeriod(ctx,now),members=gangpotMembers(ctx,period,now).map(item=>({...item,name:guild.members.cache.get(item.user_id)?.displayName||item.user_id}));
   const claims=ctx.store.db.prepare('SELECT * FROM gangpot_claims ORDER BY reported_at DESC LIMIT 200').all().map(item=>({...item,status:item.withdrawn_at?'revoked':item.status,userName:guild.members.cache.get(item.user_id)?.displayName||item.user_id,reviewerName:guild.members.cache.get(item.withdrawn_by||item.reviewer_id)?.displayName||(item.withdrawn_by||item.reviewer_id),url:item.message_id?`https://discord.com/channels/${guild.id}/${ctx.config.gangpot.paymentsChannelId}/${item.message_id}`:null}));
-  return{balance:gangpotBalance(ctx),weeklyAmount:ctx.config.gangpot.weeklyAmount,period,members,claims,periods:ctx.store.db.prepare('SELECT * FROM gangpot_periods ORDER BY starts_at DESC LIMIT 16').all(),entries:ctx.store.db.prepare('SELECT * FROM gangpot_entries ORDER BY created_at DESC LIMIT 100').all().map(item=>({...item,userName:guild.members.cache.get(item.user_id)?.displayName||item.user_id,actorName:guild.members.cache.get(item.actor_id)?.displayName||item.actor_id})),infoChannelId:ctx.config.gangpot.infoChannelId,memberRoleId:ctx.config.gangpot.memberRoleId,paymentsChannelId:ctx.config.gangpot.paymentsChannelId,totalChannelId:ctx.config.gangpot.totalChannelId};
+  return{assets:gangpotAssets(ctx),balance:gangpotBalance(ctx),weeklyAmount:ctx.config.gangpot.weeklyAmount,period,members,claims,periods:ctx.store.db.prepare('SELECT * FROM gangpot_periods ORDER BY starts_at DESC LIMIT 16').all(),entries:ctx.store.db.prepare('SELECT * FROM gangpot_entries ORDER BY created_at DESC LIMIT 100').all().map(item=>({...item,userName:guild.members.cache.get(item.user_id)?.displayName||item.user_id,actorName:guild.members.cache.get(item.actor_id)?.displayName||item.actor_id})),infoChannelId:ctx.config.gangpot.infoChannelId,memberRoleId:ctx.config.gangpot.memberRoleId,paymentsChannelId:ctx.config.gangpot.paymentsChannelId,totalChannelId:ctx.config.gangpot.totalChannelId};
 }
 export function reportGangpotPayment(ctx,input,now=Date.now()){
   requireGangPot(ctx);
@@ -288,6 +289,9 @@ export function gangpotTotalMessage(ctx,guild,now=Date.now()){
   let chunk='';const chunks=[];for(const line of lines){if(chunk.length+line.length+1>1000){chunks.push(chunk);chunk='';}chunk+=(chunk?'\n':'')+line;}if(chunk)chunks.push(chunk);
   chunks.forEach((value,index)=>card.addFields({name:index?'Betaald (vervolg)':'Wie heeft deze week betaald?',value}));
   if(paid.some(item=>item.onTime<period.weekly_amount))card.addFields({name:'🕒 Te laat goedgekeurd',value:'Het bedrag telt mee voor het saldo. Een bestaande gangwarn blijft staan.'});
+  card.addFields({name:'Zwartgeld',value:gangpotMoney(data.assets.blackMoney),inline:true});
+  const inventory=data.assets.items.map(item=>`${safeText(item.name)}: **${item.quantity.toLocaleString('nl-BE')}**`).join('\n')||'Nog geen items geregistreerd.';
+  card.addFields({name:'Items in de gangpot',value:inventory.length>1000?inventory.slice(0,950)+'\n… Volledige voorraad in het dashboard.':inventory});
   return{embeds:[card],components:[row(button('gangpot:status','Mijn betaalstatus'))],allowedMentions:quiet};
 }
 async function upsertGangpotPost(ctx,guild,channelId,key,payload,marker){
@@ -381,6 +385,12 @@ export async function handleGangpotCommand(ctx,interaction){
     const claim=reportGangpotPayment(ctx,{userId:interaction.user.id,periodId:period.id,amount:interaction.options.getInteger('bedrag')??Math.max(1,period.weekly_amount-gangpotPaid(ctx,period,interaction.user.id).total),requestId:interaction.id,note:interaction.options.getString('notitie')||''},submittedAt);
     await syncGangpot(ctx,interaction.client);
     return interaction.editReply({content:`Je betaalmelding van **${gangpotMoney(claim.amount)}** voor **${period.id}** is opgeslagen in <#${ctx.config.gangpot.paymentsChannelId}>. ${gangpotIntroduction(ctx,interaction.user.id,period)?'Dit is je instapweek; deze bijdrage is vrijwillig en zonder betaling volgt deze week geen gangpotwarn.':`Lead moet vóór zaterdag ${deadlineClock(period)} goedkeuren. Zonder volledige goedkeuring krijg je automatisch een gangwarn.`}`,allowedMentions:quiet});
+  }
+  if(['item','zwartgeld','voorraad-correctie'].includes(action)){
+    const lead=await interaction.guild.members.fetch({user:interaction.user.id,force:true});
+    assertUser(!lead.user.bot&&lead.roles.cache.has(GANGPOT_LEAD_ROLE_ID),'Alleen Lead kan items en zwartgeld in de gangpot beheren.');
+    const item=action==='voorraad-correctie'?voidGangpotAsset(ctx,interaction.options.getString('id',true),interaction.user.id,interaction.options.getString('reden',true)):recordGangpotAsset(ctx,{kind:action==='item'?'item':'blackmoney',name:interaction.options.getString('naam'),quantity:interaction.options.getInteger(action==='item'?'aantal':'bedrag',true),direction:interaction.options.getString('actie')||'in',actor:interaction.user.id,requestId:interaction.id,note:interaction.options.getString('notitie')||''});
+    await syncGangpot(ctx,interaction.client);return interaction.editReply({content:`${action==='voorraad-correctie'?'Registratie gecorrigeerd':'Voorraad bijgewerkt'}: ${item.kind==='blackmoney'?gangpotMoney(item.quantity)+' zwartgeld':`${item.quantity} × ${safeText(item.name)}`}. ID: \`${item.id}\`. Dit telt niet als verplichte weekbetaling.`,allowedMentions:quiet});
   }
   let result;
   if(action==='correctie')result=voidGangpotEntry(ctx,interaction.options.getString('id',true),interaction.user.id,interaction.options.getString('reden',true));

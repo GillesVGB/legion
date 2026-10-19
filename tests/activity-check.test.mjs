@@ -34,7 +34,7 @@ test('activiteitencheck is een zelfstandige check-in met deadline en vinkjesreac
   assert.equal(f.ctx.store.db.prepare('SELECT COUNT(*) AS n FROM activities').get().n,0);
   assert.equal(f.ctx.store.db.prepare('SELECT COUNT(*) AS n FROM activity_check_members').get().n,6);
   assert.ok(posted.embeds[0].description.includes('automatisch één gangwarn'));
-  const command=commands(500,false).find(item=>item.name==='activiteitencheck');assert.deepEqual(command.options.map(item=>item.name),['datum','tijd','kanaal']);assert.ok(!commands(500,true).some(item=>item.name==='activiteitencheck'));
+  const command=commands(500,false).find(item=>item.name==='activiteitencheck');assert.deepEqual(command.options.map(item=>item.name),['datum','tijd','kanaal','reden']);assert.ok(!commands(500,true).some(item=>item.name==='activiteitencheck'));
   await assert.rejects(f.start(),/al een activiteitencheck/);
 });
 test('tijdige bevestiging telt eenmaal; niet reageren geeft automatisch precies één gangwarn na de deadline',async t=>{

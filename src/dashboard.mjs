@@ -8,6 +8,7 @@ import { saveDashboardSettings, validateDashboardSettings,applyDashboardSettings
 import { commands } from './commands.mjs';
 import { decideCase, startInterview, publishPanel, writeWarnLog, warnLogChannel } from './service.mjs';
 import { safeText } from './ui.mjs';
+import {recordGangpotAsset,voidGangpotAsset} from './gangpot-assets.mjs';
 import { fetchTranscriptMessages } from './transcripts.mjs';
 import { transcriptViewURL } from './viewer.mjs';
 import { resendAcceptance } from './admissions.mjs';
@@ -20,7 +21,7 @@ import { decidePromotion,promotionVotes,promotionVoteReply,PROMOTION_LEAD_ROLE_I
 import { missions,missionDay } from './mission-definitions.mjs';
 import {gangpotSummary,syncGangpot,recordGangpotEntry,voidGangpotEntry,reviewGangpotPayment,GANGPOT_LEAD_ROLE_ID,gangpotMoney,requireGangPot} from './gangpot.mjs';
 import {operationSettings} from './feature-settings.mjs';
-import {decideAbsence,setExemption,createAbsence,syncAbsences,activityAbsences} from './absence.mjs';
+import {decideAbsence,setExemption,createAbsence,syncAbsences,activityAbsences,requireLead} from './absence.mjs';
 import {auditedAction,cleanAudit} from './audit-log.mjs';
 import {botHealth} from './bot-status.mjs';
 import {createActivity,planningTime} from './activities.mjs';
@@ -200,18 +201,29 @@ export class Dashboard {
     const actor = member.id;
     if(value.action==='backup.create'){requireGangPot(ctx);assertUser(member.permissions.has(P.Administrator),'Alleen een administrator mag een back-up starten.');const result=createDataBackup(config.dataDir,releaseVersion);store.audit('backup.create',actor,{id:result.id||null,files:result.files||0});return{message:result.saved?'Privé-back-up opgeslagen in data/backups.':'Er zijn nog geen botgegevens om te bewaren.'};}
     if(['appeal.approve','appeal.reject'].includes(value.action)){assertUser(value.confirm===true,'Bevestig de beslissing over het bezwaar.');const result=await decideWarnAppeal(ctx,guild,member,value.id,value.action.split('.')[1]);await syncWarnAppeals(ctx,guild);return{message:result.status==='approved'?'Bezwaar goedgekeurd. De gangwarn is ingetrokken.':result.status==='rejected'?'Bezwaar afgewezen.':'Dit bezwaar is al afgehandeld.'};}
-    if(value.action==='activitycheck.create'){const result=await createActivityCheck(ctx,guild,member,{date:value.date,time:value.time,channelId:value.channelId||config.planningChannelId});return{message:result.posted?'Activiteitencheck geplaatst. De controle na de deadline gebeurt automatisch.':'Check opgeslagen; het plaatsen wordt opnieuw geprobeerd.'};}
+    if(value.action==='activitycheck.create'){const result=await createActivityCheck(ctx,guild,member,{date:value.date,time:value.time,channelId:value.channelId||config.planningChannelId,reason:value.reason||''});return{message:result.posted?'Activiteitencheck geplaatst. De controle na de deadline gebeurt automatisch.':'Check opgeslagen; het plaatsen wordt opnieuw geprobeerd.'};}
     if(value.action==='activitycheck.cancel'){assertUser(value.confirm===true,'Bevestig het annuleren van de activiteitencheck.');await cancelActivityCheck(ctx,guild,member,value.id);return{message:'Activiteitencheck geannuleerd.'};}
     if(['absence.approve','absence.reject'].includes(value.action)){assertUser(value.confirm===true,'Bevestig de afmelding.');await decideAbsence(ctx,guild,member,value.id,value.action.split('.')[1]);await syncAbsences(ctx,guild);await syncGangpot(ctx,this.client,Date.now(),this.contexts);return{message:'Afmelding beoordeeld.'};}
     if(['absence.exempt','absence.revoke'].includes(value.action)){await setExemption(ctx,guild,member,value.userId,value.week,value.reason,value.action==='absence.revoke');await syncGangpot(ctx,this.client,Date.now(),this.contexts);return{message:'Vrijstelling bijgewerkt.'};}
     if(value.action==='planning.create'){const interaction={guild,user:member.user,member,memberPermissions:member.permissions};const result=await createActivity(ctx,interaction,{date:value.date,time:value.time,location:value.location,title:value.title,description:value.description,duration:value.duration});return{message:result.posted?'Planning geplaatst.':'Planning opgeslagen; de bot probeert opnieuw.'};}
     if(value.action==='absence.request'){const item=await createAbsence(ctx,guild,member.id,{start:value.start,end:value.end,reason:value.reason,activityId:value.activityId});await syncAbsences(ctx,guild);return{message:`Aanvraag ${item.id} opgeslagen.`};}
     if(value.action==='gangpot.refresh'){await syncGangpot(ctx,this.client,Date.now(),this.contexts);return{message:'Gangpot bijgewerkt.'};}
+    if(['gangpot.asset','gangpot.asset-void'].includes(value.action)){
+      await requireLead(ctx,guild,member);
+      requireGangPot(ctx);assertUser(value.confirm===true,'Bevestig de voorraadregistratie.');
+      const entry=value.action==='gangpot.asset-void'?voidGangpotAsset(ctx,value.id,actor,value.reason):recordGangpotAsset(ctx,{kind:value.kind,name:value.name,quantity:value.quantity,direction:value.direction,actor,requestId:value.requestId,note:value.note});
+      await syncGangpot(ctx,this.client,Date.now(),this.contexts);return{message:`Voorraadregistratie ${entry.id} verwerkt. Weekbijdragen blijven apart.`};
+    }
     if(['gangpot.approve','gangpot.reject','gangpot.donation','gangpot.expense','gangpot.void'].includes(value.action)){
       requireGangPot(ctx);assertUser(value.confirm===true,'Bevestig eerst dat deze in-game transactie werkelijk is ontvangen of uitgevoerd.');
       const submittedAt=Date.now();await syncGangpot(ctx,this.client,submittedAt,this.contexts);
       let result;
-      if(['gangpot.approve','gangpot.reject'].includes(value.action))result=await reviewGangpotPayment(ctx,guild,member,value.id,value.action.split('.')[1]);
+      if(['gangpot.asset','gangpot.asset-void'].includes(value.action)){
+      requireGangPot(ctx);assertUser(value.confirm===true,'Bevestig de voorraadregistratie.');
+      const entry=value.action==='gangpot.asset-void'?voidGangpotAsset(ctx,value.id,actor,value.reason):recordGangpotAsset(ctx,{kind:value.kind,name:value.name,quantity:value.quantity,direction:value.direction,actor,requestId:value.requestId,note:value.note});
+      await syncGangpot(ctx,this.client,Date.now(),this.contexts);return{message:`Voorraadregistratie ${entry.id} verwerkt. Weekbijdragen blijven apart.`};
+    }
+    if(['gangpot.approve','gangpot.reject'].includes(value.action))result=await reviewGangpotPayment(ctx,guild,member,value.id,value.action.split('.')[1]);
       else if(value.action==='gangpot.void')result=voidGangpotEntry(ctx,value.id,actor,value.reason);
       else{
         assertUser(typeof value.requestId==='string'&&value.requestId.length>=8,'Ongeldige registratie.');

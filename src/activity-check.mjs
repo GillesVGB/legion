@@ -27,7 +27,7 @@ async function checkStaff(ctx,guild,member){
 export function activityCheckMessage(ctx,check){
   const members=membersOf(ctx,check.id),count=status=>members.filter(item=>item.status===status).length;
   const open=check.status==='open';
-  const card=embed(ctx.config,'Bakarov — Activiteitencheck',`Laat weten dat je nog actief bent binnen Bakarov. Reageer vóór de deadline met **✅** onder dit bericht. Een geregistreerde bevestiging blijft bewaard.\n\n**Deadline:** <t:${Math.floor(check.deadline_at/1000)}:F> · <t:${Math.floor(check.deadline_at/1000)}:R>\n**Bevestigd:** ${count('responded')}/${members.length}\n**Status:** ${open?'🟢 Open':check.status==='closed'?'🔒 Afgerond':'⚪ Geannuleerd'}\n\n${open?'Niet op tijd bevestigd en geen goedgekeurde afwezigheid? Dan geeft de bot na de deadline automatisch één gangwarn. Dit geldt voor de Bakarov-leden die bij het starten van deze check zijn opgenomen.':check.status==='closed'?`**Goedgekeurd afwezig:** ${count('exempt')}\n**Gangwarns:** ${count('warned')}\n**Niet meer verplicht:** ${count('left')}`:'Deze check is geannuleerd. Er volgen geen nieuwe gangwarns.'}\n\nDeze check-in bevestigt je activiteit binnen Bakarov. Je Discord-status bepaalt niet of je een gangwarn krijgt.`).setColor(open?0x22C55E:check.status==='closed'?0x64748B:0xF59E0B).setFooter({text:marker(check.id)});
+  const card=embed(ctx.config,'Bakarov — Activiteitencheck',`Laat weten dat je nog actief bent binnen Bakarov. Reageer vóór de deadline met **✅** onder dit bericht. Een geregistreerde bevestiging blijft bewaard.\n\n${check.reason?`**Reden:** ${safeText(check.reason)}\n`:''}**Deadline:** <t:${Math.floor(check.deadline_at/1000)}:F> · <t:${Math.floor(check.deadline_at/1000)}:R>\n**Bevestigd:** ${count('responded')}/${members.length}\n**Status:** ${open?'🟢 Open':check.status==='closed'?'🔒 Afgerond':'⚪ Geannuleerd'}\n\n${open?'Niet op tijd bevestigd en geen goedgekeurde afwezigheid? Dan geeft de bot na de deadline automatisch één gangwarn. Dit geldt voor de Bakarov-leden die bij het starten van deze check zijn opgenomen.':check.status==='closed'?`**Goedgekeurd afwezig:** ${count('exempt')}\n**Gangwarns:** ${count('warned')}\n**Niet meer verplicht:** ${count('left')}`:'Deze check is geannuleerd. Er volgen geen nieuwe gangwarns.'}\n\nDeze check-in bevestigt je activiteit binnen Bakarov. Je Discord-status bepaalt niet of je een gangwarn krijgt.`).setColor(open?0x22C55E:check.status==='closed'?0x64748B:0xF59E0B).setFooter({text:marker(check.id)});
   for(const [status,label] of [['responded','✅ Actief bevestigd'],['exempt','Goedgekeurd afwezig'],['warned','Gangwarn gegeven']]){
     const list=members.filter(item=>item.status===status);if(list.length)card.addFields({name:label,value:list.slice(0,25).map(item=>`<@${item.user_id}>`).join(', ')+(list.length>25?`\n… en ${list.length-25} anderen. Zie het dashboard voor de volledige lijst.`:'')});
   }
@@ -47,6 +47,11 @@ export async function publishActivityCheck(ctx,guild,id){
 }
 export async function createActivityCheck(ctx,guild,member,input,now=Date.now()){
   const actor=await checkStaff(ctx,guild,member);
+  return createCheck(ctx,guild,actor,input,now);
+}
+async function createCheck(ctx,guild,actor,input,now){
+  requirePlanningGuild(ctx);
+  const reason=String(input.reason||'').trim();assertUser(reason.length<=300,'Gebruik een reden van maximaal 300 tekens.');
   const deadline=planningTime(input.date,input.time,now);
   assertUser(deadline>=now+60000&&deadline<=now+31*86400000,'Kies een deadline vanaf één minuut in de toekomst, binnen 31 dagen.');
   const channel=await communityChannel(guild,input.channelId);
@@ -59,8 +64,11 @@ export async function createActivityCheck(ctx,guild,member,input,now=Date.now())
   assertUser(targets.every(target=>channel.permissionsFor(target)?.has([P.ViewChannel,P.ReadMessageHistory])),'Kies een kanaal dat alle Bakarov-leden kunnen bekijken. Anders kunnen zij niet op de check reageren.');
   const id=randomBytes(6).toString('hex');
   ctx.store.transaction(()=>{
+    assertUser(!input.scheduleDate||!ctx.store.db.prepare('SELECT 1 FROM activity_check_occurrences WHERE deadline_date=?').get(input.scheduleDate),'Deze weekcheck bestaat al.');
     assertUser(!ctx.store.db.prepare("SELECT 1 FROM activity_check_sessions WHERE status='open'").get(),'Er loopt al een activiteitencheck. Wacht tot deze is afgerond of annuleer die eerst.');
     ctx.store.db.prepare('INSERT INTO activity_check_sessions(id,creator_id,channel_id,created_at,deadline_at) VALUES(?,?,?,?,?)').run(id,actor.id,channel.id,now,deadline);
+    ctx.store.db.prepare('UPDATE activity_check_sessions SET reason=? WHERE id=?').run(reason,id);
+    if(input.scheduleDate)ctx.store.db.prepare('INSERT INTO activity_check_occurrences(deadline_date,check_id) VALUES(?,?)').run(input.scheduleDate,id);
     for(const target of targets)ctx.store.db.prepare('INSERT INTO activity_check_members(check_id,user_id) VALUES(?,?)').run(id,target.id);
     ctx.store.audit('activitycheck.create',actor.id,{id,deadline,members:targets.length,channel:channel.id});
   });
@@ -113,7 +121,7 @@ export async function finishActivityCheck(ctx,guild,id,now=Date.now()){
         // Discord bewaart geen reactietijd. Herstelde vinkjes tellen mee, zodat een
         // gemist gateway-event of een botonderbreking geen onterechte warn geeft.
         if(reacted.has(entry.user_id)){ctx.store.db.prepare("UPDATE activity_check_members SET status='responded',responded_at=? WHERE check_id=? AND user_id=?").run(now,id,entry.user_id);continue;}
-        const reason=`Niet op tijd bevestigd op activiteitencheck ${id}. Deadline: ${new Date(check.deadline_at).toLocaleString('nl-BE',{timeZone:'Europe/Brussels'})} (Belgische tijd).`;
+        const reason=`${check.reason?`${check.reason}: `:''}Niet op tijd bevestigd op activiteitencheck ${id}. Deadline: ${new Date(check.deadline_at).toLocaleString('nl-BE',{timeZone:'Europe/Brussels'})} (Belgische tijd).`;
         const warning=ctx.store.addWarnInside(entry.user_id,guild.members.me.id,reason,now);
         ctx.store.db.prepare('INSERT INTO activity_check_warnings(activity_id,user_id,warn_id,created_at) VALUES(?,?,?,?)').run(id,entry.user_id,warning.id,now);
         ctx.store.db.prepare("UPDATE activity_check_members SET status='warned',warn_id=? WHERE check_id=? AND user_id=?").run(warning.id,id,entry.user_id);
@@ -154,7 +162,7 @@ export async function syncActivityWarnings(ctx,guild,now=Date.now()){
 export async function handleActivitiesCheck(ctx,interaction){
   requireStaff(interaction,ctx.config);
   await interaction.deferReply({flags:MessageFlags.Ephemeral});
-  const result=await createActivityCheck(ctx,interaction.guild,interaction.member,{date:interaction.options.getString('datum',true),time:interaction.options.getString('tijd',true),channelId:interaction.options.getChannel('kanaal')?.id||interaction.channelId});
+  const result=await createActivityCheck(ctx,interaction.guild,interaction.member,{date:interaction.options.getString('datum',true),time:interaction.options.getString('tijd',true),channelId:interaction.options.getChannel('kanaal')?.id||interaction.channelId,reason:interaction.options.getString('reden')||''});
   return interaction.editReply({content:result.posted?`Activiteitencheck geplaatst in <#${result.check.channel_id}>. Leden reageren vóór <t:${Math.floor(result.check.deadline_at/1000)}:F> met **✅**. Na de deadline controleert de bot automatisch wie niet heeft gereageerd.`:'Activiteitencheck opgeslagen. Het plaatsen wordt opnieuw geprobeerd. Zolang de check niet op tijd is geplaatst, worden er geen gangwarns gegeven.',allowedMentions:quiet});
 }
 async function checkReactionUsers(message){
@@ -217,6 +225,30 @@ export async function syncActivityChecks(ctx,guild,now=Date.now()){
   }
   await syncCheckReminders(ctx,guild,now);
   await syncActivityWarnings(ctx,guild,now);
+  // A broken destination for the next week must not block logs/DMs of completed checks.
+  await syncWeeklyActivityCheck(ctx,guild,now);
+}
+export function weeklyCheckDeadline(ctx,now=Date.now()){
+  const settings=operationSettings(ctx).activityCheck;if(!settings.weeklyEnabled)return null;
+  let date=settings.weeklyStartDate,deadline=planningTime(date,settings.weeklyTime,now);
+  // Calendar weeks preserve 07:30 through Belgian summer/winter time changes.
+  while(deadline<now+60000){date=new Date(Date.parse(date+'T12:00:00Z')+7*86400000).toISOString().slice(0,10);deadline=planningTime(date,settings.weeklyTime,now);}
+  return{date,deadline};
+}
+export async function syncWeeklyActivityCheck(ctx,guild,now=Date.now()){
+  if(ctx.config.guildId!=='1555685630640652338')return;
+  return serializeCommunity(`${guild.id}:weekly-checkin`,async()=>{
+    const next=weeklyCheckDeadline(ctx,now);if(!next||next.deadline-now>7*86400000+3600000)return;
+    if(ctx.store.db.prepare('SELECT 1 FROM activity_check_occurrences WHERE deadline_date=?').get(next.date))return;
+    const open=ctx.store.db.prepare("SELECT * FROM activity_check_sessions WHERE status='open'").get();
+    if(open){
+      // Reuse a manually started check with this exact deadline instead of duplicating it.
+      if(open.deadline_at===next.deadline){ctx.store.transaction(()=>{ctx.store.db.prepare('INSERT INTO activity_check_occurrences(deadline_date,check_id) VALUES(?,?)').run(next.date,open.id);ctx.store.db.prepare('UPDATE activity_check_sessions SET reason=?,dirty=1,next_attempt=0 WHERE id=?').run(operationSettings(ctx).activityCheck.weeklyReason,open.id);});}
+      return;
+    }
+    const settings=operationSettings(ctx).activityCheck;
+    await createCheck(ctx,guild,guild.members.me,{date:next.date,time:settings.weeklyTime,reason:settings.weeklyReason,channelId:settings.weeklyChannelId||ctx.config.planningChannelId,scheduleDate:next.date},now);
+  });
 }
 export async function syncCheckReminders(ctx,guild,now=Date.now()){
   const settings=operationSettings(ctx).activityCheck;

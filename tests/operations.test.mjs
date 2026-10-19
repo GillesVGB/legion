@@ -122,7 +122,7 @@ test('changelog wordt één keer per versie geplaatst en herstelt een verstuurd 
 
 test('Bakarov start bij 2.0.0; bestaande botupdates worden in hetzelfde bericht hernummerd en herstarts dupliceren niets',async t=>{
   const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.updateChannelId);
-  assert.equal(renamedVersions['1.9.0'],'2.0.0');assert.ok(releaseNotes['2.0.0']);assert.equal(releaseNotes['1.9.0'],undefined);assert.equal(releaseVersion,'2.4.0');
+  assert.equal(renamedVersions['1.9.0'],'2.0.0');assert.ok(releaseNotes['2.0.0']);assert.equal(releaseNotes['1.9.0'],undefined);assert.equal(releaseVersion,'2.5.0');
   const older=[];
   for(const version of ['1.9.0','1.12.0']){
     const message=await channel.send({embeds:[new EmbedBuilder().setTitle(`Bakarov — Botupdate ${version}`).setDescription('Bestaande wijziging.').setFooter({text:`Bakarov • Botupdate ${version}`})]});

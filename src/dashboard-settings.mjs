@@ -46,6 +46,11 @@ export function applyDashboardSettings(ctx, value) {
 export function loadDashboardSettings(ctx) {
   const saved = ctx.store.setting('dashboard-config');
   const migrated=migrateBrandSettings(ctx,JSON.parse(saved||'{}'));
+  if(ctx.config.guildId==='1555685630640652338'&&!ctx.store.setting('activitycheck:weekly-config:1')){
+    migrated.operations??={};migrated.operations.activityCheck={...migrated.operations.activityCheck,weeklyEnabled:true,weeklyStartDate:'2026-10-23',weeklyTime:'07:30',weeklyReason:'Wekelijkse activiteitencheck',weeklyChannelId:ctx.config.planningChannelId};
+    // Persist once; later dashboard changes, including disabling, survive restarts.
+    ctx.store.transaction(()=>{ctx.store.setSetting('dashboard-config',JSON.stringify(migrated));ctx.store.setSetting('activitycheck:weekly-config:1','1');});
+  }
   let weeklyMigrated=false;
   if(migrated.operations?.monthlyReports&&!migrated.operations.weeklyReports){migrated.operations.weeklyReports={...migrated.operations.monthlyReports};weeklyMigrated=true;}
   if(migrated.channels?.monthlyReportChannelId&&!migrated.channels.weeklyReportChannelId){migrated.channels.weeklyReportChannelId=migrated.channels.monthlyReportChannelId;weeklyMigrated=true;}
