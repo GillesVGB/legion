@@ -46,8 +46,14 @@ export function applyDashboardSettings(ctx, value) {
 export function loadDashboardSettings(ctx) {
   const saved = ctx.store.setting('dashboard-config');
   const migrated=migrateBrandSettings(ctx,JSON.parse(saved||'{}'));
+  if(ctx.config.guildId==='1555685630640652338'&&!ctx.store.setting('activitycheck:interval-config:2')){
+    migrated.operations??={};const settings=migrated.operations.activityCheck??={};
+    settings.weeklyIntervalWeeks??=2;
+    if(settings.weeklyReason==='Wekelijkse activiteitencheck')settings.weeklyReason='Tweewekelijkse activiteitencheck';
+    ctx.store.transaction(()=>{ctx.store.setSetting('dashboard-config',JSON.stringify(migrated));ctx.store.setSetting('activitycheck:interval-config:2','1');});
+  }
   if(ctx.config.guildId==='1555685630640652338'&&!ctx.store.setting('activitycheck:weekly-config:1')){
-    migrated.operations??={};migrated.operations.activityCheck={...migrated.operations.activityCheck,weeklyEnabled:true,weeklyStartDate:'2026-10-23',weeklyTime:'07:30',weeklyReason:'Wekelijkse activiteitencheck',weeklyChannelId:WEEKLY_CHECK_CHANNEL_ID};
+    migrated.operations??={};migrated.operations.activityCheck={...migrated.operations.activityCheck,weeklyEnabled:true,weeklyStartDate:'2026-10-23',weeklyIntervalWeeks:2,weeklyTime:'07:30',weeklyReason:'Tweewekelijkse activiteitencheck',weeklyChannelId:WEEKLY_CHECK_CHANNEL_ID};
     // Persist once; later dashboard changes, including disabling, survive restarts.
     ctx.store.transaction(()=>{ctx.store.setSetting('dashboard-config',JSON.stringify(migrated));ctx.store.setSetting('activitycheck:weekly-config:1','1');});
   }

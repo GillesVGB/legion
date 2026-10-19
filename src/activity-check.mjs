@@ -1,3 +1,4 @@
+import {recoverPublishedActivityChecks} from './checkin-recovery.mjs';
 import {warnAppealRow} from './warn-appeal-ui.mjs';
 import {canonicalBrandText} from './branding.mjs';
 import {randomBytes,createHash} from 'node:crypto';
@@ -209,6 +210,7 @@ async function syncOpenCheckReactions(ctx,guild,id,now){
 }
 export async function syncActivityChecks(ctx,guild,now=Date.now()){
   if(ctx.config.guildId!=='1555685630640652338')return;
+  await recoverPublishedActivityChecks(ctx,guild,now);
   await cleanupMovedActivityChecks(ctx,guild,now);
   if(ctx.store.setting('activitycheck:layout')!=='2'){
     ctx.store.transaction(()=>{ctx.store.db.prepare("UPDATE activity_check_sessions SET dirty=1,next_attempt=0 WHERE status='open'").run();ctx.store.setSetting('activitycheck:layout','2');});
@@ -282,15 +284,16 @@ export async function moveActivityCheck(ctx,guild,id,channelId,now=Date.now()){
 }
 export function weeklyCheckDeadline(ctx,now=Date.now()){
   const settings=operationSettings(ctx).activityCheck;if(!settings.weeklyEnabled)return null;
+  const intervalDays=settings.weeklyIntervalWeeks*7;
   let date=settings.weeklyStartDate,deadline=planningTime(date,settings.weeklyTime,now);
-  // Calendar weeks preserve 07:30 through Belgian summer/winter time changes.
-  while(deadline<now+60000){date=new Date(Date.parse(date+'T12:00:00Z')+7*86400000).toISOString().slice(0,10);deadline=planningTime(date,settings.weeklyTime,now);}
+  // Calendar weeks preserve the configured local time through Belgian summer/winter time changes.
+  while(deadline<now+60000){date=new Date(Date.parse(date+'T12:00:00Z')+intervalDays*86400000).toISOString().slice(0,10);deadline=planningTime(date,settings.weeklyTime,now);}
   return{date,deadline};
 }
 export async function syncWeeklyActivityCheck(ctx,guild,now=Date.now()){
   if(ctx.config.guildId!=='1555685630640652338')return;
   return serializeCommunity(`${guild.id}:weekly-checkin`,async()=>{
-    const next=weeklyCheckDeadline(ctx,now);if(!next||next.deadline-now>7*86400000+3600000)return;
+    const next=weeklyCheckDeadline(ctx,now);if(!next||next.deadline-now>operationSettings(ctx).activityCheck.weeklyIntervalWeeks*7*86400000+3600000)return;
     const settings=operationSettings(ctx).activityCheck,target=settings.weeklyChannelId||WEEKLY_CHECK_CHANNEL_ID;
     const scheduled=ctx.store.db.prepare("SELECT c.* FROM activity_check_sessions c JOIN activity_check_occurrences o ON o.check_id=c.id WHERE o.deadline_date=?").get(next.date);
     if(scheduled){if(scheduled.status==='open'&&scheduled.channel_id!==target)await moveActivityCheck(ctx,guild,scheduled.id,target,now);return;}

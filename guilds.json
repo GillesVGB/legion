@@ -5,8 +5,20 @@
     "updateChannelId": "1558496003726774432",
     "absencePanelChannelId": "1555685636017758248",
     "planningChannelId": "1555685633266163793",
-    "gangpot": { "infoChannelId": "1555685634515927050", "paymentsChannelId": "1558238040932225034", "totalChannelId": "1558420548000813126", "memberRoleId": "1555685630640652347", "weeklyAmount": 25000, "startsOn": "2026-10-10" },
-    "admission": { "targetGuildId": "1555685630640652338", "inviteChannelId": "1555685632704249927", "targetRoleId": "1555685630640652347", "inviteMaxAgeSeconds": 86400 },
+    "gangpot": {
+      "infoChannelId": "1555685634515927050",
+      "paymentsChannelId": "1558238040932225034",
+      "totalChannelId": "1558420548000813126",
+      "memberRoleId": "1555685630640652347",
+      "weeklyAmount": 25000,
+      "startsOn": "2026-10-10"
+    },
+    "admission": {
+      "targetGuildId": "1555685630640652338",
+      "inviteChannelId": "1555685632704249927",
+      "targetRoleId": "1555685630640652347",
+      "inviteMaxAgeSeconds": 86400
+    },
     "ticketsEnabled": false,
     "panelChannelId": "",
     "staffRoleIds": [
@@ -22,13 +34,32 @@
     "ticketTranscriptChannelId": "",
     "roster": {
       "channelId": "1555685633266163795",
-      "roleIds": ["1555685630770413640", "1555685630770413639", "1555685630770413638", "1555685630707769383", "1555685630707769380", "1555685630707769379", "1555685630707769378", "1555685630707769377", "1555685630707769376", "1555685630707769374"]
-    }
+      "roleIds": [
+        "1555685630770413640",
+        "1555685630770413639",
+        "1555685630770413638",
+        "1555685630707769383",
+        "1555685630707769380",
+        "1555685630707769379",
+        "1555685630707769378",
+        "1555685630707769377",
+        "1555685630707769376",
+        "1555685630707769374"
+      ]
+    },
+    "checkinRecoveryMessageIds": [
+      "1561873503282532484"
+    ]
   },
   {
     "guildId": "1555726440933363753",
     "planningChannelId": "",
-    "admission": { "targetGuildId": "1555685630640652338", "inviteChannelId": "1555685632704249927", "targetRoleId": "1555685630640652347", "inviteMaxAgeSeconds": 86400 },
+    "admission": {
+      "targetGuildId": "1555685630640652338",
+      "inviteChannelId": "1555685632704249927",
+      "targetRoleId": "1555685630640652347",
+      "inviteMaxAgeSeconds": 86400
+    },
     "ticketsEnabled": true,
     "panelChannelId": "1555726441759375398",
     "staffRoleIds": [
@@ -42,6 +73,10 @@
     "warnLogChannelId": "",
     "applicationTranscriptChannelId": "1555746237582409789",
     "ticketTranscriptChannelId": "1555747964461260861",
-    "recruitment": { "capacity": 25, "limitedAt": 20, "minimumAge": 16 }
+    "recruitment": {
+      "capacity": 25,
+      "limitedAt": 20,
+      "minimumAge": 16
+    }
   }
 ]

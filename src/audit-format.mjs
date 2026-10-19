@@ -10,6 +10,7 @@ const names={
   'warn.add':'⚠️ Gangwarn gegeven','warn.remove':'✅ Gangwarn ingetrokken',
   'planning.create':'📅 Planning geplaatst','planning.cancel':'📅 Planning geannuleerd','planning.rsvp':'📅 Planningsreactie gewijzigd',
   'gangpot.asset':'📦 Gangpotvoorraad bijgewerkt','gangpot.asset.void':'📦 Gangpotvoorraad gecorrigeerd',
+  'activitycheck.recover-published':'✅ Gepubliceerde activiteitencheck hersteld',
   'activitycheck.create':'✅ Activiteitencheck gestart','activitycheck.respond':'✅ Activiteit bevestigd','activitycheck.finish':'🔒 Activiteitencheck afgerond','activitycheck.cancel':'Activiteitencheck geannuleerd',
   'absence.request':'🌴 Afmelding aangevraagd','absence.approve':'✅ Afmelding goedgekeurd','absence.reject':'❌ Afmelding afgewezen',
   'gangpot.report':'💰 Betaling gemeld','gangpot.approve':'✅ Betaling goedgekeurd','gangpot.reject':'❌ Betaling afgekeurd',

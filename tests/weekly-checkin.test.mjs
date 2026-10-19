@@ -14,22 +14,32 @@ function fixture(t){const f=dashboardFixture();t.after(f.close);const ctx=f.cont
 test('weekcheck start met reden en vrijdagdeadline; dubbel onderhoud, herladen en annuleren dupliceren de week niet',async t=>{
   const f=fixture(t);t.mock.method(Date,'now',()=>NOW);loadDashboardSettings(f.ctx);
   await Promise.all([syncWeeklyActivityCheck(f.ctx,f.guild,NOW),syncWeeklyActivityCheck(f.ctx,f.guild,NOW)]);
-  const check=f.ctx.store.db.prepare('SELECT * FROM activity_check_sessions').get();assert.equal(check.deadline_at,FIRST);assert.equal(check.reason,'Wekelijkse activiteitencheck');
-  const post=f.guild.channels.cache.get(check.channel_id).posted.get(check.message_id);assert.match(post.embeds[0].description,/Wekelijkse activiteitencheck/);assert.ok(post.reactions.cache.get('✅').me);
+  const check=f.ctx.store.db.prepare('SELECT * FROM activity_check_sessions').get();assert.equal(check.deadline_at,FIRST);assert.equal(check.reason,'Tweewekelijkse activiteitencheck');
+  const post=f.guild.channels.cache.get(check.channel_id).posted.get(check.message_id);assert.match(post.embeds[0].description,/Tweewekelijkse activiteitencheck/);assert.ok(post.reactions.cache.get('✅').me);
   loadDashboardSettings(f.ctx);await syncWeeklyActivityCheck(f.ctx,f.guild,NOW);assert.equal(f.ctx.store.db.prepare('SELECT COUNT(*) AS n FROM activity_check_sessions').get().n,1);
   await cancelActivityCheck(f.ctx,f.guild,f.lead,check.id);await syncWeeklyActivityCheck(f.ctx,f.guild,NOW+1000);assert.equal(f.ctx.store.db.prepare('SELECT COUNT(*) AS n FROM activity_check_sessions').get().n,1);
   saveDashboardSettings(f.ctx,{operations:{activityCheck:{weeklyEnabled:false}}},ACTOR);loadDashboardSettings(f.ctx);assert.equal(f.ctx.config.operations.activityCheck.weeklyEnabled,false);
 });
-test('07:30 blijft Belgische tijd na wintertijd; gemiste weken worden niet alsnog aangemaakt',()=>{
+test('activiteitencheck herhaalt standaard om de twee weken en behoudt Belgische tijd door wintertijd',()=>{
   const ctx={config:{operations:{activityCheck:{weeklyEnabled:true}}}};
   assert.equal(weeklyCheckDeadline(ctx,NOW).deadline,FIRST);
+  assert.deepEqual(weeklyCheckDeadline(ctx,FIRST+60000),{date:'2026-11-06',deadline:Date.parse('2026-11-06T06:30:00Z')});
+  assert.deepEqual(weeklyCheckDeadline(ctx,Date.parse('2026-11-18T12:00:00Z')),{date:'2026-11-20',deadline:Date.parse('2026-11-20T06:30:00Z')});
+  ctx.config.operations.activityCheck.weeklyIntervalWeeks=1;
   assert.deepEqual(weeklyCheckDeadline(ctx,FIRST+60000),{date:'2026-10-30',deadline:Date.parse('2026-10-30T06:30:00Z')});
-  assert.deepEqual(weeklyCheckDeadline(ctx,Date.parse('2026-11-04T12:00:00Z')),{date:'2026-11-06',deadline:Date.parse('2026-11-06T06:30:00Z')});
+});
+test('interval van de automatische check is instelbaar in dashboard van 1 tot 12 weken',t=>{
+  const f=fixture(t);loadDashboardSettings(f.ctx);
+  assert.equal(f.ctx.config.operations.activityCheck.weeklyIntervalWeeks,2);
+  saveDashboardSettings(f.ctx,{operations:{activityCheck:{weeklyIntervalWeeks:3}}},ACTOR);
+  assert.equal(f.ctx.config.operations.activityCheck.weeklyIntervalWeeks,3);
+  assert.throws(()=>saveDashboardSettings(f.ctx,{operations:{activityCheck:{weeklyIntervalWeeks:13}}},ACTOR));
+  loadDashboardSettings(f.ctx);assert.equal(f.ctx.config.operations.activityCheck.weeklyIntervalWeeks,3);
 });
 test('een handmatige check met dezelfde deadline wordt hergebruikt; andere lopende checks worden niet overschreven',async t=>{
   const f=fixture(t);t.mock.method(Date,'now',()=>NOW);const {check}=await createActivityCheck(f.ctx,f.guild,f.lead,{date:'23-10-2026',time:'07:30',channelId:f.ctx.config.planningChannelId},NOW);
   loadDashboardSettings(f.ctx);await syncWeeklyActivityCheck(f.ctx,f.guild,NOW);assert.equal(f.ctx.store.db.prepare('SELECT check_id FROM activity_check_occurrences').get().check_id,check.id);
-  assert.equal(f.ctx.store.db.prepare('SELECT reason FROM activity_check_sessions WHERE id=?').get(check.id).reason,'Wekelijkse activiteitencheck');
+  assert.equal(f.ctx.store.db.prepare('SELECT reason FROM activity_check_sessions WHERE id=?').get(check.id).reason,'Tweewekelijkse activiteitencheck');
   assert.equal(f.ctx.store.db.prepare('SELECT COUNT(*) AS n FROM activity_check_sessions').get().n,1);
 });
 test('een mislukte start bewaart geen weekclaim en community krijgt geen automatische weekcheck',async t=>{

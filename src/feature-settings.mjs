@@ -4,10 +4,10 @@ export const featureDefaults={
   gangpot:{weeklyAmount:25000,deadlineTime:'23:59',remindersEnabled:true,fridayTime:'18:00',saturdayTime:'18:00',leadReminderEnabled:true,leadTime:'20:00'},
   planning:{requireApproval:true,autoApproveAbsences:true,duration:120,title:'Gangactiviteit',preparation:'Zorg dat je volledig bent geheald. Tank je voertuig helemaal vol. Neem repairkits en de benodigde spullen mee. Sta op tijd klaar en volg de aanwijzingen van de leiding.'},
   fishing:{collectionEnabled:true,weeklyEnabled:true,target:25,rareTarget:3,reward:750,rareReward:400},
-  activityCheck:{remindersEnabled:true,reminderMinutes:60,weeklyEnabled:false,weeklyStartDate:'2026-10-23',weeklyTime:'07:30',weeklyReason:'Wekelijkse activiteitencheck',weeklyChannelId:WEEKLY_CHECK_CHANNEL_ID},backups:{enabled:true,keep:5},monthlyReports:{enabled:true,sendTime:'09:00'},weeklyReports:{enabled:true,sendTime:'09:00'},
+  activityCheck:{remindersEnabled:true,reminderMinutes:60,weeklyEnabled:false,weeklyStartDate:'2026-10-23',weeklyIntervalWeeks:2,weeklyTime:'07:30',weeklyReason:'Tweewekelijkse activiteitencheck',weeklyChannelId:WEEKLY_CHECK_CHANNEL_ID},backups:{enabled:true,keep:5},monthlyReports:{enabled:true,sendTime:'09:00'},weeklyReports:{enabled:true,sendTime:'09:00'},
   absence:{maxDays:90},logs:{enabled:true,batchSize:15},recruitment:{capacity:25,limitedAt:20,minimumAge:16},admission:{inviteMaxAgeSeconds:86400}
 };
-const bounds={weeklyAmount:[1,100000000],duration:[15,720],target:[1,10000],rareTarget:[1,1000],reward:[1,1000000],rareReward:[1,1000000],maxDays:[1,180],batchSize:[1,20],capacity:[2,1000],limitedAt:[1,999],minimumAge:[1,100],inviteMaxAgeSeconds:[300,604800],reminderMinutes:[1,10080],keep:[1,30]};
+const bounds={weeklyAmount:[1,100000000],duration:[15,720],target:[1,10000],rareTarget:[1,1000],reward:[1,1000000],rareReward:[1,1000000],maxDays:[1,180],batchSize:[1,20],capacity:[2,1000],limitedAt:[1,999],minimumAge:[1,100],inviteMaxAgeSeconds:[300,604800],reminderMinutes:[1,10080],weeklyIntervalWeeks:[1,12],keep:[1,30]};
 export function operationSettings(ctx){return Object.fromEntries(Object.entries(featureDefaults).map(([group,defaults])=>[group,{...defaults,...(group==='gangpot'?{weeklyAmount:ctx.config.gangpot?.weeklyAmount??defaults.weeklyAmount}:{}),...ctx.config.operations?.[group]}]));}
 export function validateOperations(value){
   assertUser(value&&typeof value==='object'&&!Array.isArray(value),'Ongeldige module-instellingen.');const result={};

@@ -1,4 +1,13 @@
 {
+  "2.5.3": [
+    "Automatische activiteitencheck staat nu standaard om de twee weken gepland, met een instelbaar interval van 1 tot 12 weken in het dashboard.",
+    "De bestaande check in mededelingen wordt bij de eerste hostingstart overgenomen. Bestaande ✅-reacties tellen meteen mee in de teller; alleen de oorspronkelijke 19 leden tellen mee.",
+    "Nieuwe automatische checks tonen de reden Tweewekelijkse activiteitencheck. De instelling blijft bewaard na herstarts."
+  ],
+  "2.5.2": [
+    "De wekelijkse activiteitencheck voor vrijdag 23 oktober om 07:30 staat in mededelingen. De bot kan ditzelfde gepubliceerde bericht veilig overnemen met behoud van de oorspronkelijke 19 opgenomen leden en bestaande vinkjes.",
+    "Herstel controleert eigen botberichten, de privé herstelregistratie, het kanaal, de deadline en ledenrechten. De bot overschrijft geen bestaande check en maakt geen dubbele weekcheck."
+  ],
   "2.5.1": [
     "De wekelijkse activiteitencheck gebruikt voortaan mededelingen: kanaal 1555685632704249932. Een bestaande weekcheck in planning wordt veilig opnieuw geplaatst met behoud van deadline en opgeslagen bevestigingen.",
     "De gangpot-embed toont Totaal witgeld, Totaal zwartgeld en Items groot en afzonderlijk. Itemaantallen staan prominent boven het betaaloverzicht."
