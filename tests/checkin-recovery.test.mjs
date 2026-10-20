@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {Collection,PermissionsBitField,PermissionFlagsBits as P} from 'discord.js';
 import {dashboardFixture,OTHER} from './dashboard-fixture.mjs';
 import {recoverPublishedActivityChecks} from '../src/checkin-recovery.mjs';
-import {finishActivityCheck} from '../src/activity-check.mjs';
+import {finishActivityCheck,handleActivityCheckReaction} from '../src/activity-check.mjs';
 import {WEEKLY_CHECK_CHANNEL_ID} from '../src/feature-settings.mjs';
 
 const NOW=Date.parse('2026-10-20T12:00:00Z'),DEADLINE=Date.parse('2026-10-23T05:30:00Z');
@@ -62,6 +62,17 @@ test('herstel accepteert de nieuwe tweewekelijkse reden en telt bestaande ✅ me
     {user_id:f.ids[0],status:'pending',responded_at:null},{user_id:f.ids[1],status:'responded',responded_at:NOW}
   ]);
   assert.equal(f.ctx.store.db.prepare('SELECT reason FROM activity_check_sessions WHERE id=?').get(data.id).reason,'Tweewekelijkse activiteitencheck');
+});
+
+test('reactie op herstelde check 3ff6ac9b2f8d werkt dezelfde embed meteen bij',async t=>{
+  const f=fixture(t),{message}=await f.publish({id:'3ff6ac9b2f8d'});
+  await recoverPublishedActivityChecks(f.ctx,f.guild,NOW);
+  const user=f.guild.members.cache.get(f.ids[0]).user,reaction=message.reactions.cache.get('✅');
+  reaction.users.cache.set(user.id,user);
+  await handleActivityCheckReaction(f.ctx,reaction,user,true,NOW+1000);
+  const description=message.embeds[0].description;
+  assert.match(description,/\*\*Bevestigd:\*\* 1\/2/);
+  assert.ok(message.embeds[0].fields.some(field=>field.name==='✅ Actief bevestigd'&&field.value.includes(`<@${user.id}>`)));
 });
 
 test('vervalste of ongeldige privé manifesten worden overgeslagen zonder databasewijzigingen',async t=>{

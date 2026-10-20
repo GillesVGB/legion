@@ -4,6 +4,8 @@
 
 De activiteitencheck met deadline **23 oktober 2026, 07:30 Belgische tijd** is al in mededelingen geplaatst. Deze versie neemt bij opstarten hetzelfde bericht over via de privé herstelregistratie. Alleen de oorspronkelijke ledensnapshot telt mee. De bot controleert afzender, kanaal, berichtkenmerken, deadline, privacy en leesrechten en haalt bestaande ✅-reacties op vóór de deadlinecontrole.
 
+Wanneer een oorspronkelijk lid daarna met ✅ reageert, wordt hetzelfde bericht direct bijgewerkt met de nieuwe teller en de lijst met bevestigde leden. De bevestiging blijft bewaard, ook als het lid later zijn reactie verwijdert.
+
 Reeds opgeslagen, gesloten of geannuleerde checks worden niet overschreven. Bij conflicten of ontbrekende rechten wacht het herstel; er wordt geen vervangende check gefabriceerd. Als deze versie pas na de deadline wordt gestart, wordt de verlopen, nog niet gekoppelde check niet achteraf geïmporteerd om gangwarns te maken.
 
 ## Bestemming en gangpotoverzicht — 2.5.1
