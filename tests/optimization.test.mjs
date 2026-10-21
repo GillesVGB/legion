@@ -48,7 +48,7 @@ test('Discordmetadata en een nieuwe rendertijd veroorzaken geen edit, maar gewij
 test('ongewijzigde afmeldpanelen en ledenlijsten veroorzaken geen herhaalde Discord-edits',async t=>{
   const f=dashboardFixture();t.after(f.close);const ctx=f.contexts.get(MAIN),guild=f.guilds.get(MAIN);await publishAbsencePanel(ctx,guild);await publishRoster(ctx,guild);const before=f.calls.filter(item=>item.method==='message.edit').length;
   await publishAbsencePanel(ctx,guild);await publishRoster(ctx,guild);assert.equal(f.calls.filter(item=>item.method==='message.edit').length,before);
-  guild.roles.cache.get(ctx.config.roster.roleIds[0]).name='Nieuwe rangnaam';await publishRoster(ctx,guild);assert.equal(f.calls.filter(item=>item.method==='message.edit').length,before+1);
+  guild.roles.cache.get(ctx.config.roster.roleIds[0]).name='Nieuwe rangnaam';await publishRoster(ctx,guild);assert.equal(f.calls.filter(item=>item.method==='message.edit').length,before+2);
 });
 
 test('een mislukte tweede ledenpagina laat de bestaande cache intact en gedeelde aanvragen halen maar één keer op',async()=>{

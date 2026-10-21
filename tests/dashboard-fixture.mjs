@@ -78,6 +78,7 @@ export function dashboardFixture() {
     ctx.store.wallet('100000000000000020');ctx.store.adjustCoins('100000000000000020',2500,ACTOR,'Voorbeeldsaldo');
     ctx.store.wallet('100000000000000021');ctx.store.adjustCoins('100000000000000021',1350,ACTOR,'Voorbeeldsaldo');
   }
+  for(const settings of base.guilds)for(const mirror of settings.roster?.mirrors||[])guilds.get(mirror.guildId)?.makeChannel(mirror.channelId,'ledenlijst');
   const source=contexts.get(base.guilds[1].guildId),guild=guilds.get(source.config.guildId);
   const open=source.store.reserveCase('application',APPLICANT,{template:true});
   const channel=guild.makeChannel('100000000000000100','sollicitatie-kai-mercier',`Bakarov dossier:${open.id} | application`);

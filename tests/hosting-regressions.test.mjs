@@ -121,6 +121,26 @@ test('ledenlijst blijft bij restarts en gelijktijdige updates dezelfde embed; al
   assert.equal(sent, 1); assert.equal(deleted, 1); assert.equal(channel.posted.has(duplicate.id), false); assert.equal(channel.posted.has(foreign.id), true);
   assert.equal(JSON.parse(ctx.store.setting('roster:messages'))[0], id);
 });
+test('ledenlijst wordt ook in de ingestelde community-guild geplaatst en daar blijvend bijgewerkt', async t => {
+  const f=dashboardFixture();t.after(f.close);
+  const ctx=f.contexts.get(f.base.guilds[0].guildId),source=f.guilds.get(ctx.config.guildId),mirror=ctx.config.roster.mirrors[0];
+  const sourceChannel=source.channels.cache.get(ctx.config.roster.channelId),community=f.guilds.get(mirror.guildId),target=community.channels.cache.get(mirror.channelId);
+  const counters={sourceSent:0,sourceEdited:0,mirrorSent:0,mirrorEdited:0};
+  for(const [channel,which]of [[sourceChannel,'source'],[target,'mirror']]){
+    const send=channel.send.bind(channel);
+    channel.send=async payload=>{counters[`${which}Sent`]++;const message=await send(payload),edit=message.edit;message.edit=async value=>{counters[`${which}Edited`]++;return edit(value);};return message;};
+  }
+  await publishRoster(ctx,source);
+  const sourceId=JSON.parse(ctx.store.setting('roster:messages'))[0],mirrorKey=`roster:messages:${mirror.guildId}:${mirror.channelId}`,mirrorId=JSON.parse(ctx.store.setting(mirrorKey))[0];
+  assert.equal(counters.sourceSent,1);assert.equal(counters.mirrorSent,1);assert.ok(sourceChannel.posted.has(sourceId));assert.ok(target.posted.has(mirrorId));
+  const member=source.members.cache.get('100000000000000020');member.roles.cache.delete(ctx.config.roster.roleIds[0]);member.roles.cache.set(ctx.config.roster.roleIds[8],source.roles.cache.get(ctx.config.roster.roleIds[8]));
+  await publishRoster(ctx,source);
+  assert.equal(counters.sourceSent,1);assert.equal(counters.mirrorSent,1);assert.equal(counters.sourceEdited,1);assert.equal(counters.mirrorEdited,1);
+  assert.equal(JSON.parse(ctx.store.setting('roster:messages'))[0],sourceId);assert.equal(JSON.parse(ctx.store.setting(mirrorKey))[0],mirrorId);
+  assert.ok(target.posted.get(mirrorId).embeds.some(card=>card.fields.some(field=>field.name.startsWith('Recruter ·')&&field.value.includes(`<@${member.id}>`))));
+  await publishRoster({...ctx,rosterRecovered:false,rosterRecoveredMirrors:new Set()},source);
+  assert.equal(counters.sourceSent,1);assert.equal(counters.mirrorSent,1);
+});
 test('standaardconfiguratie start de lokale dashboardverbinding', () => {
   assert.equal(loadConfig({}, false).transcriptViewerMode, 'local');
 });

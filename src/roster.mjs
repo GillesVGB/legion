@@ -70,29 +70,40 @@ export async function publishRoster(ctx, guild, fetchMembers = false) {
 async function updateRoster(ctx, guild, fetchMembers) {
   const { config, store } = ctx;
   if (!config.roster) return;
-  const channel = await guild.channels.fetch(config.roster.channelId);
-  assertUser(channel?.guildId === config.guildId && channel.type === ChannelType.GuildText, 'Het ledenlijstkanaal hoort niet bij deze guild.');
-  assertUser(channel.permissionsFor(guild.members.me)?.has([P.ViewChannel, P.SendMessages, P.EmbedLinks, P.ReadMessageHistory]), 'De bot mist rechten voor de ledenlijst.');
   if (fetchMembers) await refreshMembers(guild);
   const payloads = rosterCards(config, guild);
-  let oldIds = JSON.parse(store.setting('roster:messages') ?? '[]');
-  if (!ctx.rosterRecovered) {
-    const found = await findRosterMessages(channel, guild.members.me.id);
-    const foundIds = new Set(found.map(message => message.id));
-    oldIds = [...new Set([...oldIds.filter(id => foundIds.has(id)), ...foundIds])];
-    store.setSetting('roster:messages', JSON.stringify(oldIds));
+  const destinations = [
+    { guild, channelId: config.roster.channelId, key: 'roster:messages', primary: true },
+    ...(config.roster.mirrors || []).map(mirror => ({ guild: guild.client.guilds.cache.get(mirror.guildId), channelId: mirror.channelId, key: `roster:messages:${mirror.guildId}:${mirror.channelId}` }))
+  ];
+  for (const destination of destinations) {
+    const targetGuild = destination.guild;
+    assertUser(targetGuild, `De ledenlijstguild ${destination.guild?.id || 'spiegel'} is niet bereikbaar.`);
+    if (!destination.primary) await targetGuild.members.fetchMe();
+    const channel = await targetGuild.channels.fetch(destination.channelId);
+    assertUser(channel?.guildId === targetGuild.id && channel.type === ChannelType.GuildText, 'Het ledenlijstkanaal hoort niet bij de ingestelde guild.');
+    assertUser(channel.permissionsFor(targetGuild.members.me)?.has([P.ViewChannel, P.SendMessages, P.EmbedLinks, P.ReadMessageHistory]), 'De bot mist rechten voor de ledenlijst.');
+    let oldIds = JSON.parse(store.setting(destination.key) ?? '[]');
+    const recovered = destination.primary ? ctx.rosterRecovered : ctx.rosterRecoveredMirrors?.has(destination.key);
+    if (!recovered) {
+      const found = await findRosterMessages(channel, targetGuild.members.me.id);
+      const foundIds = new Set(found.map(message => message.id));
+      oldIds = [...new Set([...oldIds.filter(id => foundIds.has(id)), ...foundIds])];
+      store.setSetting(destination.key, JSON.stringify(oldIds));
+    }
+    const ids = [];
+    for (let part = 0; part < payloads.length; part++) {
+      const old = oldIds[part] ? await channel.messages.fetch(oldIds[part]).catch(error => { if (error.code === 10008) return null; throw error; }) : null;
+      const message = isRoster(old, targetGuild.members.me.id) ? await editIfChanged(old,payloads[part]) : await channel.send(payloads[part]);
+      ids.push(message.id);
+      store.setSetting(destination.key, JSON.stringify([...ids, ...oldIds.slice(part + 1)]));
+    }
+    for (const id of oldIds.slice(payloads.length)) {
+      const old = await channel.messages.fetch(id).catch(error => { if (error.code === 10008) return null; throw error; });
+      if (isRoster(old, targetGuild.members.me.id)) await old.delete();
+    }
+    store.setSetting(destination.key, JSON.stringify(ids));
+    if (destination.primary) ctx.rosterRecovered = true;
+    else (ctx.rosterRecoveredMirrors ??= new Set()).add(destination.key);
   }
-  const ids = [];
-  for (let part = 0; part < payloads.length; part++) {
-    const old = oldIds[part] ? await channel.messages.fetch(oldIds[part]).catch(error => { if (error.code === 10008) return null; throw error; }) : null;
-    const message = isRoster(old, guild.members.me.id) ? await editIfChanged(old,payloads[part]) : await channel.send(payloads[part]);
-    ids.push(message.id);
-    store.setSetting('roster:messages', JSON.stringify([...ids, ...oldIds.slice(part + 1)]));
-  }
-  for (const id of oldIds.slice(payloads.length)) {
-    const old = await channel.messages.fetch(id).catch(error => { if (error.code === 10008) return null; throw error; });
-    if (isRoster(old, guild.members.me.id)) await old.delete();
-  }
-  store.setSetting('roster:messages', JSON.stringify(ids));
-  ctx.rosterRecovered = true;
 }

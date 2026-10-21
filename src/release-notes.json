@@ -1,4 +1,7 @@
 {
+  "2.5.4": [
+    "De automatische ledenlijst staat nu ook in communitykanaal 1556308405524898005. De rangindeling komt uit de hoofdserver; beide vaste berichten worden bij rang-, naam- en ledenwijzigingen bijgewerkt en herstellen na herstarts zonder duplicaten."
+  ],
   "2.5.3": [
     "Automatische activiteitencheck staat nu standaard om de twee weken gepland, met een instelbaar interval van 1 tot 12 weken in het dashboard.",
     "De bestaande check in mededelingen wordt bij de eerste hostingstart overgenomen. Bestaande ✅-reacties tellen meteen mee in de teller; alleen de oorspronkelijke 19 leden tellen mee.",
