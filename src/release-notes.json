@@ -1,4 +1,10 @@
 {
+  "2.5.5": [
+    "Gangpotweek loopt vanaf zaterdag 24 oktober t/m vrijdag 23:59 Belgische tijd. De open termijn van 24 oktober wordt bij de eerste hostingstart direct afgesloten; de nieuwe termijn begint daarna en sluit vrijdag 30 oktober.",
+    "De twee gangpotwarns van Fronzy op 24 oktober worden alleen ingetrokken als de hostingdatabase precies twee actieve gangpotwarns van dat account vindt. De correcties worden groen gelogd en per DM bevestigd; bij een afwijkend aantal verandert de bot niets.",
+    "De bot maakt in de hoofdserver de rollen Waarschuwing 1 en Waarschuwing 2 aan en houdt ze automatisch gelijk aan het actieve aantal warns. Eén warn geeft rol 1; twee of meer geven rol 2; na intrekken wordt de rol verlaagd of weggehaald.",
+    "Gangpotherinneringen zijn standaard donderdag en vrijdag. De herinneringstijden en vrijdagdeadline blijven instelbaar via het dashboard."
+  ],
   "2.5.4": [
     "De automatische ledenlijst staat nu ook in communitykanaal 1556308405524898005. De rangindeling komt uit de hoofdserver; beide vaste berichten worden bij rang-, naam- en ledenwijzigingen bijgewerkt en herstellen na herstarts zonder duplicaten."
   ],

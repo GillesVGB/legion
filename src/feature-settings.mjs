@@ -1,14 +1,24 @@
 import {assertUser} from './errors.mjs';
 export const WEEKLY_CHECK_CHANNEL_ID='1555685632704249932';
 export const featureDefaults={
-  gangpot:{weeklyAmount:25000,deadlineTime:'23:59',remindersEnabled:true,fridayTime:'18:00',saturdayTime:'18:00',leadReminderEnabled:true,leadTime:'20:00'},
+  gangpot:{weeklyAmount:25000,deadlineTime:'23:59',remindersEnabled:true,thursdayTime:'18:00',fridayTime:'18:00',leadReminderEnabled:true,leadTime:'20:00'},
   planning:{requireApproval:true,autoApproveAbsences:true,duration:120,title:'Gangactiviteit',preparation:'Zorg dat je volledig bent geheald. Tank je voertuig helemaal vol. Neem repairkits en de benodigde spullen mee. Sta op tijd klaar en volg de aanwijzingen van de leiding.'},
   fishing:{collectionEnabled:true,weeklyEnabled:true,target:25,rareTarget:3,reward:750,rareReward:400},
   activityCheck:{remindersEnabled:true,reminderMinutes:60,weeklyEnabled:false,weeklyStartDate:'2026-10-23',weeklyIntervalWeeks:2,weeklyTime:'07:30',weeklyReason:'Tweewekelijkse activiteitencheck',weeklyChannelId:WEEKLY_CHECK_CHANNEL_ID},backups:{enabled:true,keep:5},monthlyReports:{enabled:true,sendTime:'09:00'},weeklyReports:{enabled:true,sendTime:'09:00'},
   absence:{maxDays:90},logs:{enabled:true,batchSize:15},recruitment:{capacity:25,limitedAt:20,minimumAge:16},admission:{inviteMaxAgeSeconds:86400}
 };
 const bounds={weeklyAmount:[1,100000000],duration:[15,720],target:[1,10000],rareTarget:[1,1000],reward:[1,1000000],rareReward:[1,1000000],maxDays:[1,180],batchSize:[1,20],capacity:[2,1000],limitedAt:[1,999],minimumAge:[1,100],inviteMaxAgeSeconds:[300,604800],reminderMinutes:[1,10080],weeklyIntervalWeeks:[1,12],keep:[1,30]};
-export function operationSettings(ctx){return Object.fromEntries(Object.entries(featureDefaults).map(([group,defaults])=>[group,{...defaults,...(group==='gangpot'?{weeklyAmount:ctx.config.gangpot?.weeklyAmount??defaults.weeklyAmount}:{}),...ctx.config.operations?.[group]}]));}
+export function operationSettings(ctx){return Object.fromEntries(Object.entries(featureDefaults).map(([group,defaults])=>{
+  const saved=ctx.config.operations?.[group]||{};
+  if(group==='gangpot'){
+    const hasNewSchedule=Object.hasOwn(saved,'thursdayTime')||Object.hasOwn(saved,'fridayTime')&& !Object.hasOwn(saved,'saturdayTime');
+    const values={...defaults,weeklyAmount:ctx.config.gangpot?.weeklyAmount??defaults.weeklyAmount,...saved,
+      thursdayTime:saved.thursdayTime??(!hasNewSchedule?saved.fridayTime:undefined)??defaults.thursdayTime,
+      fridayTime:hasNewSchedule?saved.fridayTime??defaults.fridayTime:saved.saturdayTime??defaults.fridayTime};
+    delete values.saturdayTime;return[group,values];
+  }
+  return[group,{...defaults,...saved}];
+}));}
 export function validateOperations(value){
   assertUser(value&&typeof value==='object'&&!Array.isArray(value),'Ongeldige module-instellingen.');const result={};
   for(const [group,settings] of Object.entries(value)){
@@ -27,7 +37,7 @@ export function validateOperations(value){
 }
 export function applyOperations(ctx,values){
   const merged=operationSettings(ctx);for(const [group,settings] of Object.entries(values))Object.assign(merged[group],settings);
-  assertUser((!merged.gangpot.remindersEnabled||merged.gangpot.saturdayTime<merged.gangpot.deadlineTime)&&(!merged.gangpot.leadReminderEnabled||merged.gangpot.leadTime<merged.gangpot.deadlineTime),'De zaterdagherinneringen moeten vóór de deadline staan.');
+  assertUser((!merged.gangpot.remindersEnabled||merged.gangpot.thursdayTime<merged.gangpot.deadlineTime&&merged.gangpot.fridayTime<merged.gangpot.deadlineTime)&&(!merged.gangpot.leadReminderEnabled||merged.gangpot.leadTime<merged.gangpot.deadlineTime),'De herinneringen moeten vóór de deadline op vrijdag staan.');
   assertUser(merged.recruitment.limitedAt<merged.recruitment.capacity,'De grens voor beperkte plaatsen moet lager dan de capaciteit zijn.');
   ctx.config.operations=merged;if(ctx.config.gangpot)Object.assign(ctx.config.gangpot,merged.gangpot);
   if(ctx.config.recruitment)Object.assign(ctx.config.recruitment,merged.recruitment);if(ctx.config.admission)Object.assign(ctx.config.admission,merged.admission);

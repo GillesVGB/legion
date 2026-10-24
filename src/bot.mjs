@@ -37,6 +37,7 @@ import {syncWeeklyReports,handleWeeklyReport} from './weekly-reports.mjs';
 import {syncAbsenceCorrections} from './absence-corrections.mjs';
 import {handleWarnAppealButton,handleWarnAppealCommand,syncWarnAppeals} from './warn-appeals.mjs';
 import {warnAppealRow,warnAppealRows} from './warn-appeal-ui.mjs';
+import {syncWarningRoles} from './warning-roles.mjs';
 import { quiet, isStaff, requireStaff, requireAdmin, requireTickets, configureGuild, publishPanel,
   createCase, requestCaseDecision, decideCase, startInterview, cleanupInterviews, cleanupClosedCases, warningMessage, staffLogChannel, warnLogChannel, writeWarnLog, reconcileCases } from './service.mjs';
 
@@ -118,6 +119,7 @@ async function handleWarn(ctx, interaction) {
       assertUser(!member.permissions.has('Administrator') && actor.roles.highest.comparePositionTo(member.roles.highest) > 0, 'Je kunt geen administrator of lid met een gelijke/hogere rang waarschuwen.');
     }
     const { id, count } = store.addWarn(user.id, interaction.user.id, reason);
+    await syncWarningRoles(ctx,interaction.guild).catch(error=>console.error(`Guild ${interaction.guildId}: waarschuwingsrol bijwerken mislukt (${error.code??error.message}).`));
     const threshold = count >= config.warnThreshold ? `\n⚠️ **Drempel bereikt: ${count}/${config.warnThreshold} actieve warns. De leiding moet dit beoordelen.**` : '';
     const logged = await writeWarnLog(ctx, interaction.guild, 'Bakarov | Gangwarn gegeven', `Lid: <@${user.id}>\nDoor: <@${interaction.user.id}>\nID: \`${id}\`\nReden: ${safeText(reason)}\nActieve warns: **${count}**${threshold}`, [warnAppealRow(config.guildId,id)]);
     const dm = await user.send({ embeds: [embed(config, 'Bakarov | Gangwarn', `Guild: **${safeText(interaction.guild.name)}**\nReden: ${safeText(reason)}\nActieve warns: **${count}**\nID: \`${id}\`\nNeem contact op met de leiding als je hierover vragen hebt.`)], components:[warnAppealRow(config.guildId,id)],allowedMentions: quiet }).then(() => true).catch(() => false);
@@ -125,6 +127,7 @@ async function handleWarn(ctx, interaction) {
   } else {
     const id = interaction.options.getString('id', true).trim().toLowerCase();
     const removed = store.removeWarn(id, interaction.user.id, reason);
+    await syncWarningRoles(ctx,interaction.guild).catch(error=>console.error(`Guild ${interaction.guildId}: waarschuwingsrol bijwerken mislukt (${error.code??error.message}).`));
     const logged = await writeWarnLog(ctx, interaction.guild, 'Gangwarn ingetrokken', `ID: \`${id}\` • <@${removed.user_id}>\nDoor: <@${interaction.user.id}>\nReden: ${safeText(reason)}`);
     await interaction.editReply({ content: `Gangwarn \`${id}\` ingetrokken. De historie blijft bewaard.${logged ? '' : '\nDiscord-log mislukt; de gebeurtenis is lokaal opgeslagen.'}`, allowedMentions: quiet });
   }
@@ -410,6 +413,7 @@ client.once(Events.ClientReady, async ready => {
       await guild.members.fetchMe();
       if(/^legion(?:\s*\|.*)?$/i.test(guild.members.me.nickname||''))await guild.members.me.setNickname('Bakarov','Bakarov huisstijl').catch(error=>console.error(`Guild ${guildId}: botbijnaam bijwerken mislukt (${error.code??error.name}).`));
       await guild.roles.fetch();
+      if(ctx.config.guildId==='1555685630640652338')await syncWarningRoles(ctx,guild).catch(error=>console.error(`Guild ${guildId}: waarschuwingrollen niet bijgewerkt (${error.code??error.message}); controleer Rollen beheren en de rolvolgorde.`));
       await refreshRecruitment(ctx, guild);
       await reconcileCases(ctx, guild);
       if (ctx.config.roster) await publishRoster(ctx, guild, true);
@@ -538,6 +542,7 @@ async function performMaintenance(){
       if(ctx.config.absencePanelChannelId)jobs.push(['afmeldpaneel',()=>publishAbsencePanel(ctx,guild)]);
       jobs.push(['changelog',()=>announceRelease(ctx,guild)],['gesprekken',()=>cleanupInterviews(ctx,guild)],['check-ins',()=>syncActivityChecks(ctx,guild)],['planning',()=>syncActivities(ctx,guild)],['promoties',()=>syncPromotions(ctx,guild)]);
       if(ctx.config.gangpot)jobs.push(['weekoverzicht',()=>syncWeeklyReports(ctx,guild)]);
+      if(ctx.config.guildId==='1555685630640652338')jobs.push(['waarschuwingsrollen',()=>syncWarningRoles(ctx,guild)]);
     }
     jobs.push(['aannameberichten',async()=>{for(const notice of ctx.store.pendingAcceptances())await locks.run(`${ctx.config.guildId}:admission:${notice.case_id}`,()=>deliverAcceptance(ctx,client,notice.case_id)).catch(()=>{});}],
       ['uitnodigingen',()=>expireAcceptanceInvites(ctx,client)],

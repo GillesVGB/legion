@@ -15,18 +15,18 @@ import {botHealth} from '../src/bot-status.mjs';
 import {fishBookMessage,handleFishBookButton} from '../src/fish-book.mjs';
 import {commands} from '../src/commands.mjs';
 import {publishAbsencePanel,handleAbsencePanel,handleAbsenceSelection} from '../src/absence-panel.mjs';
-const SAT=Date.parse('2026-10-10T10:00:00Z'),FRI=Date.parse('2026-10-16T16:00:00Z'),END=Date.parse('2026-10-17T22:00:00Z');
+const SAT=Date.parse('2026-10-10T10:00:00Z'),THU=Date.parse('2026-10-15T16:00:00Z'),END=Date.parse('2026-10-16T22:00:00Z');
 function fixture(t){const f=dashboardFixture();t.after(f.close);const ctx=f.contexts.values().next().value,guild=f.guilds.get(ctx.config.guildId);for(const id of [ACTOR,OTHER])guild.members.cache.get(id).roles.cache.set(ctx.config.gangpot.memberRoleId,guild.roles.cache.get(ctx.config.gangpot.memberRoleId));return{...f,ctx,guild,lead:guild.members.cache.get(ACTOR)};}
-const pay=(f,user=OTHER)=>reportGangpotPayment(f.ctx,{userId:user,periodId:'2026-10-17',amount:25000,requestId:`payment-${user}-request`},SAT);
+const pay=(f,user=OTHER)=>reportGangpotPayment(f.ctx,{userId:user,periodId:'2026-10-16',amount:25000,requestId:`payment-${user}-request`},SAT);
 const warns=(f,user=OTHER)=>f.ctx.store.db.prepare("SELECT * FROM warnings WHERE user_id=? AND reason LIKE 'Gangpot t/m %' AND removed_at IS NULL").all(user);
 
 test('afwezigheid geeft alleen na Lead-goedkeuring vrijstelling voor de genoemde weken, zonder geldmutatie',async t=>{
   const f=fixture(t);await syncGangpot(f.ctx,f.client,SAT);const item=await createAbsence(f.ctx,f.guild,OTHER,{start:'12-10-2026',end:'19-10-2026',reason:'Vakantie'},SAT);
-  assert.deepEqual(JSON.parse(item.weeks),['2026-10-17','2026-10-24']);assert.equal(exemptionFor(f.ctx,OTHER,'2026-10-17'),undefined);
+  assert.deepEqual(JSON.parse(item.weeks),['2026-10-16','2026-10-23']);assert.equal(exemptionFor(f.ctx,OTHER,'2026-10-16'),undefined);
   const admin=f.guild.addMember('100000000000000077','Admin zonder Lead',[],true);
   await assert.rejects(decideAbsence(f.ctx,f.guild,admin,item.id,'approve',SAT+1000),/Alleen Lead/);
   const before=f.ctx.store.wallet(OTHER).balance;await decideAbsence(f.ctx,f.guild,f.lead,item.id,'approve',SAT+1000);await decideAbsence(f.ctx,f.guild,f.lead,item.id,'approve',SAT+2000);
-  assert.ok(exemptionFor(f.ctx,OTHER,'2026-10-17'));assert.equal(f.ctx.store.db.prepare('SELECT COUNT(*) AS n FROM gangpot_exemptions').get().n,2);
+  assert.ok(exemptionFor(f.ctx,OTHER,'2026-10-16'));assert.equal(f.ctx.store.db.prepare('SELECT COUNT(*) AS n FROM gangpot_exemptions').get().n,2);
   assert.equal(f.ctx.store.wallet(OTHER).balance,before);await syncGangpot(f.ctx,f.client,END);assert.equal(warns(f).length,0);
   await syncAbsences(f.ctx,f.guild,END);assert.equal(f.ctx.store.db.prepare("SELECT COUNT(*) AS n FROM feature_notices WHERE kind='absence' AND status='sent'").get().n,1);
 });
@@ -34,9 +34,9 @@ test('afwezigheid geeft alleen na Lead-goedkeuring vrijstelling voor de genoemde
 test('pending of afgewezen afwezigheid geeft geen vrijstelling; een late vrijstelling corrigeert uitsluitend de gangpotwarn en intrekken herstelt dezelfde warn',async t=>{
   const f=fixture(t);await syncGangpot(f.ctx,f.client,SAT);const item=await createAbsence(f.ctx,f.guild,OTHER,{start:'10-10-2026',end:'17-10-2026',reason:'Afwezig'},SAT);
   await decideAbsence(f.ctx,f.guild,f.lead,item.id,'reject',SAT+1000);await syncGangpot(f.ctx,f.client,END);assert.equal(warns(f).length,1);const id=warns(f)[0].id;
-  const manual=f.ctx.store.addWarn(OTHER,ACTOR,'Ander voorval');await setExemption(f.ctx,f.guild,f.lead,OTHER,'17-10-2026','Vrijstelling gecontroleerd',false,END+1000);
+  const manual=f.ctx.store.addWarn(OTHER,ACTOR,'Ander voorval');await setExemption(f.ctx,f.guild,f.lead,OTHER,'16-10-2026','Vrijstelling gecontroleerd',false,END+1000);
   assert.equal(warns(f).length,0);assert.equal(f.ctx.store.warnings(OTHER).find(item=>item.id===manual.id).removed_at,null);
-  await setExemption(f.ctx,f.guild,f.lead,OTHER,'17-10-2026','Vrijstelling onjuist',true,END+2000);assert.equal(warns(f)[0].id,id);assert.equal(warns(f).length,1);
+  await setExemption(f.ctx,f.guild,f.lead,OTHER,'16-10-2026','Vrijstelling onjuist',true,END+2000);assert.equal(warns(f)[0].id,id);assert.equal(warns(f).length,1);
 });
 
 test('rode planningreactie is pending, /afmelden bewaart de reden bij offline synchroniseren, goedkeuring verschijnt in tekst zonder embeds of knoppen',async t=>{
@@ -46,7 +46,7 @@ test('rode planningreactie is pending, /afmelden bewaart de reden bij offline sy
   assert.equal(activityAbsences(f.ctx,activity)[0].status,'pending');assert.ok(message.content.includes('wacht op Lead'));
   const item=await createAbsence(f.ctx,f.guild,OTHER,{activityId:activity.id,reason:'Kan niet vanwege werk'},SAT);await syncPlanningReactions(f.ctx,f.guild,activity.id);assert.equal(f.ctx.store.db.prepare('SELECT reason FROM absence_requests WHERE id=?').get(item.id).reason,'Kan niet vanwege werk');
   await decideAbsence(f.ctx,f.guild,f.lead,item.id,'approve',SAT+1000);await publishActivity(f.ctx,f.guild,activity.id);
-  assert.ok(message.content.includes('Afwezig (goedgekeurd)'));assert.equal(message.embeds.length,0);assert.equal(message.components.length,0);assert.equal(exemptionFor(f.ctx,OTHER,'2026-10-17'),undefined);
+  assert.ok(message.content.includes('Afwezig (goedgekeurd)'));assert.equal(message.embeds.length,0);assert.equal(message.components.length,0);assert.equal(exemptionFor(f.ctx,OTHER,'2026-10-16'),undefined);
 });
 
 test('goedgekeurde vakantie verschijnt op een passende planning, maar niet op een andere datum',async t=>{
@@ -58,22 +58,22 @@ test('goedgekeurde vakantie verschijnt op een passende planning, maar niet op ee
   await assert.rejects(createAbsence(f.ctx,f.guild,OTHER,{start:'01-10-2026',end:'12-10-2026',reason:'Test'},SAT),/vandaag/);
 });
 
-test('leden krijgen vrijdag en zaterdag elk één DM; goedgekeurde betalingen en vrijstellingen sluiten herinneringen uit',async t=>{
+test('leden krijgen donderdag en vrijdag elk één DM; goedgekeurde betalingen en vrijstellingen sluiten herinneringen uit',async t=>{
   const f=fixture(t);await syncGangpot(f.ctx,f.client,SAT);const paid=pay(f,ACTOR);await reviewGangpotPayment(f.ctx,f.guild,f.lead,paid.id,'approve',()=>SAT+1000);
-  const exempt='100000000000000020';await setExemption(f.ctx,f.guild,f.lead,exempt,'17-10-2026','Vakantie',false,SAT+1000);
-  await syncGangpot(f.ctx,f.client,FRI-1000);assert.equal(f.ctx.store.db.prepare("SELECT COUNT(*) AS n FROM feature_notices WHERE kind='gangpot.member'").get().n,0);
-  await syncGangpot(f.ctx,f.client,FRI);await syncGangpot(f.ctx,f.client,FRI+1000);
+  const exempt='100000000000000020';await setExemption(f.ctx,f.guild,f.lead,exempt,'16-10-2026','Vakantie',false,SAT+1000);
+  await syncGangpot(f.ctx,f.client,THU-1000);assert.equal(f.ctx.store.db.prepare("SELECT COUNT(*) AS n FROM feature_notices WHERE kind='gangpot.member'").get().n,0);
+  await syncGangpot(f.ctx,f.client,THU);await syncGangpot(f.ctx,f.client,THU+1000);
   assert.equal(f.ctx.store.db.prepare("SELECT COUNT(*) AS n FROM feature_notices WHERE kind='gangpot.member' AND user_id=? AND status='sent'").get(OTHER).n,1);
   for(const user of [ACTOR,exempt])assert.equal(f.ctx.store.db.prepare("SELECT COUNT(*) AS n FROM feature_notices WHERE kind='gangpot.member' AND user_id=?").get(user).n,0);
-  await syncGangpot(f.ctx,f.client,Date.parse('2026-10-17T16:00:00Z'));assert.equal(f.ctx.store.db.prepare("SELECT COUNT(*) AS n FROM feature_notices WHERE user_id=? AND kind='gangpot.member'").get(OTHER).n,2);
+  await syncGangpot(f.ctx,f.client,Date.parse('2026-10-16T16:00:00Z'));assert.equal(f.ctx.store.db.prepare("SELECT COUNT(*) AS n FROM feature_notices WHERE user_id=? AND kind='gangpot.member'").get(OTHER).n,2);
   await syncGangpot(f.ctx,f.client,END);assert.equal(f.ctx.store.db.prepare("SELECT COUNT(*) AS n FROM feature_notices WHERE user_id=? AND kind='gangpot.member'").get(OTHER).n,2);
 });
 
 test('DM-blokkades spammen niet; een mislukte herinnering wordt na betalen overgeslagen en Lead krijgt één privé-overzicht',async t=>{
   const f=fixture(t);await syncGangpot(f.ctx,f.client,SAT);const user=f.guild.members.cache.get(OTHER).user,send=user.send;let attempts=0;user.send=async()=>{attempts++;throw Object.assign(new Error('DM geblokkeerd'),{code:50007});};
-  await syncGangpot(f.ctx,f.client,FRI);await syncGangpot(f.ctx,f.client,FRI+60000);assert.equal(attempts,1);user.send=send;
-  const paid=pay(f);await reviewGangpotPayment(f.ctx,f.guild,f.lead,paid.id,'approve',()=>FRI+1000);
-  await syncGangpot(f.ctx,f.client,Date.parse('2026-10-17T18:00:00Z'));await syncGangpot(f.ctx,f.client,Date.parse('2026-10-17T18:01:00Z'));
+  await syncGangpot(f.ctx,f.client,THU);await syncGangpot(f.ctx,f.client,THU+60000);assert.equal(attempts,1);user.send=send;
+  const paid=pay(f);await reviewGangpotPayment(f.ctx,f.guild,f.lead,paid.id,'approve',()=>THU+1000);
+  await syncGangpot(f.ctx,f.client,Date.parse('2026-10-16T18:00:00Z'));await syncGangpot(f.ctx,f.client,Date.parse('2026-10-16T18:01:00Z'));
   assert.equal(f.ctx.store.db.prepare("SELECT COUNT(*) AS n FROM feature_notices WHERE kind='gangpot.lead' AND status='sent'").get().n,1);
   assert.ok([...f.guild.channels.cache.get(f.ctx.config.logChannelId).posted.values()].some(message=>message.embeds?.[0]?.title==='Bakarov — Betalingen wachten op Lead'));
   assert.equal(f.ctx.store.db.prepare("SELECT COUNT(*) AS n FROM feature_notices WHERE user_id=? AND kind='gangpot.member'").get(OTHER).n,1);
@@ -81,13 +81,20 @@ test('DM-blokkades spammen niet; een mislukte herinnering wordt na betalen overg
 
 test('dashboardinstellingen bewaren bedrag en tijden; lopende gangpotweek verandert alleen na expliciete bevestiging',async t=>{
   const f=fixture(t);t.mock.method(Date,'now',()=>SAT);await syncGangpot(f.ctx,f.client,SAT);const dashboard=new Dashboard({...f,locks:new Locks()});
-  await dashboard.action(f.ctx,f.guild,f.lead,{action:'settings.save',settings:{operations:{gangpot:{weeklyAmount:30000,fridayTime:'17:00',saturdayTime:'17:00',leadTime:'19:00'}}}});
-  assert.equal(f.ctx.store.db.prepare("SELECT weekly_amount FROM gangpot_periods WHERE id='2026-10-17'").get().weekly_amount,25000);
+  await dashboard.action(f.ctx,f.guild,f.lead,{action:'settings.save',settings:{operations:{gangpot:{weeklyAmount:30000,thursdayTime:'17:00',fridayTime:'17:00',leadTime:'19:00'}}}});
+  assert.equal(f.ctx.store.db.prepare("SELECT weekly_amount FROM gangpot_periods WHERE id='2026-10-16'").get().weekly_amount,25000);
   await assert.rejects(dashboard.action(f.ctx,f.guild,f.lead,{action:'settings.save',settings:{operations:{gangpot:{weeklyAmount:40000}}},applyCurrent:true}),/Bevestig/);
   assert.equal(f.ctx.config.gangpot.weeklyAmount,30000);
-  await dashboard.action(f.ctx,f.guild,f.lead,{action:'settings.save',settings:{operations:{gangpot:{weeklyAmount:35000}}},applyCurrent:true,confirm:true});assert.equal(f.ctx.store.db.prepare("SELECT weekly_amount FROM gangpot_periods WHERE id='2026-10-17'").get().weekly_amount,35000);
+  await dashboard.action(f.ctx,f.guild,f.lead,{action:'settings.save',settings:{operations:{gangpot:{weeklyAmount:35000}}},applyCurrent:true,confirm:true});assert.equal(f.ctx.store.db.prepare("SELECT weekly_amount FROM gangpot_periods WHERE id='2026-10-16'").get().weekly_amount,35000);
   const restored={config:{...f.ctx.config,operations:undefined,gangpot:{...f.base.guilds[0].gangpot}},store:f.ctx.store};loadDashboardSettings(restored);assert.equal(operationSettings(restored).gangpot.weeklyAmount,35000);assert.equal(operationSettings(restored).gangpot.fridayTime,'17:00');
   assert.throws(()=>validateDashboardSettings({operations:{gangpot:{weeklyAmount:-1}}}));assert.throws(()=>validateDashboardSettings({operations:{fishing:{reward:0}}}));
+});
+
+test('oude gangpot-DM-tijden worden naar donderdag en vrijdag gemigreerd; de nieuwe deadline is vrijdag 23:59',t=>{
+  const f=fixture(t);f.ctx.store.setSetting('dashboard-config',JSON.stringify({operations:{gangpot:{deadlineTime:'21:00',fridayTime:'17:00',saturdayTime:'19:00'}}}));
+  loadDashboardSettings(f.ctx);const settings=operationSettings(f.ctx).gangpot;
+  assert.equal(settings.thursdayTime,'17:00');assert.equal(settings.fridayTime,'19:00');assert.equal(settings.deadlineTime,'23:59');
+  assert.equal(Object.hasOwn(settings,'saturdayTime'),false);
 });
 
 test('vangstenboek telt goede en zeldzame items; weekbeloningen worden één keer betaald, blijven per guild en verwerpen oude kaarten',async t=>{
@@ -122,7 +129,7 @@ test('changelog wordt één keer per versie geplaatst en herstelt een verstuurd 
 
 test('Bakarov start bij 2.0.0; bestaande botupdates worden in hetzelfde bericht hernummerd en herstarts dupliceren niets',async t=>{
   const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.updateChannelId);
-  assert.equal(renamedVersions['1.9.0'],'2.0.0');assert.ok(releaseNotes['2.0.0']);assert.equal(releaseNotes['1.9.0'],undefined);assert.equal(releaseVersion,'2.5.4');
+  assert.equal(renamedVersions['1.9.0'],'2.0.0');assert.ok(releaseNotes['2.0.0']);assert.equal(releaseNotes['1.9.0'],undefined);assert.equal(releaseVersion,'2.5.5');
   const older=[];
   for(const version of ['1.9.0','1.12.0']){
     const message=await channel.send({embeds:[new EmbedBuilder().setTitle(`Bakarov — Botupdate ${version}`).setDescription('Bestaande wijziging.').setFooter({text:`Bakarov • Botupdate ${version}`})]});
@@ -150,9 +157,9 @@ test('botstatus toont wachtende acties; sollicitatie- en ticketcreatie blijven u
   for(const name of ['afwezig','afmelden','botstatus','vangstenboek'])assert.ok(main.some(item=>item.name===name));
 });
 
-test('een gewijzigde zaterdagdeadline gebruikt Belgische tijd en geeft geen gangwarn vóór die nieuwe deadline',async t=>{
-  const f=fixture(t);saveDashboardSettings(f.ctx,{operations:{gangpot:{deadlineTime:'21:00',fridayTime:'16:00',saturdayTime:'16:00',leadTime:'18:00'}}},ACTOR);await syncGangpot(f.ctx,f.client,SAT);
-  const end=Date.parse('2026-10-17T19:01:00Z');assert.equal(f.ctx.store.db.prepare("SELECT ends_at FROM gangpot_periods WHERE id='2026-10-17'").get().ends_at,end);
+test('een aangepaste vrijdagdeadline gebruikt Belgische tijd en geeft geen gangwarn vóór die nieuwe deadline',async t=>{
+  const f=fixture(t);saveDashboardSettings(f.ctx,{operations:{gangpot:{deadlineTime:'21:00',thursdayTime:'16:00',fridayTime:'16:00',leadTime:'18:00'}}},ACTOR);await syncGangpot(f.ctx,f.client,SAT);
+  const end=Date.parse('2026-10-16T19:01:00Z');assert.equal(f.ctx.store.db.prepare("SELECT ends_at FROM gangpot_periods WHERE id='2026-10-16'").get().ends_at,end);
   await syncGangpot(f.ctx,f.client,end-1);assert.equal(warns(f).length,0);await syncGangpot(f.ctx,f.client,end);assert.equal(warns(f).length,1);
 });
 

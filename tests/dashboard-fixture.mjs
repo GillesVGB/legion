@@ -23,19 +23,19 @@ export function dashboardFixture() {
   for(const settings of base.guilds){
     const config={...base,...settings,token:'NEVER-RETURN-THIS-TOKEN',transcriptViewerMode:'local',transcriptSiteURL:'https://dashboard.test',content:{...base.content}};
     const store=new Store(config,':memory:');const ctx={config,store,ready:true,recruitment:config.recruitment?recruitmentState(17):null};contexts.set(settings.guildId,ctx);
-    const roles=new Collection();
+    const roles=new Collection();let dynamicRole=0;
     const role=(id,name,position,admin=false)=>({id,name,position,managed:false,permissions:new PermissionsBitField(admin?P.Administrator:0n),comparePositionTo(other){return position-other.position;}});
     roles.set(settings.guildId,role(settings.guildId,'@everyone',0));roles.set(settings.staffRoleIds[0],role(settings.staffRoleIds[0],'Leiding',40));roles.set(settings.memberRoleId,role(settings.memberRoleId,'Bakarov',4));
     for(const [i,id] of (settings.roster?.roleIds||[]).entries())roles.set(id,role(id,base.content.ranks[i] || 'Recruter',30-i));
     const cache=new Collection(),channels=new Collection();
     const guild={id:settings.guildId,name:settings.ticketsEnabled?'Bakarov Community | Future Roleplay':'Bakarov | Future Roleplay',memberCount:0,
-      iconURL:()=>null,client,roles:{cache:roles,fetch:async id=>id?roles.get(id):roles},channels:{cache:channels,fetch:async id=>{if(!id)return channels;const channel=channels.get(id);if(!channel)throw Object.assign(new Error('Onbekend kanaal'),{code:10003});return channel;}},
+      iconURL:()=>null,client,roles:{cache:roles,fetch:async id=>id?roles.get(id):roles,create:async options=>{const id=String(BigInt(settings.guildId)+50000n+BigInt(++dynamicRole)),created=role(id,options.name,1);created.color=options.color;roles.set(id,created);return created;}},channels:{cache:channels,fetch:async id=>{if(!id)return channels;const channel=channels.get(id);if(!channel)throw Object.assign(new Error('Onbekend kanaal'),{code:10003});return channel;}},
       members:{cache,fetch:async options=>{const id=typeof options==='string'?options:options.user;const member=cache.get(id);if(!member)throw Object.assign(new Error('Onbekend lid'),{code:10007});return member;},list:async()=>new Collection(cache)}};
     guilds.set(guild.id,guild);
     const addMember=(id,name,ids,admin=false,bot=false)=>{
       const member={id,guild,client,displayName:name,displayAvatarURL:()=>null,permissions:new PermissionsBitField(admin?P.Administrator:0n)};
       const user={id,username:name.replace(/ /g,'_').toLowerCase(),bot,send:async payload=>{calls.push({method:'dm',user:id,payload});return{id:String(++message)};}};
-      member.user=user;member.roles={cache:new Collection(ids.map(id=>[id,roles.get(id)])),highest:role('highest','Rang',admin?100:12),add:async value=>{const roleId=typeof value==='string'?value:value.id;member.roles.cache.set(roleId,roles.get(roleId)||value);calls.push({method:'roles.add',user:id,role:roleId});},remove:async roleId=>{member.roles.cache.delete(roleId);calls.push({method:'roles.remove',user:id,role:roleId});},set:async values=>{member.roles.cache=new Collection(values.map(id=>[id,roles.get(id)]));member.roles.highest=[...member.roles.cache.values()].sort((a,b)=>b.position-a.position)[0]||role('none','Geen rang',0);calls.push({method:'roles.set',user:id,roles:values});}};
+      member.user=user;member.roles={cache:new Collection(ids.map(id=>[id,roles.get(id)])),highest:role('highest','Rang',admin?100:12),add:async value=>{const roleId=typeof value==='string'?value:value.id;member.roles.cache.set(roleId,roles.get(roleId)||value);calls.push({method:'roles.add',user:id,role:roleId});},remove:async value=>{const roleIds=Array.isArray(value)?value:[value];for(const roleId of roleIds)member.roles.cache.delete(typeof roleId==='string'?roleId:roleId.id);calls.push({method:'roles.remove',user:id,role:roleIds});},set:async values=>{member.roles.cache=new Collection(values.map(id=>[id,roles.get(id)]));member.roles.highest=[...member.roles.cache.values()].sort((a,b)=>b.position-a.position)[0]||role('none','Geen rang',0);calls.push({method:'roles.set',user:id,roles:values});}};
       cache.set(id,member);return member;
     };
     guild.addMember=addMember;

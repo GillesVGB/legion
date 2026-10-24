@@ -46,6 +46,20 @@ export function applyDashboardSettings(ctx, value) {
 export function loadDashboardSettings(ctx) {
   const saved = ctx.store.setting('dashboard-config');
   const migrated=migrateBrandSettings(ctx,JSON.parse(saved||'{}'));
+  if(ctx.config.guildId==='1555685630640652338'&&!ctx.store.setting('gangpot:reminder-settings:friday-v1')){
+    const gangpot=migrated.operations?.gangpot;
+    if(gangpot){
+      const oldFriday=gangpot.fridayTime,oldSaturday=gangpot.saturdayTime;
+      gangpot.thursdayTime??=oldFriday||'18:00';
+      gangpot.fridayTime=oldSaturday||oldFriday||'18:00';
+      delete gangpot.saturdayTime;
+    }
+    ctx.store.transaction(()=>{ctx.store.setSetting('dashboard-config',JSON.stringify(migrated));ctx.store.setSetting('gangpot:reminder-settings:friday-v1','1');});
+  }
+  if(ctx.config.guildId==='1555685630640652338'&&!ctx.store.setting('gangpot:friday-deadline-settings:1')){
+    migrated.operations??={};migrated.operations.gangpot??={};migrated.operations.gangpot.deadlineTime='23:59';
+    ctx.store.transaction(()=>{ctx.store.setSetting('dashboard-config',JSON.stringify(migrated));ctx.store.setSetting('gangpot:friday-deadline-settings:1','1');});
+  }
   if(ctx.config.guildId==='1555685630640652338'&&!ctx.store.setting('activitycheck:interval-config:2')){
     migrated.operations??={};const settings=migrated.operations.activityCheck??={};
     settings.weeklyIntervalWeeks??=2;

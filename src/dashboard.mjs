@@ -33,6 +33,7 @@ import {backupSummary,createDataBackup} from './backups.mjs';
 import {releaseVersion} from './release-announcements.mjs';
 import {dashboardAuditItem} from './audit-format.mjs';
 import {logo} from './branding.mjs';
+import {syncWarningRoles} from './warning-roles.mjs';
 import {monthlyReport,monthlyReportIndex} from './monthly-reports.mjs';
 import {weeklyReport,weeklyReportIndex} from './weekly-reports.mjs';
 import {DiscordLogin,DiscordLoginError} from './discord-login.mjs';
@@ -251,6 +252,7 @@ export class Dashboard {
       const target = await guild.members.fetch({user,force:true});
       assertUser(!target.user.bot && (member.permissions.has(P.Administrator) || (!target.permissions.has(P.Administrator) && member.roles.highest.comparePositionTo(target.roles.highest) > 0)), 'Je kunt geen bot, administrator of lid met een gelijke/hogere rang waarschuwen.');
       const result = store.addWarn(user,actor,why);
+      await syncWarningRoles(ctx,guild).catch(error=>console.error(`Dashboard: waarschuwingsrol bijwerken mislukt (${error.code??error.message}).`));
       const logged = await writeWarnLog(ctx,guild,'Bakarov | Gangwarn gegeven', `Lid: <@${user}>\nDoor: <@${actor}>\nID: \`${result.id}\`\nReden: ${safeText(why)}\nActieve warns: **${result.count}**${result.count>=config.warnThreshold?'\n⚠️ De ingestelde warn-drempel is bereikt.':''}`, [warnAppealRow(config.guildId,result.id)]);
       await target.user.send({content:`Je hebt een gangwarn ontvangen in **${safeText(guild.name)}**.\nReden: ${safeText(why)}\nActieve warns: **${result.count}**\nID: \`${result.id}\``,components:[warnAppealRow(config.guildId,result.id)],allowedMentions:{parse:[]}}).catch(()=>{});
       return { message:`Gangwarn gegeven.${logged ? '' : ' De log staat lokaal opgeslagen.'}` };
@@ -259,6 +261,7 @@ export class Dashboard {
       await warnLogChannel(guild,config);
       assertUser(/^[a-f0-9]{12}$/.test(value.id), 'Ongeldige gangwarn.');
       const why = reason(), removed = store.removeWarn(value.id,actor,why);
+      await syncWarningRoles(ctx,guild).catch(error=>console.error(`Dashboard: waarschuwingsrol bijwerken mislukt (${error.code??error.message}).`));
       await writeWarnLog(ctx,guild,'Gangwarn ingetrokken',`ID: \`${value.id}\` • <@${removed.user_id}>\nDoor: <@${actor}>\nReden: ${safeText(why)}`);
       return { message:'Gangwarn ingetrokken. De historie blijft bewaard.' };
     }
