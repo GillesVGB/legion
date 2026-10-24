@@ -408,6 +408,7 @@ client.once(Events.ClientReady, async ready => {
   for (const [guildId, ctx] of contexts) {
     const guild = client.guilds.cache.get(guildId);
     if (!guild) { console.error(`Guild ${guildId}: nodig de bot eerst uit in deze guild.`); continue; }
+    ctx.guild = guild;
     try {
       await syncCommands(ctx,guild).catch(error=>console.error(`Guild ${guildId}: commands bijwerken wacht op herstart (${error.code??error.name}).`));
       await guild.members.fetchMe();

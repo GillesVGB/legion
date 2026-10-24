@@ -100,7 +100,7 @@ test('alleen een actuele Lead-rol kan goedkeuren; gelijktijdige vinkjes boeken p
 
 test('zonder ledenrol hoeft een lid niet te betalen, kan het geen melding maken en krijgt het geen automatische warn',async t=>{
   const f=fixture(t);t.mock.method(Date,'now',()=>SAT);
-  const id='100000000000000077',person=f.guild.addMember(id,'Geen gangrol',[f.main.config.staffRoleIds[0]],true);
+  const id='100000000000000077',person=f.guild.addMember(id,'Geen gangrol',[],true);
   await syncGangpot(f.main,f.client,SAT);
   assert.ok(!gangpotMembers(f.main,period(f),SAT).some(item=>item.user_id===id));
   assert.throws(()=>claim(f,id),/betaaloverzicht/);
@@ -111,6 +111,29 @@ test('zonder ledenrol hoeft een lid niet te betalen, kan het geen melding maken 
   await syncGangpot(f.main,f.client,END);
   assert.equal(warns(f,id).length,0);assert.equal(warns(f,OTHER).length,0);
   assert.equal(f.main.store.db.prepare('SELECT active FROM gangpot_dues WHERE period_id=? AND user_id=?').get(period(f).id,id).active,0);
+});
+
+test('Lead-bijdrage is vrijwillig en geeft geen waarschuwing na de deadline',async t=>{
+  const f=fixture(t),lead=f.guild.members.cache.get(OTHER);lead.roles.cache.set('1555685630707769382',{id:'1555685630707769382'});
+  await syncGangpot(f.main,f.client,SAT);
+  const due=gangpotMembers(f.main,period(f),SAT).find(item=>item.user_id===OTHER);
+  assert.equal(due.required,false);assert.equal(due.status,'optional');assert.equal(due.remaining,0);
+  await syncGangpot(f.main,f.client,END);
+  assert.equal(warns(f,OTHER).length,0);
+  const voluntary=claim(f,OTHER,10000,'lead-voluntary-payment');assert.equal(voluntary.status,'pending');
+  assert.ok(f.guild.channels.cache.get(f.main.config.gangpot.infoChannelId).posted.first().embeds[0].description.includes('Lead is vrijgesteld van de verplichte bijdrage'));
+});
+
+test('trekt bestaande automatische gangpotwarns van Lead in maar laat handmatige warns staan',async t=>{
+  const f=fixture(t),lead=f.guild.members.cache.get(OTHER);lead.roles.cache.set('1555685630707769382',{id:'1555685630707769382'});
+  await syncGangpot(f.main,f.client,SAT);
+  const automatic=f.main.store.addWarnInside(OTHER,f.main.config.clientId,'Gangpot t/m 2026-10-16: geen volledige betaling.',END);
+  const manual=f.main.store.addWarnInside(OTHER,f.main.config.clientId,'Handmatige gangwarn wegens gedrag.',END);
+  f.main.store.db.prepare('UPDATE gangpot_dues SET warn_id=? WHERE period_id=? AND user_id=?').run(automatic.id,period(f).id,OTHER);
+  await syncGangpot(f.main,f.client,END);
+  assert.ok(f.main.store.db.prepare('SELECT removed_at FROM warnings WHERE id=?').get(automatic.id).removed_at);
+  assert.equal(f.main.store.db.prepare('SELECT removed_at FROM warnings WHERE id=?').get(manual.id).removed_at,null);
+  assert.equal(f.main.store.db.prepare("SELECT COUNT(*) AS n FROM gangpot_notifications WHERE warn_id=? AND kind='revoke'").get(automatic.id).n,1);
 });
 
 test('een ontvangen ledenrol geeft vrijstelling in de instapweek, daarna geldt de volgende volledige termijn',async t=>{
@@ -141,7 +164,7 @@ test('migratie bewaart oude zondagbetalingen en meldingen, hergebruikt de oude g
   assert.equal(payments.posted.has(oldPanel.id),false);assert.equal(payments.posted.has(someoneElse.id),true);
   const total=f.guild.channels.cache.get('1558420548000813126').posted.first();assert.ok(total.embeds[0].fields[0].value.includes(`<@${OTHER}>`));
   await syncGangpot(f.main,f.client,Date.parse('2026-10-12T10:00:00Z'));assert.equal(warns(f,ACTOR).length,0);
-  await syncGangpot(f.main,f.client,END);assert.equal(warns(f,ACTOR).length,1);assert.equal(warns(f,OTHER).length,0);
+  await syncGangpot(f.main,f.client,END);assert.equal(warns(f,ACTOR).length,0);assert.equal(warns(f,OTHER).length,0);
 });
 
 test('geen commando, pending zonder vinkje, afkeuring en gedeeltelijke goedkeuring geven elk één automatische warn',async t=>{
@@ -151,7 +174,8 @@ test('geen commando, pending zonder vinkje, afkeuring en gedeeltelijke goedkeuri
   await reviewGangpotPayment(f.main,f.guild,f.lead,partial.id,'approve',()=>DEADLINE);
   await syncGangpot(f.main,f.client,DEADLINE);assert.equal(warns(f,OTHER).length,0);
   await syncGangpot(f.main,f.client,END);await syncGangpot(f.main,f.client,END+60000);
-  for(const user of [OTHER,ACTOR,partialUser,'100000000000000021'])assert.equal(warns(f,user).length,1);
+  for(const user of [OTHER,partialUser,'100000000000000021'])assert.equal(warns(f,user).length,1);
+  assert.equal(warns(f,ACTOR).length,0); // ACTOR heeft de Lead-rol en betaalt vrijwillig.
   assert.equal(f.main.store.db.prepare('SELECT status FROM gangpot_claims WHERE id=?').get(pending.id).status,'pending');
   const warnId=warns(f,OTHER)[0].id;
   assert.equal(f.calls.filter(call=>call.method==='dm'&&call.user===OTHER&&(call.payload.embeds[0].data||call.payload.embeds[0]).description.includes(warnId)).length,1);

@@ -1,6 +1,6 @@
 # Bakarov op Bot-Hosting.net
 
-**Update 2.5.5:** de gangpot sluit voortaan vrijdag om 23:59 Belgische tijd. De open termijn van zaterdag 24 oktober wordt bij de eerste start direct afgesloten en verwerkt. De twee gangpotwarns die Fronzy die dag gaf, worden alleen ingetrokken als de hostingdatabase precies twee actieve gangpotwarns van zijn account vindt; anders laat de bot ze staan en meldt hij dat in de console. De bot maakt ook **Waarschuwing 1** en **Waarschuwing 2** aan en synchroniseert die met het actieve aantal warns. De bot heeft hiervoor **Rollen beheren** nodig en zijn hoogste rol moet boven beide rollen staan. Herstart de hosting met Git auto-pull aan en behoud de bestaande `data/`-map.
+**Update 2.5.6:** Lead hoeft de gangpotbijdrage niet te betalen, maar kan vrijwillig bijdragen. Bij de eerste synchronisatie trekt de bot gekoppelde, automatische gangpotwarns van huidige Leads in en verstuurt de gebruikelijke groene melding. Handmatige warns blijven behouden. Herinneringen en betaalplicht gelden niet voor Leads. Haal de update op en herstart de hosting; behoud de bestaande `data/`-map.
 
 **Update 2.3.0:** nieuwe gangleden zijn vrijgesteld in hun instapweek en betalen vanaf de volgende volledige termijn. Behoud de bestaande `data/`-map; de eerste betaalplicht wordt daarin blijvend opgeslagen. Bij de eerste synchronisatie worden alleen aantoonbare automatische gangpotwarns uit een instapweek gecorrigeerd. Herstart na het ophalen van de update om deze regel op de hosting toe te passen.
 

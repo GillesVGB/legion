@@ -1,4 +1,9 @@
 {
+  "2.5.6": [
+    "Lead hoeft geen wekelijkse gangpotbijdrage te betalen. Vrijwillige bijdragen blijven mogelijk; betaalherinneringen en automatische gangpotwarns gelden niet voor Lead.",
+    "Bij de eerste synchronisatie trekt de bot alleen actieve automatische gangpotwarns van huidige Leads in die aan de gangpotadministratie gekoppeld zijn. Handmatige en andere warns blijven behouden.",
+    "De gangpotinformatie, statusweergave, ledenlijst van betaalplichtigen en weektotalen tonen de Lead-uitzondering duidelijk."
+  ],
   "2.5.5": [
     "Gangpotweek loopt vanaf zaterdag 24 oktober t/m vrijdag 23:59 Belgische tijd. De open termijn van 24 oktober wordt bij de eerste hostingstart direct afgesloten; de nieuwe termijn begint daarna en sluit vrijdag 30 oktober.",
     "De twee gangpotwarns van Fronzy op 24 oktober worden alleen ingetrokken als de hostingdatabase precies twee actieve gangpotwarns van dat account vindt. De correcties worden groen gelogd en per DM bevestigd; bij een afwijkend aantal verandert de bot niets.",
