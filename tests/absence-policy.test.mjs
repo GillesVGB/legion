@@ -5,7 +5,7 @@ import {createAbsence,decideAbsence,setExemption,exemptionFor,absenceMessage} fr
 import {syncGangpot} from '../src/gangpot.mjs';
 import {createActivity} from '../src/activities.mjs';
 import {recognizedAbsenceReason} from '../src/absence-reasons.mjs';
-const NOW=Date.parse('2026-10-10T10:00:00Z'),END=Date.parse('2026-10-16T22:00:00Z');
+const NOW=Date.parse('2026-10-10T10:00:00Z'),END=Date.parse('2026-10-17T22:00:00Z');
 async function fixture(t){const f=dashboardFixture();t.after(f.close);const ctx=f.contexts.values().next().value,guild=f.guilds.get(ctx.config.guildId),lead=guild.members.cache.get(ACTOR);guild.members.cache.get(OTHER).roles.cache.set(ctx.config.gangpot.memberRoleId,guild.roles.cache.get(ctx.config.gangpot.memberRoleId));await syncGangpot(ctx,f.client,NOW);const activity=await createActivity(ctx,{guild,user:lead.user,member:lead,memberPermissions:lead.permissions},{date:'12-10-2026',time:'20:00',location:'HQ'},NOW);return{...f,ctx,guild,lead,activity};}
 const active=f=>f.ctx.store.db.prepare("SELECT * FROM warnings WHERE user_id=? AND reason LIKE 'Gangpot t/m %' AND removed_at IS NULL").all(OTHER);
 test('herkent duidelijke redenen, laat onbekende en ontkende redenen bij Lead',()=>{
@@ -19,7 +19,7 @@ test('reden is verplicht; botgoedkeuring planning geeft nooit gangpotvrijstellin
   assert.equal(absenceMessage(f.ctx,placeholder).components[0].components[0].data.disabled,true);
   const approved=await createAbsence(f.ctx,f.guild,OTHER,{activityId:f.activity.id,reason:'PC kapot'},NOW+1);
   assert.equal(approved.status,'approved');assert.equal(approved.reviewer_id,f.guild.members.me.id);assert.equal(approved.id,placeholder.id);
-  await syncGangpot(f.ctx,f.client,END);assert.equal(exemptionFor(f.ctx,OTHER,'2026-10-16'),undefined);assert.equal(active(f).length,1);
+  await syncGangpot(f.ctx,f.client,END);assert.equal(exemptionFor(f.ctx,OTHER,'2026-10-17'),undefined);assert.equal(active(f).length,1);
   assert.doesNotMatch(absenceMessage(f.ctx,approved).embeds[0].data.description,/gangpotvrijstelling/);
 });
 test('Lead kan botgoedkeuring intrekken en herhaalde aanvraag passeert Lead daarna niet meer',async t=>{
@@ -40,12 +40,12 @@ test('ontbrekende vrijstelling bij goedgekeurde afwezigheid trekt uitsluitend be
   // Simulate a legacy approval whose exemption row was never stored.
   f.ctx.store.db.prepare('DELETE FROM gangpot_exemptions WHERE request_id=?').run(absence.id);
   const manual=f.ctx.store.addWarn(OTHER,ACTOR,'Handmatige overtreding');
-  const warning=f.ctx.store.addWarnInside(OTHER,f.guild.members.me.id,'Gangpot t/m 2026-10-16: ontbreekt',END);
-  f.ctx.store.db.prepare('UPDATE gangpot_dues SET warn_id=? WHERE user_id=? AND period_id=?').run(warning.id,OTHER,'2026-10-16');
+  const warning=f.ctx.store.addWarnInside(OTHER,f.guild.members.me.id,'Gangpot t/m 2026-10-17: ontbreekt',END);
+  f.ctx.store.db.prepare('UPDATE gangpot_dues SET warn_id=? WHERE user_id=? AND period_id=?').run(warning.id,OTHER,'2026-10-17');
   await syncGangpot(f.ctx,f.client,END+1);await syncGangpot(f.ctx,f.client,END+2);
-  assert.equal(active(f).length,0);assert.ok(exemptionFor(f.ctx,OTHER,'2026-10-16'));
+  assert.equal(active(f).length,0);assert.ok(exemptionFor(f.ctx,OTHER,'2026-10-17'));
   assert.equal(f.ctx.store.db.prepare('SELECT removed_at FROM warnings WHERE id=?').get(manual.id).removed_at,null);
   const logs=[...f.guild.channels.cache.get(f.ctx.config.warnLogChannelId).posted.values()];assert.ok(logs.some(post=>post.embeds.some(card=>card.color===0x22C55E)));
-  await setExemption(f.ctx,f.guild,f.lead,OTHER,'16-10-2026','Lead heeft vrijstelling ingetrokken',true,END+3);await syncGangpot(f.ctx,f.client,END+4);
+  await setExemption(f.ctx,f.guild,f.lead,OTHER,'17-10-2026','Lead heeft vrijstelling ingetrokken',true,END+3);await syncGangpot(f.ctx,f.client,END+4);
   assert.equal(exemptionFor(f.ctx,OTHER,'2026-10-17'),undefined);assert.equal(active(f)[0].id,warning.id);
 });

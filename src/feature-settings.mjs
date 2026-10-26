@@ -37,7 +37,7 @@ export function validateOperations(value){
 }
 export function applyOperations(ctx,values){
   const merged=operationSettings(ctx);for(const [group,settings] of Object.entries(values))Object.assign(merged[group],settings);
-  assertUser((!merged.gangpot.remindersEnabled||merged.gangpot.thursdayTime<merged.gangpot.deadlineTime&&merged.gangpot.fridayTime<merged.gangpot.deadlineTime)&&(!merged.gangpot.leadReminderEnabled||merged.gangpot.leadTime<merged.gangpot.deadlineTime),'De herinneringen moeten vóór de deadline op vrijdag staan.');
+  assertUser((!merged.gangpot.remindersEnabled||merged.gangpot.thursdayTime<merged.gangpot.deadlineTime&&merged.gangpot.fridayTime<merged.gangpot.deadlineTime)&&(!merged.gangpot.leadReminderEnabled||merged.gangpot.leadTime<merged.gangpot.deadlineTime),'De herinneringen moeten vóór de deadline op zaterdag staan.');
   assertUser(merged.recruitment.limitedAt<merged.recruitment.capacity,'De grens voor beperkte plaatsen moet lager dan de capaciteit zijn.');
   ctx.config.operations=merged;if(ctx.config.gangpot)Object.assign(ctx.config.gangpot,merged.gangpot);
   if(ctx.config.recruitment)Object.assign(ctx.config.recruitment,merged.recruitment);if(ctx.config.admission)Object.assign(ctx.config.admission,merged.admission);

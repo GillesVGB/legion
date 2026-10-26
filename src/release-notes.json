@@ -1,4 +1,9 @@
 {
+  "2.5.7": [
+    "De wekelijkse gangpottermijn eindigt vanaf nu op zaterdag om 23:59 Belgische tijd. De standaard herinneringen zijn vrijdag en zaterdag; Lead ontvangt het betaaloverzicht op zaterdag.",
+    "Leden die vanaf dinsdag toetreden zijn alleen voor de lopende week vrijgesteld. Wie uiterlijk maandag toetreedt, betaalt die week mee; vanaf de volgende week geldt voor iedereen de normale bijdrage.",
+    "Open bestaande vrijdagtermijnen worden bij de update naar de zaterdagdeadline omgezet. Betaalregistraties, meldingen en bestaande betaalhistorie blijven behouden."
+  ],
   "2.5.6": [
     "Lead hoeft geen wekelijkse gangpotbijdrage te betalen. Vrijwillige bijdragen blijven mogelijk; betaalherinneringen en automatische gangpotwarns gelden niet voor Lead.",
     "Bij de eerste synchronisatie trekt de bot alleen actieve automatische gangpotwarns van huidige Leads in die aan de gangpotadministratie gekoppeld zijn. Handmatige en andere warns blijven behouden.",

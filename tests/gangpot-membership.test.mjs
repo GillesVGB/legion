@@ -7,12 +7,12 @@ import {dashboardFixture,ACTOR,OTHER} from './dashboard-fixture.mjs';
 import {Store} from '../src/store.mjs';
 import {gangpotWindow,syncGangpot,gangpotMembers,gangpotStatusMessage,trackGangpotMembership,reportGangpotPayment,reviewGangpotPayment,removeGangpotPayment,gangpotPaid,gangpotBalance} from '../src/gangpot.mjs';
 
-const START=Date.parse('2026-10-10T10:00:00Z'),MID=START+3*86400000,END=Date.parse('2026-10-16T22:00:00Z'),NEW='100000000000000078';
+const START=Date.parse('2026-10-10T10:00:00Z'),MID=START+3*86400000,END=Date.parse('2026-10-17T22:00:00Z'),NEW='100000000000000078';
 function fixture(t){
   const f=dashboardFixture();t.after(f.close);const ctx=f.contexts.values().next().value,guild=f.guilds.get(ctx.config.guildId);
   return{...f,ctx,guild,role:ctx.config.gangpot.memberRoleId};
 }
-const period=(f,date='2026-10-16')=>f.ctx.store.db.prepare('SELECT * FROM gangpot_periods WHERE id=?').get(date);
+const period=(f,date='2026-10-17')=>f.ctx.store.db.prepare('SELECT * FROM gangpot_periods WHERE id=?').get(date);
 const member=(f,id=NEW)=>gangpotMembers(f.ctx,period(f),MID).find(item=>item.user_id===id);
 const activeWarns=(f,id=NEW)=>f.ctx.store.db.prepare('SELECT * FROM warnings WHERE user_id=? AND removed_at IS NULL').all(id);
 
@@ -63,7 +63,7 @@ test('instapweek krijgt geen betaalherinnering of warn bij afkeuren of verwijder
   await reviewGangpotPayment(f.ctx,f.guild,f.guild.members.cache.get(ACTOR),voluntary.id,'approve',()=>MID+3000);
   assert.equal(gangpotBalance(f.ctx),25000);
   removeGangpotPayment(f.ctx,{userId:NEW,periodId:period(f).id,actor:ACTOR,requestId:'intro-voluntary-removal',reason:'Verkeerde registratie'},MID+4000);
-  await syncGangpot(f.ctx,f.client,Date.parse('2026-10-16T18:30:00Z'));
+  await syncGangpot(f.ctx,f.client,Date.parse('2026-10-17T18:30:00Z'));
   assert.equal(f.ctx.store.db.prepare("SELECT COUNT(*) AS n FROM feature_notices WHERE user_id=? AND kind='gangpot.member'").get(NEW).n,0);
   await syncGangpot(f.ctx,f.client,END);assert.equal(activeWarns(f).length,0);assert.equal(gangpotBalance(f.ctx),0);
   assert.equal(gangpotPaid(f.ctx,period(f),NEW).total,0);
@@ -73,7 +73,7 @@ test('aantoonbare instapweek corrigeert alleen de automatische gangpotwarn en an
   const f=fixture(t),newcomer=f.guild.addMember(NEW,'Lid sinds woensdag',[f.role]);newcomer.joinedTimestamp=MID;
   const window=gangpotWindow(f.ctx.config.gangpot,START);
   f.ctx.store.db.prepare('INSERT INTO gangpot_periods(id,starts_at,ends_at,weekly_amount) VALUES(?,?,?,?)').run(window.id,window.starts_at,window.ends_at,25000);
-  const automatic=f.ctx.store.addWarnInside(NEW,f.ctx.config.clientId,'Gangpot t/m 2026-10-16: geen betaling.',END);
+  const automatic=f.ctx.store.addWarnInside(NEW,f.ctx.config.clientId,'Gangpot t/m 2026-10-17: geen betaling.',END);
   const manual=f.ctx.store.addWarnInside(NEW,ACTOR,'Andere gangafspraak niet nagekomen.',END);
   f.ctx.store.db.prepare('INSERT INTO gangpot_dues(period_id,user_id,enrolled_at,warn_id) VALUES(?,?,?,?)').run(window.id,NEW,MID+1000,automatic.id);
   f.ctx.store.db.prepare('INSERT INTO gangpot_notifications(id,user_id,period_id,warn_id,kind,message) VALUES(?,?,?,?,?,?)').run('old-red',NEW,window.id,automatic.id,'issue','Oude rode melding');
@@ -96,15 +96,21 @@ test('oude roltoekenning levert bewijs voor instapweek; bestaande verplichtingen
   await syncGangpot(f.ctx,f.client,END);assert.equal(activeWarns(f).length,0);assert.equal(activeWarns(f,OTHER).length,1);
 });
 
-test('een lid precies op de startgrens heeft een volledige termijn; wintertijd verandert de instapvrijstelling niet',async t=>{
-  const f=fixture(t),start=Date.parse('2026-10-23T22:00:00Z'),newcomer=f.guild.addMember(NEW,'Nieuw rond wintertijd',[f.role]);
+test('maandag blijft betaalplichtig en toetreding vanaf dinsdag krijgt één week vrijstelling, ook rond wintertijd',async t=>{
+  const f=fixture(t),start=Date.parse('2026-10-24T22:00:00Z'),newcomer=f.guild.addMember(NEW,'Nieuw rond wintertijd',[f.role]);
   newcomer.joinedTimestamp=start+1000;await syncGangpot(f.ctx,f.client,start+2000);
   const window=gangpotWindow(f.ctx.config.gangpot,start+2000),row=gangpotMembers(f.ctx,window,start+2000).find(person=>person.user_id===NEW);
-  assert.equal(row.requiredFrom,window.ends_at);assert.equal(window.ends_at-start,169*3600000);
-  const boundary=f.guild.addMember(OTHER,'Precies bij nieuwe termijn',[f.role]);boundary.joinedTimestamp=start;
-  trackGangpotMembership(f.ctx,{user:boundary.user,roles:{cache:new Map()}},boundary,start);
-  await syncGangpot(f.ctx,f.client,start+3000);
-  assert.equal(gangpotMembers(f.ctx,window,start+3000).find(person=>person.user_id===OTHER).newMember,false);
+  assert.equal(row.newMember,false);assert.equal(row.exempt,false);assert.equal(row.remaining,25000);assert.equal(window.ends_at-start,169*3600000);
+  const monday=f.guild.addMember(OTHER,'Maandagtoetreding',[f.role]);monday.joinedTimestamp=Date.parse('2026-10-26T10:00:00Z');
+  const tuesday=f.guild.addMember('100000000000000079','Dinsdagtoetreding',[f.role]);tuesday.joinedTimestamp=Date.parse('2026-10-27T10:00:00Z');
+  trackGangpotMembership(f.ctx,{user:monday.user,roles:{cache:new Map()}},monday,monday.joinedTimestamp);
+  trackGangpotMembership(f.ctx,{user:tuesday.user,roles:{cache:new Map()}},tuesday,tuesday.joinedTimestamp);
+  await syncGangpot(f.ctx,f.client,Date.parse('2026-10-27T12:00:00Z'));
+  const current=gangpotWindow(f.ctx.config.gangpot,Date.parse('2026-10-27T12:00:00Z'));
+  assert.equal(gangpotMembers(f.ctx,current,Date.parse('2026-10-27T12:00:00Z')).find(person=>person.user_id===OTHER).newMember,false);
+  assert.equal(gangpotMembers(f.ctx,current,Date.parse('2026-10-27T12:00:00Z')).find(person=>person.user_id===NEW).newMember,false);
+  assert.equal(gangpotMembers(f.ctx,current,Date.parse('2026-10-27T12:00:00Z')).find(person=>person.user_id===monday.id).newMember,false);
+  assert.equal(gangpotMembers(f.ctx,current,Date.parse('2026-10-27T12:00:00Z')).find(person=>person.user_id===tuesday.id).newMember,true);
 });
 
 test('rol opnieuw geven vóór de eerste migratiesynchronisatie wist een bestaande betaalplicht niet',async t=>{
@@ -130,7 +136,7 @@ test('opgeslagen aanname corrigeert een oude instapwarn met groene kanaalmelding
   await syncGangpot(f.ctx,f.client,MID+1000);assert.equal(member(f).newMember,false);
   await syncGangpot(f.ctx,f.client,END);const automatic=activeWarns(f)[0];assert.ok(automatic);
   const manual=f.ctx.store.addWarnInside(NEW,ACTOR,'Andere gangafspraak overtreden.',END+1);
-  f.ctx.store.db.prepare('UPDATE gangpot_dues SET active=0 WHERE period_id=? AND user_id=?').run('2026-10-16',NEW);
+  f.ctx.store.db.prepare('UPDATE gangpot_dues SET active=0 WHERE period_id=? AND user_id=?').run('2026-10-17',NEW);
   await syncGangpot(f.ctx,f.client,END+1000,f.contexts);
   assert.deepEqual(activeWarns(f).map(warn=>warn.id),[manual.id]);
   assert.match(f.ctx.store.db.prepare('SELECT removed_reason FROM warnings WHERE id=?').get(automatic.id).removed_reason,/instapweek/);

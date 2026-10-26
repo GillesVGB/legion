@@ -1,12 +1,18 @@
+import {planningTime} from './activities.mjs';
+import {missionDay} from './mission-definitions.mjs';
 const eligible=(ctx,member)=>Boolean(member&&!member.user.bot&&member.roles.cache.has(ctx.config.gangpot.memberRoleId));
 export function gangpotIntroduction(ctx,user,period){
   if(!period)return null;
   const membership=ctx.store.db.prepare('SELECT * FROM gangpot_memberships WHERE user_id=?').get(user);
   return membership&&period.starts_at<membership.required_from?membership:null;
 }
+const dayShift=(date,days)=>missionDay(Date.parse(date+'T12:00:00Z')+days*86400000);
 function firstRequired(ctx,started,windowAt){
   const period=ctx.store.db.prepare('SELECT * FROM gangpot_periods WHERE starts_at<=? AND ends_at>? ORDER BY starts_at DESC LIMIT 1').get(started,started)||windowAt(started);
-  return period?(started<=period.starts_at?period.starts_at:period.ends_at):started;
+  if(!period)return started;
+  if(started<=period.starts_at)return period.starts_at;
+  const firstPayableTuesday=planningTime(dayShift(period.id,-4),'00:00',started);
+  return started>=firstPayableTuesday?period.ends_at:period.starts_at;
 }
 function remember(ctx,user,started,source,windowAt){
   const required=started===null?0:firstRequired(ctx,started,windowAt);
@@ -24,6 +30,13 @@ export function recordGangpotMembership(ctx,before,after,windowAt,now=Date.now()
 export function syncGangpotMemberships(ctx,guild,windowAt,now=Date.now()){
   const initialized=ctx.store.setting('gangpot:membership-initialized')==='1';
   ctx.store.transaction(()=>{
+    for(const membership of ctx.store.db.prepare('SELECT * FROM gangpot_memberships WHERE started_at IS NOT NULL').all()){
+      const required=firstRequired(ctx,membership.started_at,windowAt);
+      if(required!==membership.required_from){
+        ctx.store.db.prepare('UPDATE gangpot_memberships SET required_from=? WHERE user_id=?').run(required,membership.user_id);
+        ctx.store.db.prepare("UPDATE gangpot_claims SET dirty=1,next_attempt=0 WHERE user_id=? AND status IN ('pending','approved','rejected')").run(membership.user_id);
+      }
+    }
     for(const member of guild.members.cache.values()){
       if(!eligible(ctx,member)||ctx.store.db.prepare('SELECT 1 FROM gangpot_memberships WHERE user_id=?').get(member.id))continue;
       // Discord does not expose when a role was assigned. Use a recorded role grant
@@ -65,8 +78,8 @@ export function recoverAcceptedMemberships(ctx,guild,contexts,windowAt,now=Date.
       if(previous||(existing&&['role','audit'].includes(existing.source)&&existing.started_at<window.starts_at))continue;
       const joined=Number.isSafeInteger(member.joinedTimestamp)&&member.joinedTimestamp<=now?member.joinedTimestamp:0;
       const roleAt=existing&&['role','audit'].includes(existing.source)?existing.started_at||0:0;
-      const started=Math.max(at,joined,roleAt),required=Math.max(existing?.required_from||0,firstRequired(ctx,started,windowAt));
-      if(!existing||required>existing.required_from){
+      const started=Math.max(at,joined,roleAt),required=firstRequired(ctx,started,windowAt);
+      if(!existing||required!==existing.required_from){
         ctx.store.db.prepare(`INSERT INTO gangpot_memberships(user_id,started_at,required_from,source) VALUES(?,?,?,'admission')
           ON CONFLICT(user_id) DO UPDATE SET started_at=excluded.started_at,required_from=excluded.required_from,source='admission'`).run(user,started,required);
         ctx.store.db.prepare('UPDATE gangpot_claims SET dirty=1,next_attempt=0 WHERE user_id=? AND period_id IN (SELECT id FROM gangpot_periods WHERE starts_at<?)').run(user,required);
