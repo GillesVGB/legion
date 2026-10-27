@@ -1,7 +1,7 @@
 {
   "2.5.16": [
-    "🛡️ **Nieuw: automatische beveiliging in de communityserver**\nDe bot controleert berichten, nieuwe leden en uitgevoerde serveracties. Hieronder staan de standaardregels; de drempels zijn via het dashboard aanpasbaar.",
-    "🔑 **Wie is vrijgesteld?**\nLeden met beveiligingsrol `1555726440983437504` zijn vrijgesteld. Beheerrechten alleen geven geen vrijstelling. Berichten en acties van bots worden overgeslagen; webhookberichten worden ook overgeslagen.",
+    "🛡️ **Nieuw: automatische beveiliging in de hoofdserver**\nDe beveiliging geldt in de hoofdserver van Bakarov (`1555685630640652338`). De bot controleert daar berichten, nieuwe leden en uitgevoerde serveracties. Hieronder staan de standaardregels; de drempels zijn via het dashboard aanpasbaar.",
+    "🔑 **Wie is vrijgesteld?**\nLeden met de +-rol `1555685630770413643` zijn vrijgesteld. Beheerrechten alleen geven geen vrijstelling. Berichten en acties van bots worden overgeslagen; webhookberichten worden ook overgeslagen.",
     "🔗 **Links: verwijderen en bij herhaling een ban**\nEen herkend linkbericht wordt verwijderd. Een tweede linkbericht binnen 10 minuten leidt tot een ban. Twee of meer links in één bericht geven direct een ban. Ook bereikbare eerdere linkberichten uit die periode worden verwijderd.",
     "🏷️ **Tagspam: maximaal 3 tags**\nPer bericht zijn maximaal 3 verschillende leden en/of rollen toegestaan. Meer dan 3 tags, of een daadwerkelijke @everyone- of @here-vermelding, leidt tot verwijdering van het bericht en een ban.",
     "🤬 **Schelden: bericht weg en time-out**\nDe bot herkent een vaste lijst Nederlandse en Engelse scheldwoorden. Bij herkenning wordt het bericht verwijderd en krijgt het lid standaard 10 minuten time-out.",

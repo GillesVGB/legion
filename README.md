@@ -2,7 +2,7 @@
 
 ## Beveiligingssysteem — 2.5.16
 
-In de communityserver is rol **`1555726440983437504`** de enige uitzonderingsrol. Alleen leden met deze rol zijn vrijgesteld van automatische beveiligingsacties. De uitzonderingsrol en status zijn zichtbaar in **Modules instellen → Beveiliging & automatisch modereren** en **Botstatus**.
+In de hoofdserver **`1555685630640652338`** is de **+-rol `1555685630770413643`** de enige uitzonderingsrol. Alleen leden met deze rol zijn vrijgesteld van automatische beveiligingsacties. De uitzonderingsrol en status zijn zichtbaar in **Modules instellen → Beveiliging & automatisch modereren** en **Botstatus**.
 
 - Een linkbericht van een ander lid wordt altijd verwijderd. Een tweede linkbericht binnen de ingestelde periode, of meerdere links in één bericht, leidt tot een ban. De bot verwijdert ook eerdere linkberichten die hij nog kan bereiken.
 - Eén tot drie tags zijn toegestaan. Vier of meer tags, of `@everyone`/`@here`, verwijdert het bericht en leidt tot een ban.
@@ -130,7 +130,7 @@ Rollen, kanaalinstellingen, warns, coins, spellen en dossiers zijn **per guild g
 
 7. Het paneel in de tweede guild wordt automatisch geplaatst. Gebruik indien nodig `/setup paneel:alles`. In de eerste guild voer je `/setup paneel:alles kanaal:#solliciteren` uit met je eigen kanaal.
 
-Botrechten: **Kanalen bekijken, Berichten versturen, Berichtgeschiedenis lezen, Links insluiten, Bestanden bijvoegen, Kanalen beheren en Rollen beheren**. In de communityserver zijn voor beveiliging ook **View Audit Log, Manage Messages, Moderate Members en Ban Members** nodig. Plaats de botrol boven de rollen die hij moet beheren of straffen, zeker boven de ledenrol. Administrator is niet nodig voor de bot. Je eigen account moet administrator zijn om `/inrichten` en `/setup` te gebruiken.
+Botrechten: **Kanalen bekijken, Berichten versturen, Berichtgeschiedenis lezen, Links insluiten, Bestanden bijvoegen, Kanalen beheren en Rollen beheren**. In de hoofdserver zijn voor beveiliging ook **View Audit Log, Manage Messages, Moderate Members en Ban Members** nodig. Plaats de botrol boven de rollen die hij moet beheren of straffen, zeker boven de ledenrol. Administrator is niet nodig voor de bot. Je eigen account moet administrator zijn om `/inrichten` en `/setup` te gebruiken.
 
 Nieuwe commands worden bij het starten automatisch geregistreerd: 32 in de hoofdserver en 26 in de community. `npm run deploy` kan dit ook handmatig doen; het vervangt de bestaande guild-commands van deze bot-applicatie.
 

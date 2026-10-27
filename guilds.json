@@ -20,6 +20,10 @@
       "inviteMaxAgeSeconds": 86400
     },
     "ticketsEnabled": false,
+    "security": {
+      "enabled": true,
+      "trustedRoleId": "1555685630770413643"
+    },
     "panelChannelId": "",
     "staffRoleIds": [
       "1555685630707769382"
@@ -67,10 +71,6 @@
       "inviteMaxAgeSeconds": 86400
     },
     "ticketsEnabled": true,
-    "security": {
-      "enabled": true,
-      "trustedRoleId": "1555726440983437504"
-    },
     "panelChannelId": "1555726441759375398",
     "staffRoleIds": [
       "1555726440933363761"
