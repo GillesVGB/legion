@@ -1,4 +1,5 @@
 import { ChannelType, PermissionFlagsBits as P, MessageFlags, ButtonStyle, ButtonBuilder, EmbedBuilder } from 'discord.js';
+import { createHash } from 'node:crypto';
 import { assertUser, UserError } from './errors.mjs';
 import { embed, panel, caseMessages, applicationControls, withApplicationWaitingNotice, row, button, safeText } from './ui.mjs';
 import { archiveTranscript, saveLocalTranscript } from './transcripts.mjs';
@@ -209,6 +210,89 @@ export async function requestCaseDecision(ctx, interaction, id, decision) {
     )], allowedMentions: quiet });
 }
 
+async function applicationQueueCategory(ctx, guild) {
+  const saved=ctx.store.setting('application-queue-category');
+  let category=saved?await guild.channels.fetch(saved).catch(error=>{if(error.code===10003)return null;throw error;}):null;
+  if(!category&&!saved){
+    const channels=await guild.channels.fetch();
+    category=channels.find(item=>item?.type===ChannelType.GuildCategory&&item.name==='Sollicitatie Wachtrij')||null;
+  }
+  if(category)assertUser(category.guildId===guild.id&&category.type===ChannelType.GuildCategory,'De ingestelde Sollicitatie Wachtrij-categorie hoort niet bij deze server.');
+  if(!category){
+    assertUser(guild.members.me.permissions.has([P.ManageChannels,P.ManageRoles]),'De bot mist Kanalen beheren of Rollen beheren om de privéwachtrijcategorie te maken.');
+    category=await guild.channels.create({name:'Sollicitatie Wachtrij',type:ChannelType.GuildCategory,
+      permissionOverwrites:privateOverwrites(guild,ctx.config),reason:'Bakarov sollicitatiewachtrij'});
+    ctx.store.setSetting('application-queue-category',category.id);
+  }
+  assertUser(category.permissionsFor(guild.members.me)?.has([P.ViewChannel,P.ManageChannels]),'De bot heeft geen toegang tot de Sollicitatie Wachtrij-categorie.');
+  for(const role of guild.roles.cache.values()){
+    if(ctx.config.staffRoleIds.includes(role.id)||role.permissions.has(P.Administrator)||role.tags?.botId===guild.members.me.id)continue;
+    assertUser(!category.permissionsFor(role)?.has(P.ViewChannel),'De categorie Sollicitatie Wachtrij is zichtbaar voor een rol buiten de leiding. Maak de categorie privé.');
+  }
+  for(const overwrite of category.permissionOverwrites.cache.values()){
+    if(overwrite.type!==1||!overwrite.allow.has(P.ViewChannel)||overwrite.id===guild.members.me.id)continue;
+    const member=await guild.members.fetch(overwrite.id).catch(()=>null);
+    assertUser(member&&(member.permissions.has(P.Administrator)||ctx.config.staffRoleIds.some(id=>member.roles.cache.has(id))),'Een individueel lid buiten de leiding kan de Sollicitatie Wachtrij-categorie zien.');
+  }
+  return category;
+}
+
+function queueChannelName(user){
+  const applicationName=caseChannelName('application',user),username=applicationName.slice('sollicitatie-'.length);
+  return `${username.slice(0,90).replace(/-+$/g,'')||'gebruiker'}-wachtrij`;
+}
+
+async function sendApplicationQueueNotice(ctx,guild,dossier){
+  const current=ctx.store.caseById(dossier.id);
+  if(!current?.payload.queueAt||current.payload.queueNoticeSent)return true;
+  try{
+    const member=await guild.members.fetch(current.owner_id);
+    const card=embed(ctx.config,'Sollicitatie op de wachtrij',
+      `Bedankt voor je sollicitatie bij **${ctx.config.content.gangName}**. Op dit moment zitten we vol. We hebben je sollicitatie in de wachtrij geplaatst en laten het je weten zodra er plek is. Je hoeft niet opnieuw te solliciteren.`).setColor(0xF59E0B);
+    const nonce=createHash('sha256').update(`application-queue:${current.id}`).digest('hex').slice(0,24);
+    await member.user.send({embeds:[card],allowedMentions:quiet,nonce,enforceNonce:true});
+    ctx.store.markApplicationQueueNoticeSent(current.id);
+    return true;
+  }catch(error){
+    ctx.store.retryApplicationQueueNotice(current.id,error.code||error.name);
+    return false;
+  }
+}
+
+async function synchronizeQueuedApplication(ctx,guild,dossier){
+  const channel=await guild.channels.fetch(dossier.channel_id).catch(error=>{if(error.code===10003)return null;throw error;});
+  assertUser(channel?.guildId===guild.id&&channel.type===ChannelType.GuildText&&channel.topic?.includes(`dossier:${dossier.id} | application`),'Het sollicitatiekanaal hoort niet bij dit dossier.');
+  const category=await applicationQueueCategory(ctx,guild);
+  if(channel.parentId!==category.id)await channel.setParent(category.id,{lockPermissions:false,reason:'Sollicitatie verplaatsen naar de wachtrij'});
+  const member=await guild.members.fetch(dossier.owner_id).catch(()=>null);
+  const name=queueChannelName(member?.user||{username:dossier.payload.name||'sollicitant'});
+  if(channel.name!==name)await channel.setName(name,'Sollicitatie in de wachtrij');
+  const updated=ctx.store.caseById(dossier.id),message=updated.message_id?await channel.messages.fetch(updated.message_id).catch(()=>null):null;
+  if(message?.author.id===guild.members.me.id)await editIfChanged(message,{components:applicationControls(updated)});
+  return await sendApplicationQueueNotice(ctx,guild,updated);
+}
+
+export async function queueApplication(ctx,interaction,id){
+  const {guild}=interaction;
+  requireStaff(interaction,ctx.config);
+  assertUser(ctx.config.ticketsEnabled,'De sollicitatiewachtrij is alleen beschikbaar in de communityserver.');
+  const dossier=await requireOpenCase(ctx,interaction,id);
+  assertUser(dossier?.kind==='application'&&dossier.status==='open'&&dossier.channel_id===interaction.channelId,'Gebruik Wachtrij in het oorspronkelijke open sollicitatiekanaal.');
+  assertUser(!dossier.payload.queueAt,'Deze sollicitant staat al in de wachtrij.');
+  await refreshRecruitment(ctx,guild);
+  assertUser(ctx.recruitment.count>=ctx.config.recruitment.capacity,'De community is nog niet vol. Plaats de sollicitant in de wachtrij wanneer de ledenlimiet bereikt is.');
+  const queued=ctx.store.markApplicationQueued(id,interaction.user.id);
+  const delivered=await synchronizeQueuedApplication(ctx,guild,queued);
+  return {delivered};
+}
+
+export async function syncApplicationQueue(ctx,guild){
+  for(const dossier of ctx.store.pendingApplicationQueueNotices()){
+    try{await synchronizeQueuedApplication(ctx,guild,dossier);}
+    catch(error){ctx.store.audit('application.queue_retry_failed',guild.members.me.id,{id:dossier.id,error:String(error.code||error.name)});}
+  }
+}
+
 export async function startInterview(ctx, interaction, id) {
   requireStaff(interaction, ctx.config);
   const dossier = await requireOpenCase(ctx, interaction, id);
@@ -344,8 +428,11 @@ export async function reconcileCases(ctx, guild) {
     if (channel.guildId !== guild.id || channel.type !== ChannelType.GuildText || !channel.topic?.includes(`dossier:${dossier.id} |`)) continue;
     const owner = await guild.members.fetch(dossier.owner_id).catch(() => null);
     if (owner) {
-      const name = caseChannelName(dossier.kind, owner.user);
-      if (channel.name !== name) await channel.setName(name, 'Bakarov ticketnaam met gebruikersnaam');
+      if(dossier.kind==='application'&&dossier.payload.queueAt)await synchronizeQueuedApplication(ctx,guild,dossier);
+      else {
+        const name = caseChannelName(dossier.kind, owner.user);
+        if (channel.name !== name) await channel.setName(name, 'Bakarov ticketnaam met gebruikersnaam');
+      }
       const interview = ctx.store.interview(dossier.id);
       const voice = interview ? channels.get(interview.channel_id) : null;
       if (voice?.type === ChannelType.GuildVoice && voice.guildId === guild.id && voice.name !== caseChannelName('interview', owner.user)) {
@@ -369,7 +456,7 @@ export async function reconcileCases(ctx, guild) {
           if(dossier.kind==='application'&&dossier.payload.template&&index===0)updated.setDescription(caseMessages(ctx.config,dossier,ctx.recruitment)[0].embeds[0].data.description);
           return dossier.kind === 'application' && index === 0 ? withApplicationWaitingNotice(updated, ctx.recruitment) : updated;
         }),
-          ...(dossier.kind === 'application' ? { components: [applicationControls(dossier)] } : {}) });
+          ...(dossier.kind === 'application' ? { components: applicationControls(dossier) } : {}) });
       }
     }
   }

@@ -11,7 +11,7 @@ import { commands } from '../src/commands.mjs';
 import { createActivity,activityById,activityMessage,attendanceChoices,planningTime,handlePlanningReaction,syncPlanningReactions,cancelActivity,syncActivities,clearPlanningReactions } from '../src/activities.mjs';
 import { createPromotion,decidePromotion,promotionById,syncPromotions,promotionVotes,PROMOTION_LEAD_ROLE_ID } from '../src/promotions.mjs';
 import { applicationQueue,showApplicationStatus } from '../src/application-status.mjs';
-import { createCase,decideCase,reconcileCases } from '../src/service.mjs';
+import { createCase,decideCase,queueApplication,reconcileCases } from '../src/service.mjs';
 import { recruitmentState } from '../src/recruitment.mjs';
 import { missionDay } from '../src/mission-definitions.mjs';
 import { missionMessage,handleMissionButton } from '../src/missions.mjs';
@@ -251,6 +251,21 @@ test('bij 25/25 wordt een sollicitatie met waarschuwing aangemaakt; aannemen wac
   await assert.rejects(decideCase(ctx,staff,dossier.id,'accept'),/zit vol/);assert.equal(ctx.store.caseById(dossier.id).status,'open');
   ctx.recruitment=recruitmentState(24);await reconcileCases(ctx,guild);
   assert.equal(channel.posted.get(dossier.message_id).embeds[0].fields.some(field=>field.name==='Langere wachttijd'),false);
+});
+test('Lead kan een volle sollicitatie in de privéwachtrij plaatsen en de sollicitant krijgt automatisch een DM',async t=>{
+  const f=fixture(t),ctx=f.source,guild=f.guilds.get(ctx.config.guildId),channel=guild.channels.cache.get(ctx.store.caseById(f.open.id).channel_id);
+  const category=guild.makeChannel('100000000000000901','Sollicitatie Wachtrij');category.type=4;ctx.store.setSetting('application-queue-category',category.id);
+  channel.parentId=ctx.config.applicationCategoryId;channel.setParent=async(id)=>{channel.parentId=id;};
+  const staff=interaction(f,ACTOR,guild);staff.channelId=channel.id;
+  await assert.rejects(queueApplication(ctx,staff,f.open.id),/nog niet vol/);
+  for(let i=0;i<8;i++)guild.addMember(String(BigInt('100000000000000060')+BigInt(i)),`Extra ${i}`,[ctx.config.memberRoleId]);
+  const result=await queueApplication(ctx,staff,f.open.id);
+  const queued=ctx.store.caseById(f.open.id);
+  assert.ok(queued.payload.queueAt);assert.equal(queued.payload.queueBy,ACTOR);assert.equal(queued.payload.queueNoticeSent,true);
+  assert.equal(channel.name,'kai-mercier-wachtrij');assert.equal(channel.parentId,category.id);assert.equal(result.delivered,true);
+  const dm=f.calls.find(call=>call.method==='dm'&&call.user===APPLICANT);
+  assert.ok(dm);assert.match(dm.payload.embeds[0].toJSON().description,/vol.*wachtrij/i);
+  await assert.rejects(queueApplication(ctx,staff,f.open.id),/al in de wachtrij/);
 });
 test('sollicitanten zien alleen hun eigen status; binnenkomstvolgorde verandert na afhandelen en gesprek',async t=>{
   const f=fixture(t),ctx=f.source;

@@ -40,7 +40,7 @@ import {handleWarnAppealButton,handleWarnAppealCommand,syncWarnAppeals} from './
 import {warnAppealRow,warnAppealRows} from './warn-appeal-ui.mjs';
 import {syncWarningRoles} from './warning-roles.mjs';
 import { quiet, isStaff, requireStaff, requireAdmin, requireTickets, configureGuild, publishPanel,
-  createCase, requestCaseDecision, decideCase, startInterview, cleanupInterviews, cleanupClosedCases, warningMessage, staffLogChannel, warnLogChannel, writeWarnLog, reconcileCases } from './service.mjs';
+  createCase, requestCaseDecision, decideCase, queueApplication, syncApplicationQueue, startInterview, cleanupInterviews, cleanupClosedCases, warningMessage, staffLogChannel, warnLogChannel, writeWarnLog, reconcileCases } from './service.mjs';
 
 const base = loadConfig();
 console.log(`Bakarov versie ${JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version}: dashboard ${base.dashboardPublicURL ? 'via hostingadres' : 'via tunnel'}.`);
@@ -299,6 +299,12 @@ async function handleButton(ctx, interaction) {
     if (action === 'status') return showApplicationStatus(ctx,interaction,id);
     if (action === 'new') return startApplication(ctx, interaction);
     if (action === 'continue') return startApplication(ctx, interaction);
+    if (action === 'queue') return locks.run(`${interaction.guildId}:case-decision:${id}`,async()=>{
+      requireStaff(interaction,ctx.config);
+      await interaction.deferUpdate();
+      const result=await queueApplication(ctx,interaction,id);
+      return interaction.followUp({content:result.delivered?'De sollicitant staat in de wachtrij. Het DM-bericht is verstuurd.':'De sollicitant staat in de wachtrij, maar de DM kon nog niet worden bezorgd. De bot probeert het automatisch opnieuw.',flags:MessageFlags.Ephemeral,allowedMentions:quiet});
+    });
     if (action === 'interview') return locks.run(`${interaction.guildId}:case-decision:${id}`, async () => {
       requireStaff(interaction, ctx.config);
       await interaction.deferReply(privateReply);
@@ -552,6 +558,7 @@ async function performMaintenance(){
       if(ctx.config.guildId==='1555685630640652338')jobs.push(['waarschuwingsrollen',()=>syncWarningRoles(ctx,guild)]);
     }
     jobs.push(['aannameberichten',async()=>{for(const notice of ctx.store.pendingAcceptances())await locks.run(`${ctx.config.guildId}:admission:${notice.case_id}`,()=>deliverAcceptance(ctx,client,notice.case_id)).catch(()=>{});}],
+      ...(ctx.config.ticketsEnabled&&guild?[['sollicitatiewachtrij',()=>syncApplicationQueue(ctx,guild)]]:[]),
       ['uitnodigingen',()=>expireAcceptanceInvites(ctx,client)],
       ['transcripts',async()=>{for(const delivery of ctx.store.pendingTranscripts())await locks.run(`${ctx.config.guildId}:transcript:${delivery.case_id}`,()=>archiveTranscript(ctx,client,delivery.case_id,staffLogChannel)).catch(()=>{});}],
       ['gesloten-dossiers',()=>cleanupClosedCases(ctx,client)]);

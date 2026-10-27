@@ -622,6 +622,34 @@ export class Store {
     });
   }
   caseByChannel(channel) { return this.decodeCase(this.db.prepare('SELECT * FROM cases WHERE channel_id=?').get(channel)); }
+  markApplicationQueued(id, actor, now = Date.now()) {
+    return this.transaction(() => {
+      const dossier=this.caseById(id);
+      assertUser(dossier?.kind==='application'&&dossier.status==='open','Alleen een open sollicitatie kan in de wachtrij worden geplaatst.');
+      if(dossier.payload.queueAt)return dossier;
+      const payload={...dossier.payload,queueAt:now,queueBy:actor,queueNoticeSent:false};
+      this.db.prepare('UPDATE cases SET payload=? WHERE id=? AND status=\'open\'').run(JSON.stringify(payload),id);
+      this.audit('application.queued',actor,{id,owner:dossier.owner_id,queuedAt:now});
+      return this.caseById(id);
+    });
+  }
+  markApplicationQueueNoticeSent(id) {
+    const dossier=this.caseById(id);
+    if(!dossier||dossier.kind!=='application'||!dossier.payload.queueAt||dossier.payload.queueNoticeSent)return dossier;
+    const payload={...dossier.payload,queueNoticeSent:true};delete payload.queueNoticeRetryAt;delete payload.queueNoticeError;
+    this.db.prepare('UPDATE cases SET payload=? WHERE id=?').run(JSON.stringify(payload),id);
+    this.audit('application.queue_dm_sent',this.config.clientId,{id,owner:dossier.owner_id});
+    return this.caseById(id);
+  }
+  retryApplicationQueueNotice(id,error,now=Date.now()){
+    const dossier=this.caseById(id);if(!dossier||!dossier.payload.queueAt||dossier.payload.queueNoticeSent)return dossier;
+    const delay=String(error)==='50007'?60*60*1000:5*60*1000;
+    const payload={...dossier.payload,queueNoticeRetryAt:now+delay,queueNoticeError:String(error).slice(0,80)};
+    this.db.prepare('UPDATE cases SET payload=? WHERE id=?').run(JSON.stringify(payload),id);
+    this.audit('application.queue_dm_failed',this.config.clientId,{id,owner:dossier.owner_id,error:String(error)});
+    return this.caseById(id);
+  }
+  pendingApplicationQueueNotices(now=Date.now()) { return this.activeCases().filter(item=>item.kind==='application'&&item.payload.queueAt&&!item.payload.queueNoticeSent&&(item.payload.queueNoticeRetryAt||0)<=now); }
   activeCases() { return this.db.prepare("SELECT * FROM cases WHERE status IN ('creating','open')").all().map(x => this.decodeCase(x)); }
   bindCase(id, channel) { this.db.prepare('UPDATE cases SET channel_id=? WHERE id=?').run(channel, id); }
   openCase(id, message) {

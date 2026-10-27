@@ -50,7 +50,8 @@ test('directe sollicitatie heeft de volledige template, statusknop en tickets vr
   const payload = caseMessages(config, { kind: 'application', id: 'abc', owner_id: 'member', payload: { template: true } });
   assert.equal(payload.length, 1);
   assert.equal(payload[0].embeds[0].toJSON().description, applicationTemplate);
-  assert.equal(payload[0].components[0].toJSON().components.length, 5);
+  assert.equal(payload[0].components.length, 2);
+  assert.ok(payload[0].components[0].toJSON().components.some(button=>button.custom_id==='application:queue:abc'));
   const ticket = commands(500).find(cmd => cmd.name === 'ticket');
   assert.equal(ticket.options.find(option => option.name === 'openen').options?.length ?? 0, 0);
 });

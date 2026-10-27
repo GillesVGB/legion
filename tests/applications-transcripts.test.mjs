@@ -60,7 +60,9 @@ test('volledige antwoorden blijven zichtbaar en passen ook bij markdown binnen e
     assert.ok(length <= 6000);
   }
   assert.equal(messages[0].components.length, 0);
-  assert.equal(messages[2].components[0].toJSON().components.length, 5);
+  assert.equal(messages[2].components.length, 2);
+  assert.equal(messages[2].components.flatMap(row=>row.toJSON().components).length, 6);
+  assert.ok(messages[2].components.flatMap(row=>row.toJSON().components).some(button=>button.custom_id==='application:queue:abc'));
 });
 
 test('transcripts worden alleen in de community-guild naar de juiste kanalen ingepland', t => {

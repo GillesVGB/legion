@@ -55,20 +55,21 @@ export function applicationProgress(config, draft) {
     button(`application:continue:${draft.id}:${draft.step}:${draft.revision}`, `Verder met deel ${draft.step + 1}/3`, ButtonStyle.Primary)
   )] };
 }
-export const applicationControls = dossier => row(
-  button(`application:interview:${dossier.id}`, 'Gesprek starten', ButtonStyle.Primary),
-  button(`application:askaccept:${dossier.id}`, 'Aannemen', ButtonStyle.Success),
-  button(`application:askreject:${dossier.id}`, 'Afwijzen', ButtonStyle.Danger),
-  button(`application:askclose:${dossier.id}`, 'Sollicitatie sluiten'),
-  button(`application:status:${dossier.id}`, 'Sollicitatiestatus')
-);
+export const applicationControls = dossier => [
+  row(button(`application:interview:${dossier.id}`, 'Gesprek starten', ButtonStyle.Primary),
+    button(`application:status:${dossier.id}`, 'Sollicitatiestatus'),
+    ...(!dossier.payload?.queueAt ? [button(`application:queue:${dossier.id}`, 'Wachtrij', ButtonStyle.Secondary)] : [])),
+  row(button(`application:askaccept:${dossier.id}`, 'Aannemen', ButtonStyle.Success),
+    button(`application:askreject:${dossier.id}`, 'Afwijzen', ButtonStyle.Danger),
+    button(`application:askclose:${dossier.id}`, 'Sollicitatie sluiten'))
+];
 
 export function caseMessages(config, dossier, recruitment) {
   config = { ...config, color: dossier.status === 'accepted' ? 0x22C55E : ['rejected','closed'].includes(dossier.status) ? 0xEF4444 : recruitment?.color ?? (config.recruitment ? 0xF59E0B : 0x22C55E) };
   if (dossier.kind === 'application' && dossier.payload.template) return [{
     content: `<@${dossier.owner_id}> Vul de template hieronder in en plaats je antwoorden in dit kanaal.`,
     embeds: [withApplicationWaitingNotice(embed(config, 'Bakarov — Sollicitatie', applicationTemplate), recruitment)],
-    components: [applicationControls(dossier)]
+    components: applicationControls(dossier)
   }];
   if (dossier.kind !== 'application' || !Object.hasOwn(dossier.payload, 'age')) {
     const message = caseMessage(config, dossier);
@@ -87,7 +88,7 @@ export function caseMessages(config, dossier, recruitment) {
       }
     }
     if (step === 0) withApplicationWaitingNotice(card, recruitment);
-    return { embeds: [card], components: step === 2 ? [applicationControls(dossier)] : [] };
+    return { embeds: [card], components: step === 2 ? applicationControls(dossier) : [] };
   });
 }
 export function withApplicationWaitingNotice(card, recruitment) {
@@ -107,7 +108,7 @@ export function caseMessage(config, dossier) {
     `Lid: <@${dossier.owner_id}>\nDossier: \`${dossier.id}\`\n\n${applicant ? 'Bespreek dit dossier in dit privé kanaal.' : 'Welkom! Typ je vraag of probleem hieronder. De Bakarov-leiding helpt je zo snel mogelijk.'}`);
   for (const [name, value] of info) card.addFields({ name, value: safeText(value).slice(0, 1024) });
   return {
-    embeds: [card], components: [applicant ? applicationControls(dossier) : row(button(`ticket:askclose:${dossier.id}`, 'Ticket sluiten', ButtonStyle.Danger))]
+    embeds: [card], components: applicant ? applicationControls(dossier) : [row(button(`ticket:askclose:${dossier.id}`, 'Ticket sluiten', ButtonStyle.Danger))]
   };
 }
 export function blackjackMessage(config, store, game) {
