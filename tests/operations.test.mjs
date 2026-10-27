@@ -127,9 +127,37 @@ test('changelog wordt één keer per versie geplaatst en herstelt een verstuurd 
   await announceRelease(f.ctx,f.guild,'9.9.9',['Een nieuwe verbetering.']);assert.equal(channel.posted.size,2);
 });
 
+test('uitgebreide changelog past in Discord en werkt een bestaand updatebericht bij zonder duplicaten',async t=>{
+  const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.updateChannelId);
+  const message=await channel.send({embeds:[new EmbedBuilder().setTitle(`Bakarov — Botupdate ${releaseVersion}`).setDescription('De oude korte uitleg.').setFooter({text:`Bakarov • Botupdate ${releaseVersion}`})]});
+  f.ctx.store.db.prepare('INSERT INTO release_announcements(version,message_id) VALUES(?,?)').run(releaseVersion,message.id);
+  await announceRelease(f.ctx,f.guild);
+  const card=message.embeds[0].toJSON();new EmbedBuilder(card).toJSON();
+  assert.ok(card.description.length<=4096);assert.ok(card.description.includes('10 minuten → 30 minuten → 60 minuten → 24 uur'));assert.ok(card.description.includes('Benodigde rechten en grenzen'));
+  assert.equal(channel.posted.size,1);assert.equal(f.calls.filter(call=>call.method==='message.edit'&&call.id===message.id).length,1);
+  await announceRelease(f.ctx,f.guild);
+  assert.equal(f.calls.filter(call=>call.method==='message.edit'&&call.id===message.id).length,1);
+  assert.equal(f.ctx.store.db.prepare('SELECT message_id FROM release_announcements WHERE version=?').get(releaseVersion).message_id,message.id);
+});
+
+test('changelog probeert een mislukte tekstaanpassing opnieuw en laat verwijderde of andermans berichten met rust',async t=>{
+  const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.updateChannelId),version='9.9.8';
+  await announceRelease(f.ctx,f.guild,version,['Korte uitleg.']);const message=[...channel.posted.values()][0],edit=message.edit;
+  message.edit=async()=>{throw Object.assign(new Error('Tijdelijk'),{code:503});};
+  await announceRelease(f.ctx,f.guild,version,['Uitgebreide uitleg.']);
+  assert.equal(f.ctx.store.db.prepare('SELECT last_error FROM release_announcements WHERE version=?').get(version).last_error,'503');
+  message.edit=edit;await announceRelease(f.ctx,f.guild,version,['Uitgebreide uitleg.']);
+  assert.ok(message.embeds[0].description.includes('Uitgebreide uitleg.'));assert.equal(channel.posted.size,1);
+  message.author={id:OTHER};await announceRelease(f.ctx,f.guild,version,['Andere uitleg.']);
+  assert.equal(f.ctx.store.db.prepare('SELECT last_error FROM release_announcements WHERE version=?').get(version).last_error,'RELEASE_MESSAGE_MISMATCH');
+  assert.ok(message.embeds[0].description.includes('Uitgebreide uitleg.'));
+  await message.delete();await announceRelease(f.ctx,f.guild,version,['Andere uitleg.']);
+  assert.equal(channel.posted.size,0);assert.equal(f.ctx.store.db.prepare('SELECT last_error FROM release_announcements WHERE version=?').get(version).last_error,'MESSAGE_DELETED');
+});
+
 test('Bakarov start bij 2.0.0; bestaande botupdates worden in hetzelfde bericht hernummerd en herstarts dupliceren niets',async t=>{
   const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.updateChannelId);
-  assert.equal(renamedVersions['1.9.0'],'2.0.0');assert.ok(releaseNotes['2.0.0']);assert.equal(releaseNotes['1.9.0'],undefined);assert.equal(releaseVersion,'2.5.7');
+  assert.equal(renamedVersions['1.9.0'],'2.0.0');assert.ok(releaseNotes['2.0.0']);assert.equal(releaseNotes['1.9.0'],undefined);
   const older=[];
   for(const version of ['1.9.0','1.12.0']){
     const message=await channel.send({embeds:[new EmbedBuilder().setTitle(`Bakarov — Botupdate ${version}`).setDescription('Bestaande wijziging.').setFooter({text:`Bakarov • Botupdate ${version}`})]});

@@ -1,7 +1,19 @@
 {
   "2.5.16": [
-    "Nieuw beveiligingssysteem in de communityserver. De ingestelde uitzonderingsrol is vrijgesteld; onbevoegde kanaal-, rol-, webhook-, uitnodigings- en moderatieacties leiden tot een ban.",
-    "Links worden verwijderd; herhaald linken en tagspam worden bestraft. Schelden en spam geven oplopende time-outs. Raidmeldingen, botstatus en instelbare beveiligingsdrempels zijn toegevoegd."
+    "🛡️ **Nieuw: automatische beveiliging in de communityserver**\nDe bot controleert berichten, nieuwe leden en uitgevoerde serveracties. Hieronder staan de standaardregels; de drempels zijn via het dashboard aanpasbaar.",
+    "🔑 **Wie is vrijgesteld?**\nLeden met beveiligingsrol `1555726440983437504` zijn vrijgesteld. Beheerrechten alleen geven geen vrijstelling. Berichten en acties van bots worden overgeslagen; webhookberichten worden ook overgeslagen.",
+    "🔗 **Links: verwijderen en bij herhaling een ban**\nEen herkend linkbericht wordt verwijderd. Een tweede linkbericht binnen 10 minuten leidt tot een ban. Twee of meer links in één bericht geven direct een ban. Ook bereikbare eerdere linkberichten uit die periode worden verwijderd.",
+    "🏷️ **Tagspam: maximaal 3 tags**\nPer bericht zijn maximaal 3 verschillende leden en/of rollen toegestaan. Meer dan 3 tags, of een daadwerkelijke @everyone- of @here-vermelding, leidt tot verwijdering van het bericht en een ban.",
+    "🤬 **Schelden: bericht weg en time-out**\nDe bot herkent een vaste lijst Nederlandse en Engelse scheldwoorden. Bij herkenning wordt het bericht verwijderd en krijgt het lid standaard 10 minuten time-out.",
+    "💬 **Spam: veel of dezelfde berichten**\nBij 6 berichten binnen 10 seconden, of 3 gelijke berichten binnen die periode, verwijdert de bot de betrokken berichten en geeft hij standaard 10 minuten time-out.",
+    "⏳ **Herhaalde overtredingen tellen mee**\nBij herhaald schelden of spammen loopt de time-out per overtredingstype op: 10 minuten → 30 minuten → 60 minuten → 24 uur. Standaard tellen overtredingen 30 dagen mee. Deze registraties blijven na een herstart bewaard.",
+    "🏗️ **Beveiliging van kanalen en rollen**\nEen lid zonder beveiligingsrol krijgt een ban na het aanmaken, wijzigen of verwijderen van kanalen of rollen, of het wijzigen van kanaalrechten. De bot reageert zodra Discord de uitgevoerde actie meldt.",
+    "🚫 **Bescherming tegen onbevoegde beheeracties**\nOok kicken, bannen, unbannen, time-outs wijzigen, leden opschonen, berichten in bulk verwijderen, uitnodigingen aanmaken/verwijderen, webhooks beheren en serverinstellingen wijzigen vallen onder de banregel.",
+    "🚨 **Raidbeveiliging bij veel nieuwe leden**\n8 nieuwe leden binnen 10 seconden activeren 10 minuten raidmodus. Leden die daarna toetreden krijgen standaard 10 minuten time-out. Bij een bot-herstart vervalt de actieve raidmodus en begint de toetredingscontrole opnieuw.",
+    "📋 **Duidelijke logs en meldingen**\nIncidenten, straffen en mislukte beveiligingsacties worden gelogd. De bot probeert het betrokken lid via DM uitleg te geven. Bij Botstatus zie je of beveiliging actief is, hoeveel incidenten er zijn en of raidmodus aanstaat.",
+    "⚙️ **Instellen via het dashboard**\nGa naar Modules instellen → Beveiliging & automatisch modereren. Pas daar linkdrempels, taglimiet, spamdrempels, time-outs, herhalingsperiode en raidcontrole aan. De ingestelde uitzonderingsrol wordt daar ook getoond.",
+    "🔧 **Benodigde rechten en grenzen**\nDe bot heeft View Audit Log, Manage Messages, Moderate Members en Ban Members nodig, plus een botrol boven de te straffen rollen. Ontbreekt bij opstarten een vereist recht of de beveiligingsrol, dan blijft beveiliging inactief. Mislukte pogingen zijn niet zichtbaar in Discords auditlog; uitgevoerde wijzigingen worden niet automatisch teruggedraaid.",
+    "📝 **Changelog blijft actueel**\nAangepaste uitleg voor dezelfde botversie wordt voortaan in het bestaande updatebericht verwerkt. Een gewone herstart plaatst geen dubbele changelog."
   ],
   "2.5.15": [
     "De automatische gegevensback-up geeft nu de bestandsnaam en SQLite-fout door aan de console. Dat maakt een mislukte back-up op de hosting gericht te herstellen.",
