@@ -22,13 +22,14 @@ const names={
   'activitycheck.reconcile':'✅ Check-in-reacties hersteld','activitycheck.unavailable':'⚠️ Activiteitencheck niet beschikbaar','gangpot.remove':'💰 Betaling verwijderd','gangpot.void':'💰 Gangpotregistratie gecorrigeerd','gangpot.period.settings':'⚙️ Weekbijdrage aangepast','gangpot.schedule.migrate':'💰 Gangpottermijn bijgewerkt','warn.restore':'⚠️ Gangwarn hersteld',
   'case.create':'🎫 Ticket aangemaakt','case.open':'🎫 Ticket geopend','case.accepted':'✅ Sollicitatie aangenomen','case.rejected':'❌ Sollicitatie afgewezen','case.closed':'🔒 Ticket gesloten',
   'monthly.sent':'📊 Maandoverzicht verstuurd','weekly.sent':'📊 Weekoverzicht verstuurd','absence.exemption.recover':'✅ Bestaande afwezigheidsvrijstelling hersteld',
-  'warn.appeal.submit':'📝 Bezwaar ingediend','warn.appeal.approved':'✅ Bezwaar goedgekeurd','warn.appeal.rejected':'❌ Bezwaar afgewezen','warn.appeal.cancelled':'✅ Bezwaar gesloten'
+  'warn.appeal.submit':'📝 Bezwaar ingediend','warn.appeal.approved':'✅ Bezwaar goedgekeurd','warn.appeal.rejected':'❌ Bezwaar afgewezen','warn.appeal.cancelled':'✅ Bezwaar gesloten',
+  'rank.change':'👑 Gangrang gewijzigd','probation.review_due':'🗓️ Proefperiode klaar voor beoordeling','probation.passed':'✅ Proefperiode geslaagd','probation.extended':'🕒 Proefperiode verlengd','probation.followup':'🟠 Proefperiode: opvolging nodig'
 };
-const labels={week:'Week vanaf',month:'Maand',request:'Afmelding',source:'Bron',id:'Registratie',name:'Naam',interaction:'Interactie',action:'Actie',route:'Uitgevoerd',error:'Foutcode',amount:'Bedrag',period:'Termijn',version:'Versie',role:'Rang',roleId:'Rang',member:'Lid',memberId:'Lid',user:'Lid',channel:'Kanaal',message:'Bericht',case:'Dossier',caseId:'Dossier',activity:'Planning',kind:'Soort',response:'Reactie',added:'Toegevoegd',removed:'Verwijderd',nicknameChanged:'Bijnaam gewijzigd',nameChanged:'Naam gewijzigd',permissionsChanged:'Rechten gewijzigd',files:'Bestanden',deadline:'Deadline',members:'Aantal leden',restored:'Hersteld'};
+const labels={week:'Week vanaf',month:'Maand',request:'Afmelding',source:'Bron',id:'Registratie',name:'Naam',interaction:'Interactie',action:'Actie',route:'Uitgevoerd',error:'Foutcode',amount:'Bedrag',period:'Termijn',version:'Versie',role:'Rang',roleId:'Rang',member:'Lid',memberId:'Lid',user:'Lid',channel:'Kanaal',message:'Bericht',case:'Dossier',caseId:'Dossier',activity:'Planning',kind:'Soort',response:'Reactie',added:'Rang erbij',removed:'Rang eraf',approvers:'Goedgekeurd door',nicknameChanged:'Bijnaam gewijzigd',nameChanged:'Naam gewijzigd',permissionsChanged:'Rechten gewijzigd',files:'Bestanden',deadline:'Deadline',members:'Aantal leden',restored:'Hersteld'};
 function detailValue(key,value){
   if(value===null||value===undefined||value==='')return null;
   if(typeof value==='boolean')return value?'Ja':'Nee';
-  if(Array.isArray(value))return value.map(item=>typeof item==='object'?'':key==='added'||key==='removed'?`<@&${item}>`:String(item)).filter(Boolean).join(', ')||null;
+  if(Array.isArray(value))return value.map(item=>typeof item==='object'?'':key==='added'||key==='removed'?`<@&${item}>`:key==='approvers'?`<@${item}>`:String(item)).filter(Boolean).join(', ')||null;
   if(typeof value==='object')return null;
   if(['user','member','memberId'].includes(key)&&/^\d{17,20}$/.test(String(value)))return`<@${value}>`;
   if(key==='channel')return`<#${value}>`;

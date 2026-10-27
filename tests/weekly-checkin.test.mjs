@@ -56,5 +56,5 @@ test('SQLite-herstart bewaart de weekclaim en voorraad, en migratie vult oude ch
   f.ctx.store.db.exec('ALTER TABLE activity_check_sessions DROP COLUMN reason; PRAGMA user_version=18;');f.ctx.store.close();f.ctx.store=new Store(f.ctx.config,filename);
   loadDashboardSettings(f.ctx);await syncWeeklyActivityCheck(f.ctx,f.guild,NOW+1000);
   assert.equal(f.ctx.store.db.prepare('SELECT COUNT(*) AS n FROM activity_check_sessions').get().n,1);assert.equal(f.ctx.store.db.prepare('SELECT check_id FROM activity_check_occurrences').get().check_id,original);
-  assert.equal(f.ctx.store.db.prepare('SELECT quantity FROM gangpot_assets').get().quantity,2);assert.equal(f.ctx.store.db.prepare('PRAGMA user_version').get().user_version,19);
+  assert.equal(f.ctx.store.db.prepare('SELECT quantity FROM gangpot_assets').get().quantity,2);assert.equal(f.ctx.store.db.prepare('PRAGMA user_version').get().user_version,20);
 });

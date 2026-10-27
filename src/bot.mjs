@@ -20,6 +20,7 @@ import { showApplicationStatus } from './application-status.mjs';
 import { handlePlanningCommand,handlePlanningAutocomplete,handlePlanningReaction,clearPlanningReactions,syncActivities } from './activities.mjs';
 import {handleActivitiesCheck,handleStopActivityCheck,handleActivityCheckReaction,syncActivityChecks} from './activity-check.mjs';
 import { handlePromotionCommand,handlePromotionButton,syncPromotions } from './promotions.mjs';
+import { recordRankChange, handleRankHistory, syncProbationStarts, syncProbationReviews, handleProbationButton } from './rank-history.mjs';
 import { syncCommands } from './command-sync.mjs';
 import {handleGangpotCommand,handleGangpotStatus,handleGangpotReview,syncGangpot,trackGangpotMembership} from './gangpot.mjs';
 import {handleAbsenceCommand,handleAbsenceButton,syncAbsences} from './absence.mjs';
@@ -200,7 +201,7 @@ async function handleCommand(ctx, interaction) {
       ...(config.ticketsEnabled ? ['**Tickets:** /ticket openen, /ticket sluiten'] : []),
       '**Games:** /blackjack, /coinflip, /dobbel, /8ball, /steenpapier, /fish, /vangstenboek',
       '**Coins:** /saldo, /daily, /leaderboard, /missies',
-      '**Leiding:** /dashboard, /botstatus, /lidinfo, /gangwarn geven, /gangwarn bekijken, /gangwarn intrekken',
+      '**Leiding:** /dashboard, /botstatus, /lidinfo, /ranggeschiedenis, /gangwarn geven, /gangwarn bekijken, /gangwarn intrekken',
       '**Aangenomen:** /uitnodiging voor je persoonlijke ganginvite',
       '**Administrators:** /inrichten, /setup',
       '\nCoins zijn fictief, per guild gescheiden en hebben geen geldwaarde of FiveM-koppeling.'
@@ -210,6 +211,7 @@ async function handleCommand(ctx, interaction) {
   if (name === 'sollicitatiestatus') return showApplicationStatus(ctx,interaction);
   if(name==='activiteitencheck')return handleActivitiesCheck(ctx,interaction);
   if(name==='lidinfo')return handleMemberOverview(ctx,interaction);
+  if(name==='ranggeschiedenis')return handleRankHistory(ctx,interaction);
   if(name==='maandoverzicht')return handleMonthlyReport(ctx,interaction);
   if(name==='weekoverzicht')return handleWeeklyReport(ctx,interaction);
   if(name==='bezwaar')return handleWarnAppealCommand(ctx,interaction);
@@ -286,6 +288,7 @@ async function handleButton(ctx, interaction) {
   if (type === 'gangpot') return handleGangpotReview(ctx,interaction);
   if (type === 'mission') { requireGames(ctx,interaction); return handleMissionButton(ctx,interaction); }
   if (type === 'promotion') return handlePromotionButton(ctx,interaction);
+  if (type === 'probation') return handleProbationButton(ctx,interaction,action,id);
   if (type === 'info') return info(ctx, interaction);
   if (type === 'ticket') {
     requireTickets(ctx.config);
@@ -487,6 +490,7 @@ client.on(Events.GuildMemberRemove, member => {
 });
 client.on(Events.GuildMemberUpdate, (before, after) => {
   const ctx = contexts.get(after.guild.id);
+  if(ctx?.config.roster&&!shuttingDown)recordRankChange(ctx,before,after).catch(error=>console.error(`Guild ${after.guild.id}: rangwijziging loggen mislukt (${error.code??error.name}).`));
   if(ctx?.config.gangpot&&!shuttingDown)trackGangpotMembership(ctx,before,after);
   if (ctx?.config.recruitment && before.roles.cache.has(ctx.config.memberRoleId) !== after.roles.cache.has(ctx.config.memberRoleId)) membershipChanged(after.guild);
   if (ctx?.config.memberRoleId && before.roles.cache.has(ctx.config.memberRoleId) && !after.roles.cache.has(ctx.config.memberRoleId)) revokeAcceptances(ctx, client, after.id).catch(() => {});
@@ -530,6 +534,7 @@ async function drainTranscripts(){
   return maintenanceRun;
 }
 async function performMaintenance(){
+  syncProbationStarts(contexts);
   for(const ctx of contexts.values()){
     if(shuttingDown)break;
     if(!ctx.ready)continue;
@@ -542,6 +547,7 @@ async function performMaintenance(){
       jobs.push(['afmeldingen',()=>syncAbsences(ctx,guild)]);
       if(ctx.config.absencePanelChannelId)jobs.push(['afmeldpaneel',()=>publishAbsencePanel(ctx,guild)]);
       jobs.push(['changelog',()=>announceRelease(ctx,guild)],['gesprekken',()=>cleanupInterviews(ctx,guild)],['check-ins',()=>syncActivityChecks(ctx,guild)],['planning',()=>syncActivities(ctx,guild)],['promoties',()=>syncPromotions(ctx,guild)]);
+      if(ctx.config.roster?.roleIds?.length)jobs.push(['proefperioden',()=>syncProbationReviews(ctx,guild)]);
       if(ctx.config.gangpot)jobs.push(['weekoverzicht',()=>syncWeeklyReports(ctx,guild)]);
       if(ctx.config.guildId==='1555685630640652338')jobs.push(['waarschuwingsrollen',()=>syncWarningRoles(ctx,guild)]);
     }

@@ -117,6 +117,17 @@ export class Store {
         response TEXT NOT NULL CHECK(response IN ('approve','reject')),
         updated_at INTEGER NOT NULL, PRIMARY KEY(proposal_id,voter_id)
       );
+      CREATE TABLE IF NOT EXISTS rank_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, member_id TEXT NOT NULL,
+        added_roles TEXT NOT NULL, removed_roles TEXT NOT NULL, actor_id TEXT,
+        source TEXT NOT NULL DEFAULT 'discord', changed_at INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS probation_reviews (
+        case_id TEXT PRIMARY KEY, member_id TEXT NOT NULL, started_at INTEGER NOT NULL,
+        due_at INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', reviewed_by TEXT,
+        reviewed_at INTEGER, review_due_sent_at INTEGER, channel_id TEXT, message_id TEXT, dirty INTEGER NOT NULL DEFAULT 1,
+        next_attempt INTEGER NOT NULL DEFAULT 0, last_error TEXT
+      );
       CREATE TABLE IF NOT EXISTS mission_progress (
         user_id TEXT NOT NULL, day TEXT NOT NULL, kind TEXT NOT NULL, amount INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY(user_id,day,kind)
@@ -258,7 +269,7 @@ export class Store {
       CREATE INDEX IF NOT EXISTS check_member_history ON activity_check_members(user_id,check_id);
       CREATE INDEX IF NOT EXISTS notice_due_kind ON feature_notices(status,kind,next_attempt);
       CREATE INDEX IF NOT EXISTS check_deadline_due ON activity_check_sessions(status,deadline_at,next_attempt);
-      PRAGMA user_version = 19;
+      PRAGMA user_version = 20;
     `);
   }
 

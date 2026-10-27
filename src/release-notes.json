@@ -1,4 +1,8 @@
 {
+  "2.5.8": [
+    "Rangwijzigingen van alle ingestelde gangrangen worden automatisch met datum en uitvoerder bijgehouden. /ranggeschiedenis toont de laatste wijzigingen; promoties vermelden de Lead-stemmen die hebben goedgekeurd.",
+    "Na een aangenomen sollicitatie start een proefperiode van 14 dagen. Daarna ontvangt Lead een beoordelingsbericht met keuzes voor geslaagd, verlengen met 14 dagen of verdere opvolging."
+  ],
   "2.5.7": [
     "De wekelijkse gangpottermijn eindigt vanaf nu op zaterdag om 23:59 Belgische tijd. De standaard herinneringen zijn vrijdag en zaterdag; Lead ontvangt het betaaloverzicht op zaterdag.",
     "Leden die vanaf dinsdag toetreden zijn alleen voor de lopende week vrijgesteld. Wie uiterlijk maandag toetreedt, betaalt die week mee; vanaf de volgende week geldt voor iedereen de normale bijdrage.",

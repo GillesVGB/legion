@@ -347,7 +347,7 @@ test('schema 9 migreert eerdere correcties naar ingetrokken betaalmeldingen en b
   const newClaim=claim(f,OTHER,25000,'new-payment-after-migration');
   const removalResult=removeGangpotPayment(f.main,removal(f),SAT+3000);
   f.main.store.close();f.main.store=new Store(f.main.config,path);
-  assert.equal(f.main.store.db.prepare('PRAGMA user_version').get().user_version,19);
+  assert.equal(f.main.store.db.prepare('PRAGMA user_version').get().user_version,20);
   assert.equal(f.main.store.db.prepare('SELECT id FROM gangpot_removals').get().id,removalResult.id);
   assert.ok(f.main.store.db.prepare('SELECT withdrawn_at FROM gangpot_claims WHERE id=?').get(newClaim.id).withdrawn_at);
 });

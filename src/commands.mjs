@@ -14,6 +14,7 @@ export function commands(maxBet, ticketsEnabled = true) {
     cmd('dashboard', 'Open het privé Bakarov-dashboard (alleen leiding)'),
     cmd('botstatus','Bekijk verbinding, uptime en acties die op herhaling wachten (leiding)'),
     cmd('lidinfo','Bekijk check-ins, afmeldingen en gangwarns van een lid (leiding)').addUserOption(userOption),
+    cmd('ranggeschiedenis','Bekijk rangwijzigingen en wie ze heeft goedgekeurd (leiding)').addUserOption(userOption),
     cmd('maandoverzicht','Bekijk activiteiten, check-ins, promoties en gangpot per maand (leiding)')
       .addStringOption(o=>o.setName('maand').setDescription('JJJJ-MM, bijvoorbeeld 2026-10; standaard de huidige maand').setMinLength(7).setMaxLength(7)),
     cmd('weekoverzicht','Bekijk activiteiten, check-ins, promoties en gangpot per week (leiding)')
