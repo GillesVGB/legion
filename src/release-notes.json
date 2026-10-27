@@ -1,4 +1,8 @@
 {
+  "2.5.15": [
+    "De automatische gegevensback-up geeft nu de bestandsnaam en SQLite-fout door aan de console. Dat maakt een mislukte back-up op de hosting gericht te herstellen.",
+    "De back-up heeft een alternatieve SQLite-opdracht voor omgevingen die parameters in VACUUM INTO niet ondersteunen."
+  ],
   "2.5.14": [
     "Het wachtrijbord wordt nu bij de botstart klaargezet, ook als er nog geen sollicitanten in de wachtrij staan.",
     "Het opgegeven wachtrijkanaal wordt gebruikt en onder de privé-categorie Sollicitatie Wachtrij geplaatst."

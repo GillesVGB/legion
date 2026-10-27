@@ -7,7 +7,9 @@ const mainDatabase='legion-1555685630640652338.sqlite';
 const backupOptions=dataDir=>{
   const file=join(dataDir,mainDatabase);if(!existsSync(file))return{enabled:true,keep:5};
   const db=new DatabaseSync(file,{readOnly:true});
-  try{const exists=db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='settings'").get();const saved=exists?JSON.parse(db.prepare("SELECT value FROM settings WHERE key='dashboard-config'").get()?.value||'{}'):{};
+  try{const exists=db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='settings'").get();
+    const columns=exists?new Set(db.prepare('PRAGMA table_info(settings)').all().map(column=>column.name)):new Set();
+    const saved=columns.has('key')&&columns.has('value')?JSON.parse(db.prepare("SELECT value FROM settings WHERE key='dashboard-config'").get()?.value||'{}'):{};
     const value=saved.operations?.backups||{};return{enabled:value.enabled!==false,keep:Number.isSafeInteger(value.keep)&&value.keep>=1&&value.keep<=30?value.keep:5};
   }finally{db.close();}
 };
@@ -38,12 +40,25 @@ export function createDataBackup(dataDir,version,{automatic=false,now=Date.now()
   const partial=join(root,`.partial-${id}`),destination=join(root,id);mkdirSync(partial,{mode:0o700});
   try{
     for(const file of files){
-      const target=join(partial,relative(dataDir,file));mkdirSync(dirname(target),{recursive:true,mode:0o700});
-      if(/\.(sqlite|db)$/i.test(file)){
-        const db=new DatabaseSync(file,{readOnly:true});try{db.exec('PRAGMA busy_timeout=5000;');db.prepare('VACUUM INTO ?').run(target);}finally{db.close();}
-        const copy=new DatabaseSync(target,{readOnly:true});try{if(copy.prepare('PRAGMA quick_check').get().quick_check!=='ok')throw new Error('BACKUP_INTEGRITY');}finally{copy.close();}
-      }else copyFileSync(file,target);
-      chmodSync(target,0o600);
+      try{
+        const target=join(partial,relative(dataDir,file));mkdirSync(dirname(target),{recursive:true,mode:0o700});
+        if(/\.(sqlite|db)$/i.test(file)){
+          const db=new DatabaseSync(file,{readOnly:true});try{
+            db.exec('PRAGMA busy_timeout=5000;');
+            try{db.prepare('VACUUM INTO ?').run(target);}
+            catch(error){
+              if(error.code!=='ERR_SQLITE_ERROR'||!/(?:near\s+["']?\?|syntax error)/i.test(error.message||''))throw error;
+              // Some bundled SQLite builds reject a bind parameter in VACUUM INTO.
+              // The destination is our generated path; quote it as a SQL string literal.
+              rmSync(target,{force:true});
+              const literal=`'${target.replaceAll("'","''")}'`;
+              db.exec(`VACUUM INTO ${literal}`);
+            }
+          }finally{db.close();}
+          const copy=new DatabaseSync(target,{readOnly:true});try{if(copy.prepare('PRAGMA quick_check').get().quick_check!=='ok')throw new Error('BACKUP_INTEGRITY');}finally{copy.close();}
+        }else copyFileSync(file,target);
+        chmodSync(target,0o600);
+      }catch(error){if(error&&typeof error==='object')error.message=`${relative(dataDir,file)}: ${error.message}`;throw error;}
     }
     writeFileSync(join(partial,'manifest.json'),JSON.stringify({app:'legion',complete:true,version,createdAt:now,files:files.map(file=>relative(dataDir,file).replaceAll('\\','/'))},null,2),{mode:0o600});
     renameSync(partial,destination);

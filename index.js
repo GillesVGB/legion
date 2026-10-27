@@ -27,5 +27,9 @@ try{
   const {readFileSync}=await import('node:fs');
   const result=createDataBackup(loadConfig(process.env,false).dataDir,JSON.parse(readFileSync(new URL('./package.json',import.meta.url),'utf8')).version,{automatic:true});
   if(result.saved)console.log(`Back-up vóór gegevensupdate opgeslagen: ${result.id}.`);
-}catch(error){console.error(`Back-up vóór update mislukt (${error.code||error.name}). Controleer vrije schijfruimte en schrijfrechten; de botgegevens zijn nog niet bijgewerkt.`);process.exit(1);}
+}catch(error){
+  const detail=String(error.message||'').replace(/[\r\n]+/g,' ').slice(0,240);
+  console.error(`Back-up vóór update mislukt (${error.code||error.name}${detail?`: ${detail}`:''}). Controleer vrije schijfruimte en schrijfrechten; de botgegevens zijn nog niet bijgewerkt.`);
+  process.exit(1);
+}
 await import('./src/bot.mjs');
