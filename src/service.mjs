@@ -11,6 +11,7 @@ import { requireOpenCase, recoverGuildCases } from './case-recovery.mjs';
 import {editIfChanged} from './message-updates.mjs';
 import {canonicalBrandText,brandLogoURL} from './branding.mjs';
 
+const APPLICATION_QUEUE_BOARD_CHANNEL_ID='1564738761026441316';
 export const quiet = { parse: [], repliedUser: false };
 export const isAdmin = interaction => interaction.memberPermissions?.has(P.Administrator) ?? false;
 export const isStaff = (interaction, config) => isAdmin(interaction) || config.staffRoleIds.some(id =>
@@ -234,13 +235,23 @@ async function applicationQueueCategory(ctx, guild) {
     const member=await guild.members.fetch(overwrite.id).catch(()=>null);
     assertUser(member&&(member.permissions.has(P.Administrator)||ctx.config.staffRoleIds.some(id=>member.roles.cache.has(id))),'Een individueel lid buiten de leiding kan de Sollicitatie Wachtrij-categorie zien.');
   }
+  ctx.store.setSetting('application-queue-category',category.id);
   return category;
 }
 
 async function applicationQueueBoardChannel(ctx,guild,category){
   const saved=ctx.store.setting('application-queue-board-channel');
-  let channel=saved?await guild.channels.fetch(saved).catch(error=>{if(error.code===10003)return null;throw error;}):null;
-  if(channel)assertUser(channel.guildId===guild.id&&channel.type===ChannelType.GuildText&&channel.parentId===category.id,'Het ingestelde wachtrijbord hoort niet bij de Sollicitatie Wachtrij-categorie.');
+  let channel=await guild.channels.fetch(APPLICATION_QUEUE_BOARD_CHANNEL_ID).catch(error=>{if(error.code===10003)return null;throw error;});
+  const pinned=Boolean(channel);
+  if(!channel&&saved)channel=await guild.channels.fetch(saved).catch(error=>{if(error.code===10003)return null;throw error;});
+  if(channel&&pinned)assertUser(channel.guildId===guild.id&&channel.type===ChannelType.GuildText,'Het opgegeven wachtrijkanaal hoort niet bij de Bakarov-communityserver.');
+  if(channel){
+    assertUser(channel.guildId===guild.id&&channel.type===ChannelType.GuildText,'Het ingestelde wachtrijbord hoort niet bij de Bakarov-communityserver.');
+    if(channel.parentId!==category.id){
+      assertUser(pinned,'Het ingestelde wachtrijbord hoort niet bij de Sollicitatie Wachtrij-categorie.');
+      await channel.setParent(category.id,{lockPermissions:true,reason:'Wachtrijkanaal onder Sollicitatie Wachtrij plaatsen'});
+    }
+  }
   if(!channel){
     const channels=await guild.channels.fetch();
     channel=channels.find(item=>item?.type===ChannelType.GuildText&&item.parentId===category.id&&item.name==='wachtrij')||null;
@@ -379,6 +390,8 @@ export async function handleApplicationQueueButton(ctx,interaction,id){
 }
 
 export async function syncApplicationQueue(ctx,guild){
+  const category=await applicationQueueCategory(ctx,guild);
+  await applicationQueueBoardChannel(ctx,guild,category);
   for(const dossier of ctx.store.queuedApplications()){
     try{await synchronizeQueuedApplication(ctx,guild,dossier);}
     catch(error){ctx.store.audit('application.queue_retry_failed',guild.members.me.id,{id:dossier.id,error:String(error.code||error.name)});}

@@ -1,4 +1,8 @@
 {
+  "2.5.14": [
+    "Het wachtrijbord wordt nu bij de botstart klaargezet, ook als er nog geen sollicitanten in de wachtrij staan.",
+    "Het opgegeven wachtrijkanaal wordt gebruikt en onder de privé-categorie Sollicitatie Wachtrij geplaatst."
+  ],
   "2.5.13": [
     "De sollicitatiewachtrij heeft nu een eigen privé kanaal #wachtrij met één bijgewerkte kaart per kandidaat en knoppen om te accepteren, af te wijzen of het ticket opnieuw te openen.",
     "Wachtrijtickets krijgen nu de naam wachtrij-gebruikersnaam. Bij het opnieuw openen wordt het ticket teruggezet naar de gewone sollicitatiecategorie en kan de sollicitant weer reageren. Bestaande wachtrijdossiers worden na een herstart automatisch gesynchroniseerd."
