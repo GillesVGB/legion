@@ -68,6 +68,27 @@ test('dashboard toont module-instellingen, botstatus, afmeldingen en visverzamel
   }finally{f.close();}
 });
 
+test('beveiligingsdashboard toont in beide servers actieve raidcontrole en houdt uitgeschakelde beveiliging instelbaar',()=>{
+  const f=dashboardFixture();try{
+    const dashboard=new Dashboard({...f,locks:new Locks()}),source=readFileSync(new URL('../src/dashboard-assets/app.js',import.meta.url),'utf8');
+    for(const ctx of f.contexts.values()){
+      const guild=f.guilds.get(ctx.config.guildId);ctx.securityReady=true;
+      const context=vm.createContext({data:dashboard.summary(ctx,guild),Intl,Date,Number,String,Math,URL,console});
+      vm.runInContext(source.slice(0,source.indexOf("document.addEventListener('click'"))+`\nstate.data=data;`,context);
+      const modules=vm.runInContext('modulesPage()',context),health=vm.runInContext('healthPage()',context);
+      for(const setting of ['security.enabled','security.raidEnabled','security.raidModeMinutes'])assert.ok(modules.includes(`name="${setting}"`));
+      assert.match(health,/Aan — controleert nieuwe leden/);assert.match(health,/Geen raid gedetecteerd/);
+      ctx.securityRaidUntil=Date.now()+60000;context.data=dashboard.summary(ctx,guild);vm.runInContext('state.data=data;',context);
+      assert.match(vm.runInContext('healthPage()',context),/Beschermmodus:<\/strong> 🟠 Actief tot/);
+      ctx.config.operations={...ctx.config.operations,security:{...ctx.config.operations?.security,enabled:false}};
+      context.data=dashboard.summary(ctx,guild);vm.runInContext('state.data=data;',context);
+      const disabledHealth=vm.runInContext('healthPage()',context),disabledModules=vm.runInContext('modulesPage()',context);
+      assert.match(disabledHealth,/<h2>Beveiligingssysteem<\/h2><p>Uit<\/p>/);assert.doesNotMatch(disabledHealth,/Aan — controleert nieuwe leden/);
+      assert.match(disabledModules,/name="security.enabled"/);assert.match(disabledModules,/name="security.raidEnabled"/);
+    }
+  }finally{f.close();}
+});
+
 test('gangpotdashboard toont betaalmeldingen met Lead-vinkjes, escapt tekst en houdt de community gescheiden',async()=>{
   const f=dashboardFixture();
   try{

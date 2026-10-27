@@ -6,9 +6,9 @@ export const featureDefaults={
   fishing:{collectionEnabled:true,weeklyEnabled:true,target:25,rareTarget:3,reward:750,rareReward:400},
   activityCheck:{remindersEnabled:true,reminderMinutes:60,weeklyEnabled:false,weeklyStartDate:'2026-10-23',weeklyIntervalWeeks:2,weeklyTime:'07:30',weeklyReason:'Tweewekelijkse activiteitencheck',weeklyChannelId:WEEKLY_CHECK_CHANNEL_ID},backups:{enabled:true,keep:5},monthlyReports:{enabled:true,sendTime:'09:00'},weeklyReports:{enabled:true,sendTime:'09:00'},
   absence:{maxDays:90},logs:{enabled:true,batchSize:15},recruitment:{capacity:25,limitedAt:20,minimumAge:16},admission:{inviteMaxAgeSeconds:86400},
-  security:{linkBanCount:2,linkWindowMinutes:10,allowedMentions:3,spamWindowSeconds:10,spamMessageCount:6,duplicateMessageCount:3,timeoutMinutes:10,escalationEnabled:true,escalationDays:30,raidJoinCount:8,raidWindowSeconds:10,raidTimeoutMinutes:10}
+  security:{enabled:true,raidEnabled:true,linkBanCount:2,linkWindowMinutes:10,allowedMentions:3,spamWindowSeconds:10,spamMessageCount:6,duplicateMessageCount:3,timeoutMinutes:10,escalationEnabled:true,escalationDays:30,raidJoinCount:8,raidWindowSeconds:10,raidModeMinutes:10,raidTimeoutMinutes:10}
 };
-const bounds={weeklyAmount:[1,100000000],duration:[15,720],target:[1,10000],rareTarget:[1,1000],reward:[1,1000000],rareReward:[1,1000000],maxDays:[1,180],batchSize:[1,20],capacity:[2,1000],limitedAt:[1,999],minimumAge:[1,100],inviteMaxAgeSeconds:[300,604800],reminderMinutes:[1,10080],weeklyIntervalWeeks:[1,12],keep:[1,30],linkBanCount:[2,5],linkWindowMinutes:[1,120],allowedMentions:[1,3],spamWindowSeconds:[3,30],spamMessageCount:[4,20],duplicateMessageCount:[2,10],timeoutMinutes:[1,1440],escalationDays:[1,365],raidJoinCount:[5,100],raidWindowSeconds:[5,60],raidTimeoutMinutes:[1,1440]};
+const bounds={weeklyAmount:[1,100000000],duration:[15,720],target:[1,10000],rareTarget:[1,1000],reward:[1,1000000],rareReward:[1,1000000],maxDays:[1,180],batchSize:[1,20],capacity:[2,1000],limitedAt:[1,999],minimumAge:[1,100],inviteMaxAgeSeconds:[300,604800],reminderMinutes:[1,10080],weeklyIntervalWeeks:[1,12],keep:[1,30],linkBanCount:[2,5],linkWindowMinutes:[1,120],allowedMentions:[1,3],spamWindowSeconds:[3,30],spamMessageCount:[4,20],duplicateMessageCount:[2,10],timeoutMinutes:[1,1440],escalationDays:[1,365],raidJoinCount:[5,100],raidWindowSeconds:[5,60],raidModeMinutes:[1,1440],raidTimeoutMinutes:[1,1440]};
 export function operationSettings(ctx){return Object.fromEntries(Object.entries(featureDefaults).map(([group,defaults])=>{
   const saved=ctx.config.operations?.[group]||{};
   if(group==='gangpot'){
@@ -41,5 +41,6 @@ export function applyOperations(ctx,values){
   assertUser((!merged.gangpot.remindersEnabled||merged.gangpot.thursdayTime<merged.gangpot.deadlineTime&&merged.gangpot.fridayTime<merged.gangpot.deadlineTime)&&(!merged.gangpot.leadReminderEnabled||merged.gangpot.leadTime<merged.gangpot.deadlineTime),'De herinneringen moeten vóór de deadline op zaterdag staan.');
   assertUser(merged.recruitment.limitedAt<merged.recruitment.capacity,'De grens voor beperkte plaatsen moet lager dan de capaciteit zijn.');
   ctx.config.operations=merged;if(ctx.config.gangpot)Object.assign(ctx.config.gangpot,merged.gangpot);
+  if(!merged.security.enabled||!merged.security.raidEnabled){ctx.securityRaidUntil=0;ctx.securityJoins=[];}
   if(ctx.config.recruitment)Object.assign(ctx.config.recruitment,merged.recruitment);if(ctx.config.admission)Object.assign(ctx.config.admission,merged.admission);
 }

@@ -37,6 +37,7 @@ import {syncWarningRoles} from './warning-roles.mjs';
 import {monthlyReport,monthlyReportIndex} from './monthly-reports.mjs';
 import {weeklyReport,weeklyReportIndex} from './weekly-reports.mjs';
 import {DiscordLogin,DiscordLoginError} from './discord-login.mjs';
+import {initializeSecurity} from './security.mjs';
 
 const secret = () => randomBytes(32).toString('base64url');
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -280,6 +281,7 @@ export class Dashboard {
       if (desiredMax !== undefined) assertUser(Number.isSafeInteger(desiredMax) && desiredMax>=2 && desiredMax<=100000,'Kies een maximale inzet tussen 2 en 100000.');
       if (desiredMax !== undefined && desiredMax!==config.maxBet) await this.client.rest.put(Routes.applicationGuildCommands(config.clientId,guild.id),{body:commands(desiredMax,config.ticketsEnabled)});
       saveDashboardSettings(ctx,checked,actor);
+      if(checked.operations?.security&&config.security?.enabled)ctx.securityReady=await initializeSecurity(ctx,guild);
       if(config.recruitment)await refreshRecruitment(ctx,guild);
       if(currentUpdate){store.db.prepare('UPDATE gangpot_periods SET weekly_amount=?,ends_at=? WHERE id=?').run(config.gangpot.weeklyAmount,currentUpdate.end,currentUpdate.id);store.audit('gangpot.period.settings',actor,{period:currentUpdate.id,amount:config.gangpot.weeklyAmount});}
       for (const item of store.db.prepare("SELECT key FROM settings WHERE key LIKE 'panel:%'").all()) { const [,type,id]=item.key.split(':'); await publishPanel(ctx,guild,id,type); }

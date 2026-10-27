@@ -63,6 +63,7 @@
   },
   {
     "guildId": "1555726440933363753",
+    "botLogChannelId": "1556781560320102432",
     "planningChannelId": "",
     "admission": {
       "targetGuildId": "1555685630640652338",
@@ -71,6 +72,10 @@
       "inviteMaxAgeSeconds": 86400
     },
     "ticketsEnabled": true,
+    "security": {
+      "enabled": true,
+      "trustedRoleId": "1555726440983437504"
+    },
     "panelChannelId": "1555726441759375398",
     "staffRoleIds": [
       "1555726440933363761"

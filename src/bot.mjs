@@ -39,7 +39,7 @@ import {syncAbsenceCorrections} from './absence-corrections.mjs';
 import {handleWarnAppealButton,handleWarnAppealCommand,syncWarnAppeals} from './warn-appeals.mjs';
 import {warnAppealRow,warnAppealRows} from './warn-appeal-ui.mjs';
 import {syncWarningRoles} from './warning-roles.mjs';
-import {initializeSecurity,handleSecurityMessage,handleSecurityAudit,handleSecurityJoin} from './security.mjs';
+import {initializeSecurity,securityIsEnabled,handleSecurityMessage,handleSecurityAudit,handleSecurityJoin} from './security.mjs';
 import { quiet, isStaff, requireStaff, requireAdmin, requireTickets, configureGuild, publishPanel,
   createCase, requestCaseDecision, decideCase, handleApplicationQueueButton, handleApplicationQueueBoardButton, syncApplicationQueue, startInterview, cleanupInterviews, cleanupClosedCases, warningMessage, staffLogChannel, warnLogChannel, writeWarnLog, reconcileCases } from './service.mjs';
 
@@ -421,7 +421,7 @@ client.once(Events.ClientReady, async ready => {
       if(/^legion(?:\s*\|.*)?$/i.test(guild.members.me.nickname||''))await guild.members.me.setNickname('Bakarov','Bakarov huisstijl').catch(error=>console.error(`Guild ${guildId}: botbijnaam bijwerken mislukt (${error.code??error.name}).`));
       await guild.roles.fetch();
       ctx.securityReady=await initializeSecurity(ctx,guild);
-      if(ctx.config.security?.enabled)console.log(`Guild ${guildId}: beveiliging ${ctx.securityReady?'actief':'niet actief'}; uitzonderingsrol ${ctx.config.security.trustedRoleId}.`);
+      if(ctx.config.security?.enabled)console.log(`Guild ${guildId}: beveiliging ${securityIsEnabled(ctx)?ctx.securityReady?'actief':'niet actief — controleer botrechten en vertrouwensrol':'uit via dashboard'}; uitzonderingsrol ${ctx.config.security.trustedRoleId}.`);
       if(ctx.config.guildId==='1555685630640652338')await syncWarningRoles(ctx,guild).catch(error=>console.error(`Guild ${guildId}: waarschuwingrollen niet bijgewerkt (${error.code??error.message}); controleer Rollen beheren en de rolvolgorde.`));
       await refreshRecruitment(ctx, guild);
       await reconcileCases(ctx, guild);
@@ -478,7 +478,8 @@ function membershipChanged(guild) {
   task.unref();
   recruitmentDebounce.set(guild.id, task);
 }
-client.on(Events.GuildMemberAdd, member => { membershipChanged(member.guild); rosterChanged(member.guild); admissionJoined(member, contexts).catch(() => {});const ctx=contexts.get(member.guild.id);if(ctx)handleSecurityJoin(ctx,member).catch(error=>console.error(`Guild ${member.guild.id}: raidcontrole mislukt (${error.code??error.name}).`)); });
+function securityFailure(ctx,action,error){ctx.store.audit('security.check_failed',ctx.config.clientId,{action,error:String(error.code||error.name)});console.error(`Guild ${ctx.config.guildId}: ${action} mislukt (${error.code??error.name}).`);}
+client.on(Events.GuildMemberAdd, member => { membershipChanged(member.guild); rosterChanged(member.guild); admissionJoined(member, contexts).catch(() => {});const ctx=contexts.get(member.guild.id);if(ctx&&!shuttingDown)handleSecurityJoin(ctx,member).catch(error=>securityFailure(ctx,'Raidcontrole',error)); });
 function logGuildEvent(guild,event,details){const ctx=contexts.get(guild.id);if(ctx&&!shuttingDown)ctx.store.audit(event,'',details);}
 client.on(Events.GuildMemberAdd,member=>logGuildEvent(member.guild,'member.join',{user:member.id}));
 client.on(Events.GuildMemberRemove,member=>logGuildEvent(member.guild,'member.leave',{user:member.id}));
@@ -488,15 +489,15 @@ client.on(Events.ChannelUpdate,(before,after)=>{if(after.guild)logGuildEvent(aft
 client.on(Events.GuildRoleUpdate,(before,after)=>logGuildEvent(after.guild,'role.update',{id:after.id,nameChanged:before.name!==after.name,permissionsChanged:before.permissions.bitfield!==after.permissions.bitfield}));
 client.on(Events.MessageCreate,message=>{
   const ctx=contexts.get(message.guildId);
-  if(ctx&&!shuttingDown)handleSecurityMessage(ctx,message).catch(error=>console.error(`Guild ${message.guildId}: beveiligingscontrole mislukt (${error.code??error.name}).`));
+  if(ctx&&!shuttingDown)handleSecurityMessage(ctx,message).catch(error=>securityFailure(ctx,'Berichtencontrole',error));
 });
 client.on(Events.GuildAuditLogEntryCreate,(entry,guild)=>{
   const ctx=contexts.get(guild.id);
-  if(ctx&&!shuttingDown)handleSecurityAudit(ctx,entry,guild).catch(error=>console.error(`Guild ${guild.id}: controle serveractie mislukt (${error.code??error.name}).`));
+  if(ctx&&!shuttingDown)handleSecurityAudit(ctx,entry,guild).catch(error=>securityFailure(ctx,'Controle serveractie',error));
 });
 client.on(Events.MessageDelete,message=>{const ctx=contexts.get(message.guildId||message.guild?.id);if(ctx&&!shuttingDown)recordMessageEvent(ctx,'message.delete',message);});
 client.on(Events.MessageBulkDelete,messages=>{if(shuttingDown)return;for(const message of messages.values()){const ctx=contexts.get(message.guildId||message.guild?.id);if(ctx)recordMessageEvent(ctx,'message.delete',message,null,{bulk:true});}});
-client.on(Events.MessageUpdate,(before,after)=>{const ctx=contexts.get(after.guildId||after.guild?.id);if(ctx&&!shuttingDown){recordMessageEvent(ctx,'message.edit',after,before);if((after.content||'')!==(before.content||''))handleSecurityMessage(ctx,after).catch(error=>console.error(`Guild ${after.guildId}: beveiligingscontrole mislukt (${error.code??error.name}).`));}});
+client.on(Events.MessageUpdate,(before,after)=>{const ctx=contexts.get(after.guildId||after.guild?.id);if(ctx&&!shuttingDown){recordMessageEvent(ctx,'message.edit',after,before);if((after.content||'')!==(before.content||''))handleSecurityMessage(ctx,after).catch(error=>securityFailure(ctx,'Controle berichtwijziging',error));}});
 client.on(Events.GuildMemberRemove, member => {
   membershipChanged(member.guild); rosterChanged(member.guild);
   const ctx = contexts.get(member.guild.id); if (ctx) revokeAcceptances(ctx, client, member.id).catch(() => {});

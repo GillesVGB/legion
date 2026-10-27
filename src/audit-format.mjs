@@ -2,6 +2,7 @@ import {embed,safeText} from './ui.mjs';
 import {cleanAudit} from './audit-sanitize.mjs';
 const names={
   'message.delete':'🗑️ Bericht verwijderd','message.edit':'✏️ Bericht aangepast',
+  'security.ready':'🛡️ Beveiligingscontrole gereed','security.unavailable':'⚠️ Beveiliging kan niet starten','security.messages_removed':'🗑️ Beveiliging: berichten verwijderd','security.notice_sent':'📨 Beveiligingsmelding via DM verstuurd','security.notice_failed':'⚠️ Beveiligingsmelding via DM niet bezorgd','security.check_failed':'⚠️ Beveiligingscontrole mislukt',
   'security.link_removed':'🔗 Linkbericht verwijderd','security.links_ban':'🚫 Meerdere links: ban','security.mention_ban':'🚫 Tagspam: ban','security.timeout':'⏳ Automatische time-out','security.ban':'⛔ Automatische ban','security.enforcement_failed':'⚠️ Beveiligingsactie mislukt','security.delete_failed':'⚠️ Beveiliging kon een bericht niet verwijderen','security.unauthorized_action':'🚫 Onbevoegde serveractie: ban','security.unauthorized_action_failed':'⚠️ Onbevoegde actie: ban mislukt','security.raid_detected':'🚨 Mogelijke serverraid','security.raid_timeout':'⏳ Raidbeveiliging: nieuw lid beperkt',
   'interaction.succeeded':'✅ Actie uitgevoerd','interaction.failed':'❌ Actie mislukt',
   'dashboard.action.succeeded':'🖥️ Dashboardactie uitgevoerd','dashboard.action.failed':'❌ Dashboardactie mislukt',
@@ -27,21 +28,21 @@ const names={
   'rank.change':'👑 Gangrang gewijzigd','probation.review_due':'🗓️ Proefperiode klaar voor beoordeling','probation.passed':'✅ Proefperiode geslaagd','probation.extended':'🕒 Proefperiode verlengd','probation.followup':'🟠 Proefperiode: opvolging nodig',
   'application.queued':'⏳ Sollicitant in wachtrij geplaatst','application.queue_dm_sent':'📨 Wachtrijbericht verstuurd','application.queue_dm_failed':'⚠️ Wachtrijbericht niet bezorgd','application.queue_retry_failed':'⚠️ Wachtrijherstel mislukt','application.queue_ticket_notice':'📨 Wachtrijbericht in ticket geplaatst'
 };
-const labels={week:'Week vanaf',month:'Maand',request:'Afmelding',source:'Bron',id:'Registratie',name:'Naam',interaction:'Interactie',action:'Uitgevoerde actie',route:'Uitgevoerd',error:'Foutcode',amount:'Bedrag',period:'Termijn',version:'Versie',role:'Rang',roleId:'Rang',member:'Lid',memberId:'Lid',user:'Lid',channel:'Kanaal',message:'Bericht',case:'Dossier',caseId:'Dossier',activity:'Planning',kind:'Soort',response:'Reactie',added:'Rang erbij',removed:'Rang eraf',approvers:'Goedgekeurd door',nicknameChanged:'Bijnaam gewijzigd',nameChanged:'Naam gewijzigd',permissionsChanged:'Rechten gewijzigd',files:'Bestanden',deadline:'Deadline',members:'Aantal leden',restored:'Hersteld',count:'Aantal',minutes:'Time-out (minuten)',incident:'Overtreding',urls:'Links',everyone:'Massatag',joins:'Nieuwe leden',windowSeconds:'Tijdvenster (seconden)',target:'Doel'};
+const labels={week:'Week vanaf',month:'Maand',request:'Afmelding',source:'Bron',id:'Registratie',name:'Naam',interaction:'Interactie',action:'Uitgevoerde actie',route:'Uitgevoerd',error:'Foutcode',amount:'Bedrag',period:'Termijn',version:'Versie',role:'Rang',roleId:'Rang',member:'Lid',memberId:'Lid',user:'Lid',channel:'Kanaal',message:'Bericht',case:'Dossier',caseId:'Dossier',activity:'Planning',kind:'Soort',response:'Reactie',added:'Rang erbij',removed:'Rang eraf',approvers:'Goedgekeurd door',nicknameChanged:'Bijnaam gewijzigd',nameChanged:'Naam gewijzigd',permissionsChanged:'Rechten gewijzigd',files:'Bestanden',deadline:'Deadline',members:'Aantal leden',restored:'Hersteld',count:'Aantal',minutes:'Time-out (minuten)',incident:'Overtreding',urls:'Links',everyone:'Massatag',joins:'Nieuwe leden',windowSeconds:'Tijdvenster (seconden)',target:'Doel',notice:'Melding',status:'Status',permissions:'Ontbrekende botrechten',raidEnabled:'Raidcontrole',channels:'Kanalen',until:'Beschermmodus tot'};
 function detailValue(key,value){
   if(value===null||value===undefined||value==='')return null;
   if(typeof value==='boolean')return value?'Ja':'Nee';
-  if(Array.isArray(value))return value.map(item=>typeof item==='object'?'':key==='added'||key==='removed'?`<@&${item}>`:key==='approvers'?`<@${item}>`:String(item)).filter(Boolean).join(', ')||null;
+  if(Array.isArray(value))return value.map(item=>typeof item==='object'?'':key==='added'||key==='removed'?`<@&${item}>`:key==='approvers'?`<@${item}>`:key==='channels'?`<#${item}>`:String(item)).filter(Boolean).join(', ')||null;
   if(typeof value==='object')return null;
   if(['user','member','memberId'].includes(key)&&/^\d{17,20}$/.test(String(value)))return`<@${value}>`;
   if(key==='channel')return`<#${value}>`;
   if(['role','roleId'].includes(key)&&/^\d{17,20}$/.test(String(value)))return`<@&${value}>`;
-  if(key==='deadline'&&typeof value==='number')return`<t:${Math.floor(value/1000)}:F>`;
+  if(['deadline','until'].includes(key)&&typeof value==='number')return`<t:${Math.floor(value/1000)}:F>`;
   return safeText(String(value));
 }
 export function auditPresentation(item,snapshot=null){
   const details=cleanAudit(typeof item.details==='string'?JSON.parse(item.details):item.details||{}),message=item.event.startsWith('message.');
-  const result={title:names[item.event]||item.event.split('.').map(word=>word.replaceAll('_',' ')).join(' · '),color:item.event.endsWith('.failed')?0xEF4444:message?0xF59E0B:0x22C55E,fields:[],sections:[]};
+  const result={title:names[item.event]||item.event.split('.').map(word=>word.replaceAll('_',' ')).join(' · '),color:item.event.endsWith('.failed')||item.event.endsWith('_failed')||item.event==='security.unavailable'?0xEF4444:message?0xF59E0B:0x22C55E,fields:[],sections:[]};
   if(details.type==='command'&&item.event.startsWith('interaction.'))result.title=item.event.endsWith('.failed')?'❌ Command mislukt':'✅ Command uitgevoerd';
   if(message){
     result.fields.push({name:'Auteur',value:snapshot?.authorId?`<@${snapshot.authorId}> · ${safeText(snapshot.authorName)}`:details.user?`<@${details.user}>`:'Onbekend (bericht niet in cache)'});

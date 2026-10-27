@@ -90,6 +90,33 @@ test('dashboardinstellingen bewaren bedrag en tijden; lopende gangpotweek verand
   assert.throws(()=>validateDashboardSettings({operations:{gangpot:{weeklyAmount:-1}}}));assert.throws(()=>validateDashboardSettings({operations:{fishing:{reward:0}}}));
 });
 
+test('beveiliging staat in beide servers aan; dashboardschakelaars en raiddrempels blijven per server bewaard na herladen',async t=>{
+  const f=fixture(t),community=f.source,communityGuild=f.guilds.get(community.config.guildId),dashboard=new Dashboard({...f,locks:new Locks()});
+  assert.deepEqual(f.ctx.config.security,{enabled:true,trustedRoleId:'1555685630770413643'});
+  assert.deepEqual(community.config.security,{enabled:true,trustedRoleId:'1555726440983437504'});
+  for(const ctx of [f.ctx,community]){const id=ctx.config.security.trustedRoleId;f.guilds.get(ctx.config.guildId).roles.cache.set(id,{id,name:'+'});assert.equal(operationSettings(ctx).security.enabled,true);assert.equal(operationSettings(ctx).security.raidEnabled,true);}
+  await dashboard.action(f.ctx,f.guild,f.lead,{action:'settings.save',settings:{operations:{security:{enabled:false,raidEnabled:true,raidModeMinutes:15,raidJoinCount:9}}}});
+  assert.equal(operationSettings(community).security.enabled,true);assert.equal(operationSettings(community).security.raidModeMinutes,10);
+  await dashboard.action(community,communityGuild,communityGuild.members.cache.get(ACTOR),{action:'settings.save',settings:{operations:{security:{enabled:true,raidEnabled:false,raidModeMinutes:20,raidJoinCount:12}}}});
+  for(const [ctx,expected]of [[f.ctx,{enabled:false,raidEnabled:true,raidModeMinutes:15,raidJoinCount:9}],[community,{enabled:true,raidEnabled:false,raidModeMinutes:20,raidJoinCount:12}]]){
+    const restored={config:{...ctx.config,operations:undefined},store:ctx.store};loadDashboardSettings(restored);
+    for(const [key,value]of Object.entries(expected))assert.equal(operationSettings(restored).security[key],value);
+  }
+  assert.throws(()=>validateDashboardSettings({operations:{security:{enabled:'true'}}}));
+  assert.throws(()=>validateDashboardSettings({operations:{security:{raidModeMinutes:0}}}));
+});
+
+test('botstatus onderscheidt actieve raidcontrole, een gedetecteerde raid en uitgeschakelde beveiliging',t=>{
+  const f=fixture(t);f.ctx.securityReady=true;
+  let status=botHealth(f.ctx,f.client).security;
+  assert.equal(status.active,true);assert.equal(status.raidEnabled,true);assert.equal(status.raidActive,true);assert.equal(status.raidMode,false);
+  f.ctx.securityRaidUntil=Date.now()+600000;status=botHealth(f.ctx,f.client).security;assert.equal(status.raidMode,true);
+  saveDashboardSettings(f.ctx,{operations:{security:{raidEnabled:false}}},ACTOR);status=botHealth(f.ctx,f.client).security;
+  assert.equal(status.active,true);assert.equal(status.raidEnabled,false);assert.equal(status.raidActive,false);assert.equal(status.raidMode,false);
+  saveDashboardSettings(f.ctx,{operations:{security:{enabled:false,raidEnabled:true}}},ACTOR);status=botHealth(f.ctx,f.client).security;
+  assert.equal(status.enabled,false);assert.equal(status.active,false);assert.equal(status.raidActive,false);assert.equal(status.raidMode,false);
+});
+
 test('oude gangpot-DM-tijden worden naar vrijdag en zaterdag gemigreerd; de nieuwe deadline is zaterdag 23:59',t=>{
   const f=fixture(t);f.ctx.store.setSetting('dashboard-config',JSON.stringify({operations:{gangpot:{deadlineTime:'21:00',fridayTime:'17:00',saturdayTime:'19:00'}}}));
   loadDashboardSettings(f.ctx);const settings=operationSettings(f.ctx).gangpot;
@@ -120,6 +147,28 @@ test('commands en fouten worden gelogd zonder privé-opties; Discord-logherstel 
   const job=f.ctx.store.db.prepare('SELECT * FROM audit_deliveries WHERE message_id IS NOT NULL').get();f.ctx.store.db.prepare('UPDATE audit_deliveries SET message_id=NULL WHERE id=?').run(job.id);f.ctx.store.setSetting('audit:cursor','0');await flushAuditLogs(f.ctx,f.guild,SAT+63000);assert.equal(channel.posted.size,1);
 });
 
+test('beveiligingsmeldingen gaan uitsluitend naar het eigen serverlogkanaal en worden niet dubbel geplaatst',async t=>{
+  const f=fixture(t),scenarios=[
+    {ctx:f.ctx,channelId:'1555685637129109586',user:'100000000000000901',notice:'Beveiligingsmelding hoofdserver'},
+    {ctx:f.source,channelId:'1556781560320102432',user:'100000000000000902',notice:'Beveiligingsmelding community'}
+  ];
+  for(const item of scenarios){
+    assert.equal(item.ctx.config.botLogChannelId,item.channelId);
+    saveDashboardSettings(item.ctx,{operations:{logs:{enabled:true}}},ACTOR);
+    item.ctx.store.setSetting('audit:cursor',String(item.ctx.store.db.prepare('SELECT MAX(id) AS n FROM audit').get().n));
+    item.ctx.store.audit('security.notice_sent',item.user,{user:item.user,notice:item.notice});
+    await flushAuditLogs(item.ctx,f.guilds.get(item.ctx.config.guildId),SAT);
+  }
+  for(const [index,item]of scenarios.entries()){
+    const guild=f.guilds.get(item.ctx.config.guildId),channel=guild.channels.cache.get(item.channelId),other=scenarios[1-index];
+    assert.equal(channel.posted.size,1);
+    const text=JSON.stringify([...channel.posted.values()].map(message=>message.embeds.map(card=>card.toJSON())));
+    assert.ok(text.includes(item.user));assert.ok(text.includes(item.notice));assert.ok(!text.includes(other.user));assert.ok(!text.includes(other.notice));
+    const delivery=item.ctx.store.db.prepare('SELECT * FROM audit_deliveries WHERE message_id IS NOT NULL').get();assert.equal(delivery.channel_id,item.channelId);
+    await flushAuditLogs(item.ctx,guild,SAT+1000);assert.equal(channel.posted.size,1);
+  }
+});
+
 test('changelog wordt één keer per versie geplaatst en herstelt een verstuurd bericht na een herstart',async t=>{
   const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.updateChannelId);assert.ok(releaseNotes[releaseVersion].length>0);
   await announceRelease(f.ctx,f.guild);await announceRelease(f.ctx,f.guild);assert.equal(channel.posted.size,1);
@@ -128,16 +177,16 @@ test('changelog wordt één keer per versie geplaatst en herstelt een verstuurd 
 });
 
 test('uitgebreide changelog past in Discord en werkt een bestaand updatebericht bij zonder duplicaten',async t=>{
-  const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.updateChannelId);
-  const message=await channel.send({embeds:[new EmbedBuilder().setTitle(`Bakarov — Botupdate ${releaseVersion}`).setDescription('De oude korte uitleg.').setFooter({text:`Bakarov • Botupdate ${releaseVersion}`})]});
-  f.ctx.store.db.prepare('INSERT INTO release_announcements(version,message_id) VALUES(?,?)').run(releaseVersion,message.id);
-  await announceRelease(f.ctx,f.guild);
+  const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.updateChannelId),version='2.5.16';
+  const message=await channel.send({embeds:[new EmbedBuilder().setTitle(`Bakarov — Botupdate ${version}`).setDescription('De oude korte uitleg.').setFooter({text:`Bakarov • Botupdate ${version}`})]});
+  f.ctx.store.db.prepare('INSERT INTO release_announcements(version,message_id) VALUES(?,?)').run(version,message.id);
+  await announceRelease(f.ctx,f.guild,version);
   const card=message.embeds[0].toJSON();new EmbedBuilder(card).toJSON();
   assert.ok(card.description.length<=4096);assert.ok(card.description.includes('10 minuten → 30 minuten → 60 minuten → 24 uur'));assert.ok(card.description.includes('Benodigde rechten en grenzen'));
   assert.equal(channel.posted.size,1);assert.equal(f.calls.filter(call=>call.method==='message.edit'&&call.id===message.id).length,1);
-  await announceRelease(f.ctx,f.guild);
+  await announceRelease(f.ctx,f.guild,version);
   assert.equal(f.calls.filter(call=>call.method==='message.edit'&&call.id===message.id).length,1);
-  assert.equal(f.ctx.store.db.prepare('SELECT message_id FROM release_announcements WHERE version=?').get(releaseVersion).message_id,message.id);
+  assert.equal(f.ctx.store.db.prepare('SELECT message_id FROM release_announcements WHERE version=?').get(version).message_id,message.id);
 });
 
 test('changelog probeert een mislukte tekstaanpassing opnieuw en laat verwijderde of andermans berichten met rust',async t=>{

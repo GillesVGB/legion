@@ -51,3 +51,52 @@ test('a join burst starts raid mode and temporarily times out further joins',asy
   f.member.id='new-9';await handleSecurityJoin(f.ctx,f.member,6000);assert.equal(f.timeouts.at(-1).ms,600000);
   assert.equal(f.audits.some(row=>row[0]==='security.raid_detected'),true);
 });
+
+test('turning security off skips message penalties, server-action bans and raid checks until enabled again',async()=>{
+  resetSecurityState();const f=fixture({overrides:{enabled:false}}),message=f.message('https://example.com https://example.org');
+  await handleSecurityMessage(f.ctx,message,1000);
+  await handleSecurityAudit(f.ctx,{action:AuditLogEvent.ChannelDelete,executorId:f.member.id,targetId:'channel',id:'audit-disabled'},f.guild);
+  for(let i=0;i<8;i++){f.member.id=`disabled-${i}`;await handleSecurityJoin(f.ctx,f.member,1000+i*100);}
+  assert.equal(message.deleted,undefined);assert.equal(f.bans.length,0);assert.equal(f.timeouts.length,0);assert.ok(!f.ctx.securityRaidUntil);
+  f.ctx.config.operations.security.enabled=true;
+  const enabledMessage=f.message('https://example.com https://example.org');await handleSecurityMessage(f.ctx,enabledMessage,3000);
+  assert.equal(enabledMessage.deleted,true);assert.equal(f.bans.length,1);
+});
+
+test('raid checking can be switched off separately and clears an ongoing raid without disabling message moderation',async()=>{
+  resetSecurityState();const f=fixture({overrides:{raidEnabled:false}});f.ctx.securityRaidUntil=600000;
+  for(let i=0;i<8;i++){f.member.id=`disabled-raid-${i}`;await handleSecurityJoin(f.ctx,f.member,1000+i*100);}
+  assert.ok(!(f.ctx.securityRaidUntil>2000));assert.equal(f.timeouts.length,0);assert.equal(f.audits.some(row=>row[0]==='security.raid_detected'),false);
+  const message=f.message('https://example.com');await handleSecurityMessage(f.ctx,message,2000);assert.equal(message.deleted,true);
+  f.ctx.config.operations.security.raidEnabled=true;
+  f.member.id='first-after-enabling';await handleSecurityJoin(f.ctx,f.member,2100);
+  assert.ok(!(f.ctx.securityRaidUntil>2100));assert.equal(f.timeouts.length,0);
+});
+
+test('configured raid threshold, protection duration and timeout apply and expire without further penalties',async()=>{
+  resetSecurityState();const f=fixture({overrides:{raidJoinCount:5,raidWindowSeconds:5,raidModeMinutes:2,raidTimeoutMinutes:3}});
+  for(let i=0;i<5;i++){f.member.id=`custom-raid-${i}`;await handleSecurityJoin(f.ctx,f.member,1000+i*500);}
+  assert.equal(f.ctx.securityRaidUntil,3000+2*60000);
+  f.member.id='during-raid';await handleSecurityJoin(f.ctx,f.member,4000);assert.equal(f.timeouts.at(-1).ms,3*60000);
+  f.member.id='after-raid';await handleSecurityJoin(f.ctx,f.member,124000);assert.equal(f.timeouts.length,1);
+});
+
+test('security DM delivery and failures are audited without stopping message enforcement',async()=>{
+  resetSecurityState();const f=fixture(),message=f.message('https://example.com');await handleSecurityMessage(f.ctx,message,1000);
+  assert.equal(message.deleted,true);assert.equal(f.audits.some(row=>row[0]==='security.notice_sent'&&row[2].user===f.member.id),true);
+  resetSecurityState();const g=fixture();g.member.user.send=async()=>{throw Object.assign(new Error('DM geblokkeerd'),{code:50007});};
+  const blocked=g.message('https://example.org');await handleSecurityMessage(g.ctx,blocked,2000);
+  assert.equal(blocked.deleted,true);const failure=g.audits.find(row=>row[0]==='security.notice_failed');
+  assert.ok(failure);assert.equal(failure[2].user,g.member.id);assert.equal(failure[2].error,'50007');
+});
+
+test('higher configured spam thresholds work without timing out before the selected limit',async()=>{
+  resetSecurityState();const f=fixture({overrides:{spamMessageCount:12,duplicateMessageCount:10}});
+  for(let i=0;i<11;i++)await handleSecurityMessage(f.ctx,f.message(`different message ${i}`),1000+i*100);
+  assert.equal(f.timeouts.length,0);
+  await handleSecurityMessage(f.ctx,f.message('twelfth message'),2200);assert.equal(f.timeouts.length,1);
+  resetSecurityState();const g=fixture({overrides:{spamMessageCount:20,duplicateMessageCount:10}});
+  for(let i=0;i<9;i++)await handleSecurityMessage(g.ctx,g.message('duplicate'),1000+i*100);
+  assert.equal(g.timeouts.length,0);
+  await handleSecurityMessage(g.ctx,g.message('duplicate'),2000);assert.equal(g.timeouts.length,1);
+});

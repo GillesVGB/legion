@@ -1,8 +1,12 @@
 # Bakarov — Discord-bot voor Future RP
 
-## Beveiligingssysteem — 2.5.16
+## Beveiligingssysteem — 2.5.17
 
-In de hoofdserver **`1555685630640652338`** is de **+-rol `1555685630770413643`** de enige uitzonderingsrol. Alleen leden met deze rol zijn vrijgesteld van automatische beveiligingsacties. De uitzonderingsrol en status zijn zichtbaar in **Modules instellen → Beveiliging & automatisch modereren** en **Botstatus**.
+De beveiliging staat standaard aan in beide servers. In de hoofdserver **`1555685630640652338`** is de **+-rol `1555685630770413643`** de uitzonderingsrol; in de community **`1555726440933363753`** is dit rol **`1555726440983437504`**. Alleen leden met de uitzonderingsrol van hun eigen server zijn vrijgesteld van automatische beveiligingsacties.
+
+Selecteer in het dashboard de gewenste server en open **Modules instellen → Beveiliging & automatisch modereren**. Hier schakel je de beveiliging en raidcontrole onafhankelijk aan of uit en stel je de drempels, beschermduur en time-outs in. De instellingen gelden direct en blijven bewaard bij herstarts. **Botstatus** toont afzonderlijk of de raidcontrole aanstaat en of een tijdelijke beschermmodus actief is. **Geen raid gedetecteerd** betekent dat de ingeschakelde controle actief blijft.
+
+Beveiligingsmeldingen van de hoofdserver gaan naar **`1555685637129109586`**. De community gebruikt haar eigen privé logkanaal **`1556781560320102432`**. Ook verstuurde en mislukte DM-meldingen, verwijderingen en uitvoeringsfouten worden daar geregistreerd; de bestemming is via de dashboardinstelling **Botlogs** per server te wijzigen.
 
 - Een linkbericht van een ander lid wordt altijd verwijderd. Een tweede linkbericht binnen de ingestelde periode, of meerdere links in één bericht, leidt tot een ban. De bot verwijdert ook eerdere linkberichten die hij nog kan bereiken.
 - Eén tot drie tags zijn toegestaan. Vier of meer tags, of `@everyone`/`@here`, verwijdert het bericht en leidt tot een ban.
@@ -130,7 +134,7 @@ Rollen, kanaalinstellingen, warns, coins, spellen en dossiers zijn **per guild g
 
 7. Het paneel in de tweede guild wordt automatisch geplaatst. Gebruik indien nodig `/setup paneel:alles`. In de eerste guild voer je `/setup paneel:alles kanaal:#solliciteren` uit met je eigen kanaal.
 
-Botrechten: **Kanalen bekijken, Berichten versturen, Berichtgeschiedenis lezen, Links insluiten, Bestanden bijvoegen, Kanalen beheren en Rollen beheren**. In de hoofdserver zijn voor beveiliging ook **View Audit Log, Manage Messages, Moderate Members en Ban Members** nodig. Plaats de botrol boven de rollen die hij moet beheren of straffen, zeker boven de ledenrol. Administrator is niet nodig voor de bot. Je eigen account moet administrator zijn om `/inrichten` en `/setup` te gebruiken.
+Botrechten: **Kanalen bekijken, Berichten versturen, Berichtgeschiedenis lezen, Links insluiten, Bestanden bijvoegen, Kanalen beheren en Rollen beheren**. In beide servers zijn voor beveiliging ook **View Audit Log, Manage Messages, Moderate Members en Ban Members** nodig. Plaats de botrol boven de rollen die hij moet beheren of straffen, zeker boven de ledenrol. Administrator is niet nodig voor de bot. Je eigen account moet administrator zijn om `/inrichten` en `/setup` te gebruiken.
 
 Nieuwe commands worden bij het starten automatisch geregistreerd: 32 in de hoofdserver en 26 in de community. `npm run deploy` kan dit ook handmatig doen; het vervangt de bestaande guild-commands van deze bot-applicatie.
 
