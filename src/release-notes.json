@@ -1,4 +1,8 @@
 {
+  "2.5.16": [
+    "Nieuw beveiligingssysteem in de communityserver. De ingestelde uitzonderingsrol is vrijgesteld; onbevoegde kanaal-, rol-, webhook-, uitnodigings- en moderatieacties leiden tot een ban.",
+    "Links worden verwijderd; herhaald linken en tagspam worden bestraft. Schelden en spam geven oplopende time-outs. Raidmeldingen, botstatus en instelbare beveiligingsdrempels zijn toegevoegd."
+  ],
   "2.5.15": [
     "De automatische gegevensback-up geeft nu de bestandsnaam en SQLite-fout door aan de console. Dat maakt een mislukte back-up op de hosting gericht te herstellen.",
     "De back-up heeft een alternatieve SQLite-opdracht voor omgevingen die parameters in VACUUM INTO niet ondersteunen."

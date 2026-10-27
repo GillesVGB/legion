@@ -67,6 +67,7 @@ export function loadConfig(env = process.env, requireDiscord = true) {
       if (typeof guild.guildId !== 'string' || !snowflake.test(guild.guildId) || seen.has(guild.guildId)) errors.push('guilds.json: elk guildId moet geldig en uniek zijn.');
       seen.add(guild.guildId);
       if (typeof guild.ticketsEnabled !== 'boolean') errors.push(`Guild ${guild.guildId}: ticketsEnabled moet true of false zijn.`);
+      if(guild.security!==undefined&&(!guild.security||typeof guild.security.enabled!=='boolean'||typeof guild.security.trustedRoleId!=='string'||!snowflake.test(guild.security.trustedRoleId)))errors.push(`Guild ${guild.guildId}: controleer de beveiligingsinstellingen en vertrouwensrol.`);
       for (const key of ['panelChannelId', 'planningChannelId', 'memberRoleId', 'ticketCategoryId', 'applicationCategoryId', 'logChannelId', 'gameChannelId', 'warnLogChannelId', 'applicationTranscriptChannelId', 'ticketTranscriptChannelId']) {
         if (typeof guild[key] !== 'string' || (guild[key] && !snowflake.test(guild[key]))) errors.push(`Guild ${guild.guildId}: ${key} moet leeg of een geldig Discord-ID zijn.`);
       }

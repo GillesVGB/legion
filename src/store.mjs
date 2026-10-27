@@ -47,6 +47,10 @@ export class Store {
         case_id TEXT PRIMARY KEY,channel_id TEXT NOT NULL,message_id TEXT,
         status TEXT NOT NULL DEFAULT 'queued',updated_at INTEGER NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS security_incidents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,user_id TEXT NOT NULL,kind TEXT NOT NULL,
+        created_at INTEGER NOT NULL,reason TEXT NOT NULL
+      );
       CREATE UNIQUE INDEX IF NOT EXISTS one_open_case ON cases(owner_id, kind) WHERE status IN ('creating','open');
       CREATE TABLE IF NOT EXISTS audit (
         id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT NOT NULL,
@@ -269,11 +273,13 @@ export class Store {
     for(const [name,type] of [['message_ids',"TEXT NOT NULL DEFAULT '[]'"],['payloads','TEXT']])if(!auditColumns.has(name))this.db.exec(`ALTER TABLE audit_deliveries ADD COLUMN ${name} ${type};`);
     this.db.exec(`
       CREATE INDEX IF NOT EXISTS warnings_user_history ON warnings(user_id,created_at DESC);
+      CREATE INDEX IF NOT EXISTS security_incidents_user_kind ON security_incidents(user_id,kind,created_at DESC);
+      CREATE INDEX IF NOT EXISTS security_incidents_created ON security_incidents(created_at);
       CREATE INDEX IF NOT EXISTS absence_user_history ON absence_requests(user_id,created_at DESC);
       CREATE INDEX IF NOT EXISTS check_member_history ON activity_check_members(user_id,check_id);
       CREATE INDEX IF NOT EXISTS notice_due_kind ON feature_notices(status,kind,next_attempt);
       CREATE INDEX IF NOT EXISTS check_deadline_due ON activity_check_sessions(status,deadline_at,next_attempt);
-      PRAGMA user_version = 20;
+      PRAGMA user_version = 21;
     `);
   }
 

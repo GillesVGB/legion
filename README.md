@@ -1,5 +1,17 @@
 # Bakarov — Discord-bot voor Future RP
 
+## Beveiligingssysteem — 2.5.16
+
+In de communityserver is rol **`1555726440983437504`** de enige uitzonderingsrol. Alleen leden met deze rol zijn vrijgesteld van automatische beveiligingsacties. De uitzonderingsrol en status zijn zichtbaar in **Modules instellen → Beveiliging & automatisch modereren** en **Botstatus**.
+
+- Een linkbericht van een ander lid wordt altijd verwijderd. Een tweede linkbericht binnen de ingestelde periode, of meerdere links in één bericht, leidt tot een ban. De bot verwijdert ook eerdere linkberichten die hij nog kan bereiken.
+- Eén tot drie tags zijn toegestaan. Vier of meer tags, of `@everyone`/`@here`, verwijdert het bericht en leidt tot een ban.
+- Schelden en spam verwijderen de betrokken berichten en geven een time-out. Herhaling verhoogt die standaard van 10 minuten naar 30 minuten, 60 minuten en daarna maximaal 24 uur. Herhaalde overtredingen tellen 30 dagen mee.
+- Acht nieuwe leden binnen tien seconden signaleren een mogelijke raid. Volgende toetreders krijgen tijdelijk een time-out en de gebeurtenis komt in de botlogs.
+- Een onbevoegde kanaal-, kanaalrechten-, rol-, webhook-, uitnodigings- of serverwijziging, bulkverwijdering, kick, ban of time-out leidt tot een ban van de uitvoerder. De uitzonderingsrol mag deze acties uitvoeren.
+
+De standaarddrempels en time-outs zijn aanpasbaar via het dashboard. Beveiliging vereist voor de bot **View Audit Log**, **Manage Messages**, **Moderate Members** en **Ban Members**; zet de botrol ook boven de rollen die hij moet kunnen straffen. Als deze rechten of de uitzonderingsrol ontbreken, meldt de bot dat in de console en bij **Botstatus**. Discord registreert alleen uitgevoerde acties; een geblokkeerde, mislukte poging is niet zichtbaar in het auditlog.
+
 ## Gepubliceerde activiteitencheck overnemen — 2.5.3
 
 De activiteitencheck met deadline **23 oktober 2026, 07:30 Belgische tijd** is al in mededelingen geplaatst. Deze versie neemt bij opstarten hetzelfde bericht over via de privé herstelregistratie. Alleen de oorspronkelijke ledensnapshot telt mee. De bot controleert afzender, kanaal, berichtkenmerken, deadline, privacy en leesrechten en haalt bestaande ✅-reacties op vóór de deadlinecontrole.
@@ -118,7 +130,7 @@ Rollen, kanaalinstellingen, warns, coins, spellen en dossiers zijn **per guild g
 
 7. Het paneel in de tweede guild wordt automatisch geplaatst. Gebruik indien nodig `/setup paneel:alles`. In de eerste guild voer je `/setup paneel:alles kanaal:#solliciteren` uit met je eigen kanaal.
 
-Botrechten: **Kanalen bekijken, Berichten versturen, Berichtgeschiedenis lezen, Links insluiten, Bestanden bijvoegen, Kanalen beheren en Rollen beheren**. Plaats de botrol boven de rollen die hij moet beheren, zeker boven de ledenrol. Administrator is niet nodig voor de bot. Je eigen account moet administrator zijn om `/inrichten` en `/setup` te gebruiken.
+Botrechten: **Kanalen bekijken, Berichten versturen, Berichtgeschiedenis lezen, Links insluiten, Bestanden bijvoegen, Kanalen beheren en Rollen beheren**. In de communityserver zijn voor beveiliging ook **View Audit Log, Manage Messages, Moderate Members en Ban Members** nodig. Plaats de botrol boven de rollen die hij moet beheren of straffen, zeker boven de ledenrol. Administrator is niet nodig voor de bot. Je eigen account moet administrator zijn om `/inrichten` en `/setup` te gebruiken.
 
 Nieuwe commands worden bij het starten automatisch geregistreerd: 32 in de hoofdserver en 26 in de community. `npm run deploy` kan dit ook handmatig doen; het vervangt de bestaande guild-commands van deze bot-applicatie.
 

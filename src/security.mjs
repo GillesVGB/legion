@@ -1,0 +1,155 @@
+import { AuditLogEvent, PermissionFlagsBits as P } from 'discord.js';
+import { safeText } from './ui.mjs';
+import { operationSettings } from './feature-settings.mjs';
+
+const spamByMember=new Map(),linkByMember=new Map();
+let lastMemoryPrune=0,lastIncidentCleanup=0;
+const LINK=/https?:\/\/[^\s<>]+|www\.[^\s<>]+|discord\.gg\/[a-z0-9-]+|discord(?:app)?\.com\/invite\/[a-z0-9-]+|\b(?:[a-z0-9-]+\.)+(?:com|net|org|nl|be|gg|io|me|tv|co|eu|xyz|site|app|dev)(?:\/[^\s<>]*)?/giu;
+const PROFANITY=/\b(?:kanker|tering|tyfus|godverdomme|godver|kut|klootzak|eikel|lul|hoer|fuck(?:er|ing)?|shit|bitch|asshole|motherfucker)\b/iu;
+const protectedAuditActions=new Set([AuditLogEvent.ChannelCreate,AuditLogEvent.ChannelUpdate,AuditLogEvent.ChannelDelete,
+  AuditLogEvent.ChannelOverwriteCreate,AuditLogEvent.ChannelOverwriteUpdate,AuditLogEvent.ChannelOverwriteDelete,
+  AuditLogEvent.RoleCreate,AuditLogEvent.RoleUpdate,AuditLogEvent.RoleDelete,
+  AuditLogEvent.MemberKick,AuditLogEvent.MemberBanAdd,AuditLogEvent.MemberBanRemove,
+  AuditLogEvent.MemberPrune,AuditLogEvent.InviteCreate,AuditLogEvent.InviteDelete,
+  AuditLogEvent.WebhookCreate,AuditLogEvent.WebhookUpdate,AuditLogEvent.WebhookDelete,AuditLogEvent.GuildUpdate,AuditLogEvent.MessageBulkDelete]);
+
+const key=(guildId,userId)=>`${guildId}:${userId}`;
+function audit(ctx,event,actor,details){ctx.store.audit(event,actor||'',details);}
+function trusted(ctx,member){return Boolean(member&&ctx.config.security?.trustedRoleId&&member.roles?.cache?.has(ctx.config.security.trustedRoleId));}
+function shortReason(reason){return safeText(reason).slice(0,300);}
+function settings(ctx){return operationSettings(ctx).security;}
+function incidentCount(ctx,userId,kind,now,days){
+  const since=now-days*24*60*60*1000;
+  if(now-lastIncidentCleanup>60*60*1000){ctx.store.db.prepare('DELETE FROM security_incidents WHERE created_at<?').run(now-365*24*60*60*1000);lastIncidentCleanup=now;}
+  ctx.store.db.prepare('INSERT INTO security_incidents(user_id,kind,created_at,reason) VALUES(?,?,?,?)').run(userId,kind,now,kind);
+  return ctx.store.db.prepare('SELECT COUNT(*) AS count FROM security_incidents WHERE user_id=? AND kind=? AND created_at>=?').get(userId,kind,since).count;
+}
+function pruneMemory(now){
+  if(now-lastMemoryPrune<60*1000)return;lastMemoryPrune=now;
+  for(const [id,items]of spamByMember){const recent=items.filter(item=>now-item.at<60_000);if(recent.length)spamByMember.set(id,recent);else spamByMember.delete(id);}
+  for(const [id,items]of linkByMember){const recent=items.filter(item=>now-item.at<120*60_000);if(recent.length)linkByMember.set(id,recent);else linkByMember.delete(id);}
+}
+
+export async function initializeSecurity(ctx,guild){
+  const config=ctx.config.security;
+  if(!config?.enabled)return false;
+  const role=await guild.roles.fetch(config.trustedRoleId).catch(()=>null);
+  if(!role){console.error(`Guild ${guild.id}: beveiliging uitgeschakeld; vertrouwensrol ${config.trustedRoleId} bestaat niet.`);return false;}
+  const me=guild.members.me||await guild.members.fetchMe();
+  const required=[P.ViewAuditLog,P.ManageMessages,P.ModerateMembers,P.BanMembers];
+  const missing=required.filter(permission=>!me.permissions.has(permission));
+  if(missing.length){console.error(`Guild ${guild.id}: beveiliging beperkt; geef de bot View Audit Log, Manage Messages, Moderate Members en Ban Members.`);return false;}
+  return true;
+}
+
+async function removeMessages(ctx,messages){
+  const unique=[...new Map(messages.filter(Boolean).map(message=>[message.id,message])).values()];
+  const results=await Promise.all(unique.map(message=>message.delete().then(()=>true).catch(error=>({message,error}))));
+  const failed=results.filter(result=>result!==true);
+  if(failed.length)audit(ctx,'security.delete_failed',ctx.config.clientId,{count:failed.length,channels:[...new Set(failed.map(item=>item.message.channelId))]});
+}
+async function notify(member,text){const user=member?.user||member;if(typeof user?.send==='function')await user.send({content:text,allowedMentions:{parse:[]}}).catch(()=>{});}
+async function banMember(ctx,guild,member,reason){
+  const memberId=member.id;
+  await notify(member,`Je bent uit **${safeText(ctx.config.content.gangName)}** verbannen. Reden: ${shortReason(reason)}`);
+  try{
+    await guild.members.ban(memberId,{reason:`Bakarov-beveiliging: ${reason}`});
+    audit(ctx,'security.ban',guild.members.me?.id,{user:memberId,reason});
+    return true;
+  }catch(error){audit(ctx,'security.enforcement_failed',guild.members.me?.id,{user:memberId,action:'ban',reason,error:String(error.code||error.name)});return false;}
+}
+export async function handleSecurityMessage(ctx,message,now=Date.now()){
+  pruneMemory(now);
+  const config=ctx.config.security;
+  if(message?.partial)message=await message.fetch().catch(()=>null);
+  if(!message||!config?.enabled||!ctx.securityReady||!message.guild||!message.author||message.author.bot||message.webhookId)return;
+  const member=message.member||await message.guild.members.fetch(message.author.id).catch(()=>null);
+  if(!member||trusted(ctx,member))return;
+  const policy=settings(ctx),id=key(message.guild.id,member.id),urls=[...(message.content||'').matchAll(LINK)].map(match=>match[0]);
+  const linkHistory=(linkByMember.get(id)||[]).filter(entry=>now-entry.at<policy.linkWindowMinutes*60*1000);
+  if(urls.length||message.embeds?.some(embed=>embed.url)){
+    const entries=[...linkHistory,{at:now,message}],count=incidentCount(ctx,member.id,'links',now,policy.linkWindowMinutes/1440);
+    linkByMember.set(id,entries);
+    if(urls.length>=2||count>=policy.linkBanCount){
+      await removeMessages(ctx,entries.map(entry=>entry.message));
+      await banMember(ctx,message.guild,member,urls.length>=2?'meerdere links in één bericht':'meerdere linkberichten binnen 10 minuten');
+      linkByMember.delete(id);
+      audit(ctx,'security.links_ban',member.id,{count,urls:urls.length,channel:message.channelId});
+    }else{
+      await removeMessages(ctx,[message]);
+      audit(ctx,'security.link_removed',member.id,{channel:message.channelId,urls:1});
+      await notify(member,`Links zijn niet toegestaan. Je bericht is verwijderd. Een tweede linkbericht binnen ${policy.linkWindowMinutes} minuten leidt tot een ban.`);
+    }
+    return;
+  }
+  const mentionCount=message.mentions.users.size+message.mentions.roles.size;
+  if(message.mentions.everyone||mentionCount>policy.allowedMentions){
+    await removeMessages(ctx,[message]);
+    await banMember(ctx,message.guild,member,message.mentions.everyone?'@everyone/@here vermelding':`meer dan ${policy.allowedMentions} leden of rollen tegelijk taggen`);
+    audit(ctx,'security.mention_ban',member.id,{count:mentionCount,everyone:message.mentions.everyone,channel:message.channelId});
+    return;
+  }
+  if(PROFANITY.test(message.content||'')){
+    await timeoutMember(ctx,message.guild,member,'profanity','schelden of grof taalgebruik',[message],now,policy);
+    return;
+  }
+  const text=(message.content||'').trim().toLocaleLowerCase('nl-BE').replace(/\s+/g,' ');
+  if(!text)return;
+  const recent=(spamByMember.get(id)||[]).filter(entry=>now-entry.at<policy.spamWindowSeconds*1000);
+  recent.push({at:now,text,message});spamByMember.set(id,recent);
+  const duplicates=recent.filter(entry=>entry.text===text);
+  if(recent.length>=policy.spamMessageCount||duplicates.length>=policy.duplicateMessageCount){
+    spamByMember.delete(id);
+    await timeoutMember(ctx,message.guild,member,'spam','berichten spammen',recent.map(entry=>entry.message),now,policy);
+    return;
+  }
+  if(recent.length>8)spamByMember.set(id,recent.slice(-8));
+}
+
+async function timeoutMember(ctx,guild,member,kind,text,messages,now,policy){
+  await removeMessages(ctx,messages);
+  const count=incidentCount(ctx,member.id,kind,now,policy.escalationDays);
+  const durations=policy.escalationEnabled?[policy.timeoutMinutes,policy.timeoutMinutes*3,policy.timeoutMinutes*6,1440]:[policy.timeoutMinutes];
+  const minutes=Math.min(1440,durations[Math.min(count-1,durations.length-1)]);
+  await notify(member,`Je berichten zijn verwijderd en je hebt een time-out van ${minutes} minuten gekregen. Reden: ${shortReason(text)}${policy.escalationEnabled&&count>1?` (overtreding ${count})`:''}`);
+  try{
+    await member.timeout(minutes*60*1000,`Bakarov-beveiliging: ${text}`);
+    audit(ctx,'security.timeout',guild.members.me?.id,{user:member.id,reason:text,minutes,count,incident:kind});
+  }catch(error){audit(ctx,'security.enforcement_failed',guild.members.me?.id,{user:member.id,action:'timeout',reason:text,error:String(error.code||error.name)});}
+}
+
+const joinsByGuild=new Map();
+export async function handleSecurityJoin(ctx,member,now=Date.now()){
+  pruneMemory(now);
+  const config=ctx.config.security;if(!config?.enabled||!ctx.securityReady||member.user.bot||trusted(ctx,member))return;
+  const policy=settings(ctx),recent=(joinsByGuild.get(member.guild.id)||[]).filter(entry=>now-entry.at<policy.raidWindowSeconds*1000);
+  recent.push({at:now,id:member.id});joinsByGuild.set(member.guild.id,recent);
+  if(recent.length>=policy.raidJoinCount&&(!ctx.securityRaidUntil||ctx.securityRaidUntil<now)){
+    ctx.securityRaidUntil=now+10*60*1000;
+    audit(ctx,'security.raid_detected',member.id,{joins:recent.length,windowSeconds:policy.raidWindowSeconds,until:ctx.securityRaidUntil});
+  }else if(ctx.securityRaidUntil>now){
+    await notify(member,'De server heeft tijdelijk een beveiligingscontrole ingeschakeld vanwege veel nieuwe leden. Je account is tijdelijk beperkt.');
+    try{
+      await member.timeout(policy.raidTimeoutMinutes*60*1000,'Bakarov-beveiliging: tijdelijke raidbeveiliging');
+      audit(ctx,'security.raid_timeout',ctx.config.clientId,{user:member.id,minutes:policy.raidTimeoutMinutes});
+    }catch(error){audit(ctx,'security.enforcement_failed',ctx.config.clientId,{user:member.id,action:'raid timeout',error:String(error.code||error.name)});}
+  }
+}
+
+function timeoutChange(entry){return entry.changes?.some(change=>change.key==='communication_disabled_until'&&change.old!==change.new)??false;}
+export async function handleSecurityAudit(ctx,entry,guild){
+  const config=ctx.config.security;
+  if(!config?.enabled||!ctx.securityReady||!entry.executorId||entry.executorId===guild.members.me?.id)return;
+  const risky=protectedAuditActions.has(entry.action)||(entry.action===AuditLogEvent.MemberUpdate&&timeoutChange(entry));
+  if(!risky)return;
+  let actor=await guild.members.fetch(entry.executorId).catch(()=>null);
+  if(actor?.user.bot||entry.executor?.bot||trusted(ctx,actor))return;
+  const action=entry.action===AuditLogEvent.MemberKick?'iemand kicken':entry.action===AuditLogEvent.MemberBanAdd?'iemand bannen':entry.action===AuditLogEvent.MemberBanRemove?'een ban intrekken':entry.action===AuditLogEvent.MemberUpdate?'iemand time-outen':entry.action===AuditLogEvent.ChannelOverwriteCreate||entry.action===AuditLogEvent.ChannelOverwriteUpdate||entry.action===AuditLogEvent.ChannelOverwriteDelete?'kanaalrechten wijzigen':entry.action===AuditLogEvent.MemberPrune?'leden verwijderen via prune':entry.action===AuditLogEvent.InviteCreate?'een uitnodiging maken':entry.action===AuditLogEvent.InviteDelete?'een uitnodiging verwijderen':entry.action===AuditLogEvent.MessageBulkDelete?'berichten in bulk verwijderen':`serveronderdeel wijzigen (${entry.action})`;
+  const reason=`onbevoegde actie: ${action}`;
+  if(!actor)actor={id:entry.executorId,send:async()=>{throw new Error('DM_UNAVAILABLE');}};
+  const banned=await banMember(ctx,guild,actor,reason);
+  audit(ctx,banned?'security.unauthorized_action':'security.unauthorized_action_failed',entry.executorId,
+    {action,target:entry.targetId||null,entry:String(entry.id),reason});
+}
+
+export function resetSecurityState(){spamByMember.clear();linkByMember.clear();joinsByGuild.clear();lastMemoryPrune=0;lastIncidentCleanup=0;}
