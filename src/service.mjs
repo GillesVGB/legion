@@ -259,6 +259,25 @@ async function sendApplicationQueueNotice(ctx,guild,dossier){
   }
 }
 
+async function postApplicationQueueTicketNotice(ctx,channel,dossier){
+  const current=ctx.store.caseById(dossier.id);
+  if(current?.payload.queueTicketNoticeSent)return;
+  const card=embed(ctx.config,'Sollicitatie in de wachtrij',
+    `De sollicitatie van <@${current.owner_id}> staat in de wachtrij. De sollicitant kan dit kanaal blijven lezen, maar kan tijdelijk niet reageren. De leiding kan het dossier verder beoordelen.`).setColor(0xF59E0B);
+  const nonce=createHash('sha256').update(`application-queue-ticket:${current.id}:${current.payload.queueAt}`).digest('hex').slice(0,24);
+  await channel.send({embeds:[card],allowedMentions:quiet,nonce,enforceNonce:true});
+  ctx.store.markApplicationQueueTicketNoticeSent(current.id);
+}
+
+async function lockQueuedApplication(ctx,channel,dossier){
+  const ownerOverwrite=channel.permissionOverwrites.cache.get(dossier.owner_id);
+  const blocked=[P.SendMessages,P.AddReactions,P.SendMessagesInThreads,P.CreatePublicThreads,P.CreatePrivateThreads];
+  if(!ownerOverwrite||!ownerOverwrite.deny.has(blocked)){
+    assertUser(channel.permissionsFor(channel.guild.members.me)?.has(P.ManageRoles),'De bot mist Rollen beheren om de sollicitant tijdelijk te blokkeren in het wachtrijkanaal.');
+    await channel.permissionOverwrites.edit(dossier.owner_id,{SendMessages:false,AddReactions:false,SendMessagesInThreads:false,CreatePublicThreads:false,CreatePrivateThreads:false},'Bakarov sollicitatie staat in de wachtrij');
+  }
+}
+
 async function synchronizeQueuedApplication(ctx,guild,dossier){
   const channel=await guild.channels.fetch(dossier.channel_id).catch(error=>{if(error.code===10003)return null;throw error;});
   assertUser(channel?.guildId===guild.id&&channel.type===ChannelType.GuildText&&channel.topic?.includes(`dossier:${dossier.id} | application`),'Het sollicitatiekanaal hoort niet bij dit dossier.');
@@ -267,6 +286,8 @@ async function synchronizeQueuedApplication(ctx,guild,dossier){
   const member=await guild.members.fetch(dossier.owner_id).catch(()=>null);
   const name=queueChannelName(member?.user||{username:dossier.payload.name||'sollicitant'});
   if(channel.name!==name)await channel.setName(name,'Sollicitatie in de wachtrij');
+  await postApplicationQueueTicketNotice(ctx,channel,dossier);
+  await lockQueuedApplication(ctx,channel,dossier);
   const updated=ctx.store.caseById(dossier.id),message=updated.message_id?await channel.messages.fetch(updated.message_id).catch(()=>null):null;
   if(message?.author.id===guild.members.me.id)await editIfChanged(message,{components:applicationControls(updated)});
   return await sendApplicationQueueNotice(ctx,guild,updated);

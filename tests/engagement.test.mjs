@@ -256,6 +256,7 @@ test('Lead kan ook vóór de ledenlimiet een sollicitatie in de privéwachtrij p
   const f=fixture(t),ctx=f.source,guild=f.guilds.get(ctx.config.guildId),channel=guild.channels.cache.get(ctx.store.caseById(f.open.id).channel_id);
   const category=guild.makeChannel('100000000000000901','Sollicitatie Wachtrij');category.type=4;ctx.store.setSetting('application-queue-category',category.id);
   channel.parentId=ctx.config.applicationCategoryId;channel.setParent=async(id)=>{channel.parentId=id;};
+  let lock;channel.permissionOverwrites.edit=async(user,permissions,reason)=>{lock={user,permissions,reason};};
   const staff=interaction(f,ACTOR,guild);staff.channelId=channel.id;
   let reply;staff.editReply=async payload=>{reply=payload;};
   await handleApplicationQueueButton(ctx,staff,f.open.id);
@@ -263,6 +264,8 @@ test('Lead kan ook vóór de ledenlimiet een sollicitatie in de privéwachtrij p
   const queued=ctx.store.caseById(f.open.id);
   assert.ok(queued.payload.queueAt);assert.equal(queued.payload.queueBy,ACTOR);assert.equal(queued.payload.queueNoticeSent,true);
   assert.equal(channel.name,'kai-mercier-wachtrij');assert.equal(channel.parentId,category.id);
+  assert.equal(lock.user,APPLICANT);assert.equal(lock.permissions.SendMessages,false);assert.equal(lock.permissions.SendMessagesInThreads,false);
+  assert.ok([...channel.posted.values()].some(message=>message.embeds?.[0]?.title==='Sollicitatie in de wachtrij'));
   const dm=f.calls.find(call=>call.method==='dm'&&call.user===APPLICANT);
   assert.ok(dm);assert.match(dm.payload.embeds[0].toJSON().description,/wachtrij.*neemt contact/i);assert.doesNotMatch(dm.payload.embeds[0].toJSON().description,/community zit momenteel vol/i);
   await assert.rejects(handleApplicationQueueButton(ctx,staff,f.open.id),/al in de wachtrij/);

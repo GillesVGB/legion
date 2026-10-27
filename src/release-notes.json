@@ -1,4 +1,7 @@
 {
+  "2.5.12": [
+    "Bij plaatsing in de sollicitatiewachtrij schrijft de bot nu ook een bericht in het ticket. De sollicitant kan het kanaal lezen maar niet meer reageren; Lead kan het dossier blijven behandelen."
+  ],
   "2.5.11": [
     "Lead kan sollicitaties ook in de wachtrij plaatsen als de community nog niet vol is. De DM vermeldt voortaan de actuele ledenstatus."
   ],

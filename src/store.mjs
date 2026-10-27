@@ -627,7 +627,7 @@ export class Store {
       const dossier=this.caseById(id);
       assertUser(dossier?.kind==='application'&&dossier.status==='open','Alleen een open sollicitatie kan in de wachtrij worden geplaatst.');
       if(dossier.payload.queueAt)return dossier;
-      const payload={...dossier.payload,queueAt:now,queueBy:actor,queueNoticeSent:false};
+      const payload={...dossier.payload,queueAt:now,queueBy:actor,queueNoticeSent:false,queueTicketNoticeSent:false};
       this.db.prepare('UPDATE cases SET payload=? WHERE id=? AND status=\'open\'').run(JSON.stringify(payload),id);
       this.audit('application.queued',actor,{id,owner:dossier.owner_id,queuedAt:now});
       return this.caseById(id);
@@ -639,6 +639,13 @@ export class Store {
     const payload={...dossier.payload,queueNoticeSent:true};delete payload.queueNoticeRetryAt;delete payload.queueNoticeError;
     this.db.prepare('UPDATE cases SET payload=? WHERE id=?').run(JSON.stringify(payload),id);
     this.audit('application.queue_dm_sent',this.config.clientId,{id,owner:dossier.owner_id});
+    return this.caseById(id);
+  }
+  markApplicationQueueTicketNoticeSent(id){
+    const dossier=this.caseById(id);if(!dossier||dossier.kind!=='application'||!dossier.payload.queueAt||dossier.payload.queueTicketNoticeSent)return dossier;
+    const payload={...dossier.payload,queueTicketNoticeSent:true};
+    this.db.prepare('UPDATE cases SET payload=? WHERE id=?').run(JSON.stringify(payload),id);
+    this.audit('application.queue_ticket_notice',this.config.clientId,{id,owner:dossier.owner_id});
     return this.caseById(id);
   }
   retryApplicationQueueNotice(id,error,now=Date.now()){
