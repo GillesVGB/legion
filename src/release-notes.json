@@ -1,4 +1,7 @@
 {
+  "2.5.11": [
+    "Lead kan sollicitaties ook in de wachtrij plaatsen als de community nog niet vol is. De DM vermeldt voortaan de actuele ledenstatus."
+  ],
   "2.5.10": [
     "De Wachtrij-knop bevestigt nu privé direct de uitkomst. Fouten, zoals een nog niet volle ledenlijst of ontbrekende kanaalrechten, worden meteen duidelijk aan Lead getoond."
   ],

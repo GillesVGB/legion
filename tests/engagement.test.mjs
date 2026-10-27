@@ -252,13 +252,11 @@ test('bij 25/25 wordt een sollicitatie met waarschuwing aangemaakt; aannemen wac
   ctx.recruitment=recruitmentState(24);await reconcileCases(ctx,guild);
   assert.equal(channel.posted.get(dossier.message_id).embeds[0].fields.some(field=>field.name==='Langere wachttijd'),false);
 });
-test('Lead kan een volle sollicitatie in de privéwachtrij plaatsen en de sollicitant krijgt automatisch een DM',async t=>{
+test('Lead kan ook vóór de ledenlimiet een sollicitatie in de privéwachtrij plaatsen en de sollicitant krijgt een juiste DM',async t=>{
   const f=fixture(t),ctx=f.source,guild=f.guilds.get(ctx.config.guildId),channel=guild.channels.cache.get(ctx.store.caseById(f.open.id).channel_id);
   const category=guild.makeChannel('100000000000000901','Sollicitatie Wachtrij');category.type=4;ctx.store.setSetting('application-queue-category',category.id);
   channel.parentId=ctx.config.applicationCategoryId;channel.setParent=async(id)=>{channel.parentId=id;};
   const staff=interaction(f,ACTOR,guild);staff.channelId=channel.id;
-  await assert.rejects(handleApplicationQueueButton(ctx,staff,f.open.id),/nog niet vol/);
-  for(let i=0;i<8;i++)guild.addMember(String(BigInt('100000000000000060')+BigInt(i)),`Extra ${i}`,[ctx.config.memberRoleId]);
   let reply;staff.editReply=async payload=>{reply=payload;};
   await handleApplicationQueueButton(ctx,staff,f.open.id);
   assert.match(reply.content,/in de wachtrij.*DM-bericht is verstuurd/);
@@ -266,7 +264,7 @@ test('Lead kan een volle sollicitatie in de privéwachtrij plaatsen en de sollic
   assert.ok(queued.payload.queueAt);assert.equal(queued.payload.queueBy,ACTOR);assert.equal(queued.payload.queueNoticeSent,true);
   assert.equal(channel.name,'kai-mercier-wachtrij');assert.equal(channel.parentId,category.id);
   const dm=f.calls.find(call=>call.method==='dm'&&call.user===APPLICANT);
-  assert.ok(dm);assert.match(dm.payload.embeds[0].toJSON().description,/vol.*wachtrij/i);
+  assert.ok(dm);assert.match(dm.payload.embeds[0].toJSON().description,/wachtrij.*neemt contact/i);assert.doesNotMatch(dm.payload.embeds[0].toJSON().description,/community zit momenteel vol/i);
   await assert.rejects(handleApplicationQueueButton(ctx,staff,f.open.id),/al in de wachtrij/);
 });
 test('sollicitanten zien alleen hun eigen status; binnenkomstvolgorde verandert na afhandelen en gesprek',async t=>{

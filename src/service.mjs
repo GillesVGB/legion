@@ -248,7 +248,7 @@ async function sendApplicationQueueNotice(ctx,guild,dossier){
   try{
     const member=await guild.members.fetch(current.owner_id);
     const card=embed(ctx.config,'Sollicitatie op de wachtrij',
-      `Bedankt voor je sollicitatie bij **${ctx.config.content.gangName}**. Op dit moment zitten we vol. We hebben je sollicitatie in de wachtrij geplaatst en laten het je weten zodra er plek is. Je hoeft niet opnieuw te solliciteren.`).setColor(0xF59E0B);
+      `Bedankt voor je sollicitatie bij **${ctx.config.content.gangName}**. Je sollicitatie is in de wachtrij geplaatst.\n\n${ctx.recruitment?.full?'De community zit momenteel vol. We laten het je weten zodra er plek is.':'De leiding behandelt je sollicitatie via de wachtrij en neemt contact met je op zodra er een update is.'}\n\nJe hoeft niet opnieuw te solliciteren.`).setColor(0xF59E0B);
     const nonce=createHash('sha256').update(`application-queue:${current.id}`).digest('hex').slice(0,24);
     await member.user.send({embeds:[card],allowedMentions:quiet,nonce,enforceNonce:true});
     ctx.store.markApplicationQueueNoticeSent(current.id);
@@ -280,7 +280,6 @@ export async function queueApplication(ctx,interaction,id){
   assertUser(dossier?.kind==='application'&&dossier.status==='open'&&dossier.channel_id===interaction.channelId,'Gebruik Wachtrij in het oorspronkelijke open sollicitatiekanaal.');
   assertUser(!dossier.payload.queueAt,'Deze sollicitant staat al in de wachtrij.');
   await refreshRecruitment(ctx,guild);
-  assertUser(ctx.recruitment.count>=ctx.config.recruitment.capacity,'De community is nog niet vol. Plaats de sollicitant in de wachtrij wanneer de ledenlimiet bereikt is.');
   const queued=ctx.store.markApplicationQueued(id,interaction.user.id);
   const delivered=await synchronizeQueuedApplication(ctx,guild,queued);
   return {delivered};
