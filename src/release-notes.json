@@ -1,4 +1,7 @@
 {
+  "2.5.10": [
+    "De Wachtrij-knop bevestigt nu privé direct de uitkomst. Fouten, zoals een nog niet volle ledenlijst of ontbrekende kanaalrechten, worden meteen duidelijk aan Lead getoond."
+  ],
   "2.5.9": [
     "Lead kan een sollicitant met één knop in de categorie Sollicitatie Wachtrij plaatsen. Het kanaal krijgt de naam gebruikersnaam-wachtrij en blijft privé voor de sollicitant en de leiding.",
     "De bot stuurt de sollicitant automatisch een DM dat de community vol zit en de aanvraag in de wachtrij staat. Mislukte DM's worden automatisch opnieuw geprobeerd.",

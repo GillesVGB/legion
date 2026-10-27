@@ -286,6 +286,13 @@ export async function queueApplication(ctx,interaction,id){
   return {delivered};
 }
 
+export async function handleApplicationQueueButton(ctx,interaction,id){
+  requireStaff(interaction,ctx.config);
+  await interaction.deferReply({flags:MessageFlags.Ephemeral});
+  const result=await queueApplication(ctx,interaction,id);
+  return interaction.editReply({content:result.delivered?'De sollicitant staat in de wachtrij. Het privé kanaal is verplaatst en het DM-bericht is verstuurd.':'De sollicitant staat in de wachtrij en het privé kanaal is verplaatst. De DM kon nog niet worden bezorgd; de bot probeert het opnieuw.',allowedMentions:quiet});
+}
+
 export async function syncApplicationQueue(ctx,guild){
   for(const dossier of ctx.store.pendingApplicationQueueNotices()){
     try{await synchronizeQueuedApplication(ctx,guild,dossier);}
