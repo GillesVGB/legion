@@ -1,4 +1,8 @@
 {
+  "2.5.13": [
+    "De sollicitatiewachtrij heeft nu een eigen privé kanaal #wachtrij met één bijgewerkte kaart per kandidaat en knoppen om te accepteren, af te wijzen of het ticket opnieuw te openen.",
+    "Wachtrijtickets krijgen nu de naam wachtrij-gebruikersnaam. Bij het opnieuw openen wordt het ticket teruggezet naar de gewone sollicitatiecategorie en kan de sollicitant weer reageren. Bestaande wachtrijdossiers worden na een herstart automatisch gesynchroniseerd."
+  ],
   "2.5.12": [
     "Bij plaatsing in de sollicitatiewachtrij schrijft de bot nu ook een bericht in het ticket. De sollicitant kan het kanaal lezen maar niet meer reageren; Lead kan het dossier blijven behandelen."
   ],

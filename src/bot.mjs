@@ -40,7 +40,7 @@ import {handleWarnAppealButton,handleWarnAppealCommand,syncWarnAppeals} from './
 import {warnAppealRow,warnAppealRows} from './warn-appeal-ui.mjs';
 import {syncWarningRoles} from './warning-roles.mjs';
 import { quiet, isStaff, requireStaff, requireAdmin, requireTickets, configureGuild, publishPanel,
-  createCase, requestCaseDecision, decideCase, handleApplicationQueueButton, syncApplicationQueue, startInterview, cleanupInterviews, cleanupClosedCases, warningMessage, staffLogChannel, warnLogChannel, writeWarnLog, reconcileCases } from './service.mjs';
+  createCase, requestCaseDecision, decideCase, handleApplicationQueueButton, handleApplicationQueueBoardButton, syncApplicationQueue, startInterview, cleanupInterviews, cleanupClosedCases, warningMessage, staffLogChannel, warnLogChannel, writeWarnLog, reconcileCases } from './service.mjs';
 
 const base = loadConfig();
 console.log(`Bakarov versie ${JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version}: dashboard ${base.dashboardPublicURL ? 'via hostingadres' : 'via tunnel'}.`);
@@ -307,6 +307,7 @@ async function handleButton(ctx, interaction) {
     });
     if (['askaccept', 'askreject', 'askclose'].includes(action)) return requestCaseDecision(ctx, interaction, id, { askaccept: 'accept', askreject: 'reject', askclose: 'close' }[action]);
   }
+  if(type==='queuecase')return locks.run(`${interaction.guildId}:case-decision:${id}`,()=>handleApplicationQueueBoardButton(ctx,interaction,action,id));
   if (type === 'case') {
     if (action === 'cancel') {
       assertUser(extra === interaction.user.id, 'Deze bevestiging is van een ander lid.');

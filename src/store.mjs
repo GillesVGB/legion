@@ -43,6 +43,10 @@ export class Store {
         payload TEXT NOT NULL, created_at INTEGER NOT NULL,
         closed_by TEXT, closed_at INTEGER
       );
+      CREATE TABLE IF NOT EXISTS application_queue_posts (
+        case_id TEXT PRIMARY KEY,channel_id TEXT NOT NULL,message_id TEXT,
+        status TEXT NOT NULL DEFAULT 'queued',updated_at INTEGER NOT NULL
+      );
       CREATE UNIQUE INDEX IF NOT EXISTS one_open_case ON cases(owner_id, kind) WHERE status IN ('creating','open');
       CREATE TABLE IF NOT EXISTS audit (
         id INTEGER PRIMARY KEY AUTOINCREMENT, event TEXT NOT NULL,
@@ -626,8 +630,8 @@ export class Store {
     return this.transaction(() => {
       const dossier=this.caseById(id);
       assertUser(dossier?.kind==='application'&&dossier.status==='open','Alleen een open sollicitatie kan in de wachtrij worden geplaatst.');
-      if(dossier.payload.queueAt)return dossier;
-      const payload={...dossier.payload,queueAt:now,queueBy:actor,queueNoticeSent:false,queueTicketNoticeSent:false};
+      if(dossier.payload.queueAt&&dossier.payload.queueStatus!=='released')return dossier;
+      const payload={...dossier.payload,queueAt:now,queueStatus:'queued',queueBy:actor,queueNoticeSent:false,queueTicketNoticeSent:false};
       this.db.prepare('UPDATE cases SET payload=? WHERE id=? AND status=\'open\'').run(JSON.stringify(payload),id);
       this.audit('application.queued',actor,{id,owner:dossier.owner_id,queuedAt:now});
       return this.caseById(id);
@@ -635,28 +639,37 @@ export class Store {
   }
   markApplicationQueueNoticeSent(id) {
     const dossier=this.caseById(id);
-    if(!dossier||dossier.kind!=='application'||!dossier.payload.queueAt||dossier.payload.queueNoticeSent)return dossier;
+    if(!dossier||dossier.kind!=='application'||!dossier.payload.queueAt||dossier.payload.queueStatus==='released'||dossier.payload.queueNoticeSent)return dossier;
     const payload={...dossier.payload,queueNoticeSent:true};delete payload.queueNoticeRetryAt;delete payload.queueNoticeError;
     this.db.prepare('UPDATE cases SET payload=? WHERE id=?').run(JSON.stringify(payload),id);
     this.audit('application.queue_dm_sent',this.config.clientId,{id,owner:dossier.owner_id});
     return this.caseById(id);
   }
   markApplicationQueueTicketNoticeSent(id){
-    const dossier=this.caseById(id);if(!dossier||dossier.kind!=='application'||!dossier.payload.queueAt||dossier.payload.queueTicketNoticeSent)return dossier;
+    const dossier=this.caseById(id);if(!dossier||dossier.kind!=='application'||!dossier.payload.queueAt||dossier.payload.queueStatus==='released'||dossier.payload.queueTicketNoticeSent)return dossier;
     const payload={...dossier.payload,queueTicketNoticeSent:true};
     this.db.prepare('UPDATE cases SET payload=? WHERE id=?').run(JSON.stringify(payload),id);
     this.audit('application.queue_ticket_notice',this.config.clientId,{id,owner:dossier.owner_id});
     return this.caseById(id);
   }
   retryApplicationQueueNotice(id,error,now=Date.now()){
-    const dossier=this.caseById(id);if(!dossier||!dossier.payload.queueAt||dossier.payload.queueNoticeSent)return dossier;
+    const dossier=this.caseById(id);if(!dossier||!dossier.payload.queueAt||dossier.payload.queueStatus==='released'||dossier.payload.queueNoticeSent)return dossier;
     const delay=String(error)==='50007'?60*60*1000:5*60*1000;
     const payload={...dossier.payload,queueNoticeRetryAt:now+delay,queueNoticeError:String(error).slice(0,80)};
     this.db.prepare('UPDATE cases SET payload=? WHERE id=?').run(JSON.stringify(payload),id);
     this.audit('application.queue_dm_failed',this.config.clientId,{id,owner:dossier.owner_id,error:String(error)});
     return this.caseById(id);
   }
-  pendingApplicationQueueNotices(now=Date.now()) { return this.activeCases().filter(item=>item.kind==='application'&&item.payload.queueAt&&!item.payload.queueNoticeSent&&(item.payload.queueNoticeRetryAt||0)<=now); }
+  pendingApplicationQueueNotices(now=Date.now()) { return this.activeCases().filter(item=>item.kind==='application'&&item.payload.queueAt&&item.payload.queueStatus!=='released'&&!item.payload.queueNoticeSent&&(item.payload.queueNoticeRetryAt||0)<=now); }
+  queuedApplications() { return this.activeCases().filter(item=>item.kind==='application'&&item.payload.queueAt&&item.payload.queueStatus!=='released'); }
+  applicationQueuePost(id) { return this.db.prepare('SELECT * FROM application_queue_posts WHERE case_id=?').get(id)||null; }
+  applicationQueuePosts() { return this.db.prepare('SELECT * FROM application_queue_posts').all(); }
+  saveApplicationQueuePost(id,channelId,messageId,status='queued') {
+    this.db.prepare(`INSERT INTO application_queue_posts(case_id,channel_id,message_id,status,updated_at) VALUES(?,?,?,?,?)
+      ON CONFLICT(case_id) DO UPDATE SET channel_id=excluded.channel_id,message_id=COALESCE(excluded.message_id,application_queue_posts.message_id),status=excluded.status,updated_at=excluded.updated_at`)
+      .run(id,channelId,messageId,status,Date.now());
+    return this.applicationQueuePost(id);
+  }
   activeCases() { return this.db.prepare("SELECT * FROM cases WHERE status IN ('creating','open')").all().map(x => this.decodeCase(x)); }
   bindCase(id, channel) { this.db.prepare('UPDATE cases SET channel_id=? WHERE id=?').run(channel, id); }
   openCase(id, message) {

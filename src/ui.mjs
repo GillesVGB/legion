@@ -58,7 +58,7 @@ export function applicationProgress(config, draft) {
 export const applicationControls = dossier => [
   row(button(`application:interview:${dossier.id}`, 'Gesprek starten', ButtonStyle.Primary),
     button(`application:status:${dossier.id}`, 'Sollicitatiestatus'),
-    ...(!dossier.payload?.queueAt ? [button(`application:queue:${dossier.id}`, 'Wachtrij', ButtonStyle.Secondary)] : [])),
+    ...(!dossier.payload?.queueAt||dossier.payload?.queueStatus==='released' ? [button(`application:queue:${dossier.id}`, 'Wachtrij', ButtonStyle.Secondary)] : [])),
   row(button(`application:askaccept:${dossier.id}`, 'Aannemen', ButtonStyle.Success),
     button(`application:askreject:${dossier.id}`, 'Afwijzen', ButtonStyle.Danger),
     button(`application:askclose:${dossier.id}`, 'Sollicitatie sluiten'))

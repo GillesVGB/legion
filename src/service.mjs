@@ -237,9 +237,73 @@ async function applicationQueueCategory(ctx, guild) {
   return category;
 }
 
+async function applicationQueueBoardChannel(ctx,guild,category){
+  const saved=ctx.store.setting('application-queue-board-channel');
+  let channel=saved?await guild.channels.fetch(saved).catch(error=>{if(error.code===10003)return null;throw error;}):null;
+  if(channel)assertUser(channel.guildId===guild.id&&channel.type===ChannelType.GuildText&&channel.parentId===category.id,'Het ingestelde wachtrijbord hoort niet bij de Sollicitatie Wachtrij-categorie.');
+  if(!channel){
+    const channels=await guild.channels.fetch();
+    channel=channels.find(item=>item?.type===ChannelType.GuildText&&item.parentId===category.id&&item.name==='wachtrij')||null;
+  }
+  if(!channel){
+    assertUser(guild.members.me.permissions.has([P.ManageChannels,P.ManageRoles]),'De bot mist Kanalen beheren of Rollen beheren om het wachtrijkanaal te maken.');
+    channel=await guild.channels.create({name:'wachtrij',type:ChannelType.GuildText,parent:category.id,
+      permissionOverwrites:[...category.permissionOverwrites.cache.values()].map(({id,allow,deny,type})=>({id,allow,deny,type})),
+      reason:'Bakarov sollicitatiewachtrij overzicht'});
+  }
+  if(channel.parentId===category.id&&channel.permissionsLocked===false)await channel.lockPermissions();
+  assertUser(channel.permissionsFor(guild.members.me)?.has([P.ViewChannel,P.SendMessages,P.EmbedLinks,P.ReadMessageHistory]),'De bot mist rechten in het kanaal #wachtrij.');
+  ctx.store.setSetting('application-queue-board-channel',channel.id);
+  return channel;
+}
+
+async function applicationQueueCard(ctx,guild,dossier,sourceChannel){
+  const member=await guild.members.fetch(dossier.owner_id).catch(()=>null);
+  const card=embed(ctx.config,'📋 Sollicitatie in de wachtrij',`**Sollicitant:** <@${dossier.owner_id}>${member?` (${safeText(member.user.username)})`:''}\n**In wachtrij sinds:** <t:${Math.floor(dossier.payload.queueAt/1000)}:R>\n**Dossier:** <#${sourceChannel.id}>\n**Geplaatst door:** <@${dossier.payload.queueBy}>`).setColor(0xF59E0B);
+  let answers='';
+  if(dossier.payload.template){
+    const history=await sourceChannel.messages.fetch({limit:100}).catch(()=>null);
+    answers=history?[...history.values()].filter(message=>message.author.id===dossier.owner_id).sort((a,b)=>a.createdTimestamp-b.createdTimestamp)
+      .map(message=>[message.content?.trim(),...message.attachments.map(file=>`[bijlage: ${file.name||'bestand'}]`)].filter(Boolean).join('\n')).filter(Boolean).join('\n\n'):'';
+  }else{
+    answers=Object.entries(dossier.payload).filter(([key,value])=>key!=='template'&&typeof value==='string'&&value.trim())
+      .map(([key,value])=>`**${safeText(key)}:** ${safeText(value)}`).join('\n');
+  }
+  if(answers)card.addFields({name:'Sollicitatie / antwoorden',value:safeText(answers).slice(0,1024)});
+  else card.addFields({name:'Sollicitatie / antwoorden',value:'Antwoorden staan in het ticket. Open het dossier via de knop hieronder.'});
+  return card;
+}
+
+async function upsertApplicationQueueCard(ctx,guild,dossier,sourceChannel){
+  const category=await applicationQueueCategory(ctx,guild),board=await applicationQueueBoardChannel(ctx,guild,category);
+  let saved=ctx.store.applicationQueuePost(dossier.id),message=saved?.message_id?await board.messages.fetch(saved.message_id).catch(()=>null):null;
+  if(!message){
+    const marker=`Bakarov • Wachtrij ${dossier.id}`,history=await board.messages.fetch({limit:100});
+    message=[...history.values()].find(item=>item.author.id===guild.members.me.id&&item.embeds.some(card=>card.footer?.text===marker))||null;
+  }
+  const card=await applicationQueueCard(ctx,guild,dossier,sourceChannel);card.setFooter({text:`Bakarov • Wachtrij ${dossier.id}`});
+  const components=[row(button(`queuecase:accept:${dossier.id}`,'Accepteren',ButtonStyle.Success),button(`queuecase:reject:${dossier.id}`,'Afwijzen',ButtonStyle.Danger),button(`queuecase:reopen:${dossier.id}`,'Ticket heropenen',ButtonStyle.Primary)),
+    row(new ButtonBuilder().setLabel('Ticket openen').setStyle(ButtonStyle.Link).setURL(`https://discord.com/channels/${guild.id}/${sourceChannel.id}`))];
+  if(message)await editIfChanged(message,{embeds:[card],components,allowedMentions:quiet});
+  else message=await board.send({embeds:[card],components,allowedMentions:quiet});
+  ctx.store.saveApplicationQueuePost(dossier.id,board.id,message.id,'queued');
+}
+
+async function editApplicationQueueCard(ctx,guild,dossier,status){
+  const saved=ctx.store.applicationQueuePost(dossier.id);if(!saved)return;
+  const board=await guild.channels.fetch(saved.channel_id).catch(()=>null);if(!board?.isTextBased())return;
+  const message=saved.message_id?await board.messages.fetch(saved.message_id).catch(()=>null):null;if(!message)return;
+  const labels={accepted:'✅ Sollicitatie geaccepteerd',rejected:'❌ Sollicitatie afgewezen',released:'🔓 Ticket heropend',closed:'📁 Sollicitatie gesloten',failed:'⚠️ Dossier niet meer beschikbaar'};
+  const old=message.embeds[0],card=old?EmbedBuilder.from(old):embed(ctx.config,'Sollicitatie wachtrij',`Dossier \`${dossier.id}\``);
+  card.setTitle(labels[status]||'Sollicitatie bijgewerkt').setColor(status==='accepted'?0x22C55E:status==='rejected'?0xEF4444:0x5865F2)
+    .setFooter({text:`Bakarov • Wachtrij ${dossier.id}`});
+  await message.edit({embeds:[card],components:[],allowedMentions:quiet});
+  ctx.store.saveApplicationQueuePost(dossier.id,board.id,message.id,status);
+}
+
 function queueChannelName(user){
   const applicationName=caseChannelName('application',user),username=applicationName.slice('sollicitatie-'.length);
-  return `${username.slice(0,90).replace(/-+$/g,'')||'gebruiker'}-wachtrij`;
+  return `wachtrij-${username.slice(0,90).replace(/-+$/g,'')||'gebruiker'}`;
 }
 
 async function sendApplicationQueueNotice(ctx,guild,dossier){
@@ -290,6 +354,7 @@ async function synchronizeQueuedApplication(ctx,guild,dossier){
   await lockQueuedApplication(ctx,channel,dossier);
   const updated=ctx.store.caseById(dossier.id),message=updated.message_id?await channel.messages.fetch(updated.message_id).catch(()=>null):null;
   if(message?.author.id===guild.members.me.id)await editIfChanged(message,{components:applicationControls(updated)});
+  await upsertApplicationQueueCard(ctx,guild,updated,channel);
   return await sendApplicationQueueNotice(ctx,guild,updated);
 }
 
@@ -299,7 +364,7 @@ export async function queueApplication(ctx,interaction,id){
   assertUser(ctx.config.ticketsEnabled,'De sollicitatiewachtrij is alleen beschikbaar in de communityserver.');
   const dossier=await requireOpenCase(ctx,interaction,id);
   assertUser(dossier?.kind==='application'&&dossier.status==='open'&&dossier.channel_id===interaction.channelId,'Gebruik Wachtrij in het oorspronkelijke open sollicitatiekanaal.');
-  assertUser(!dossier.payload.queueAt,'Deze sollicitant staat al in de wachtrij.');
+  assertUser(dossier.payload.queueStatus==='released'||!dossier.payload.queueAt,'Deze sollicitant staat al in de wachtrij.');
   await refreshRecruitment(ctx,guild);
   const queued=ctx.store.markApplicationQueued(id,interaction.user.id);
   const delivered=await synchronizeQueuedApplication(ctx,guild,queued);
@@ -314,10 +379,45 @@ export async function handleApplicationQueueButton(ctx,interaction,id){
 }
 
 export async function syncApplicationQueue(ctx,guild){
-  for(const dossier of ctx.store.pendingApplicationQueueNotices()){
+  for(const dossier of ctx.store.queuedApplications()){
     try{await synchronizeQueuedApplication(ctx,guild,dossier);}
     catch(error){ctx.store.audit('application.queue_retry_failed',guild.members.me.id,{id:dossier.id,error:String(error.code||error.name)});}
   }
+  for(const post of ctx.store.applicationQueuePosts().filter(item=>item.status==='queued')){
+    const dossier=ctx.store.caseById(post.case_id);
+    if(dossier&&dossier.status!=='open')await editApplicationQueueCard(ctx,guild,dossier,dossier.status==='accepted'?'accepted':dossier.status==='rejected'?'rejected':dossier.status==='failed'?'failed':'closed');
+  }
+}
+
+export async function handleApplicationQueueBoardButton(ctx,interaction,action,id){
+  requireStaff(interaction,ctx.config);
+  assertUser(['accept','reject','reopen'].includes(action),'Deze wachtrijactie bestaat niet.');
+  const dossier=ctx.store.caseById(id),saved=ctx.store.applicationQueuePost(id);
+  assertUser(dossier&&dossier.channel_id,'De dossiergegevens ontbreken.');
+  assertUser(dossier?.kind==='application'&&dossier.status==='open'&&dossier.payload.queueAt&&dossier.payload.queueStatus!=='released'&&saved?.status==='queued'&&saved.message_id===interaction.message.id&&saved.channel_id===interaction.channelId,'Deze sollicitatie staat niet meer open in de wachtrij.');
+  await interaction.deferReply({flags:MessageFlags.Ephemeral});
+  const guild=interaction.guild,channel=await guild.channels.fetch(dossier.channel_id).catch(()=>null);
+  assertUser(channel?.type===ChannelType.GuildText&&channel.topic?.includes(`dossier:${id} | application`),'Het oorspronkelijke sollicitatieticket is niet beschikbaar.');
+  if(action==='reopen'){
+    const owner=await guild.members.fetch(dossier.owner_id).catch(()=>null);
+    assertUser(owner,'De sollicitant is niet meer in de communityserver.');
+    await channel.setParent(ctx.config.applicationCategoryId,{lockPermissions:false,reason:'Sollicitatie opnieuw oppakken vanuit wachtrij'});
+    await channel.setName(caseChannelName('application',owner.user),'Sollicitatieticket heropend');
+    await channel.permissionOverwrites.edit(dossier.owner_id,{ViewChannel:true,SendMessages:true,ReadMessageHistory:true,EmbedLinks:true,AttachFiles:true,
+      AddReactions:null,SendMessagesInThreads:null,CreatePublicThreads:null,CreatePrivateThreads:null},'Sollicitant mag opnieuw reageren na heropenen');
+    const payload={...dossier.payload,queueStatus:'released',queueReleasedAt:Date.now(),queueReleasedBy:interaction.user.id};
+    ctx.store.db.prepare('UPDATE cases SET payload=? WHERE id=? AND status=\'open\'').run(JSON.stringify(payload),id);
+    const original=dossier.message_id?await channel.messages.fetch(dossier.message_id).catch(()=>null):null;
+    if(original?.author.id===guild.members.me.id)await original.edit({components:applicationControls(ctx.store.caseById(id))});
+    await channel.send({content:`<@${dossier.owner_id}>`,embeds:[embed(ctx.config,'Sollicitatie opnieuw in behandeling',`De leiding heeft je sollicitatie uit de wachtrij gehaald en pakt je dossier opnieuw op. Je kunt hieronder weer reageren.`).setColor(0x5865F2)],allowedMentions:{parse:[],users:[dossier.owner_id]}});
+    await editApplicationQueueCard(ctx,guild,dossier,'released');
+    return interaction.editReply({content:`Het ticket is heropend en verplaatst naar <#${ctx.config.applicationCategoryId}>. De sollicitant kan weer reageren.`,allowedMentions:quiet});
+  }
+  const proxy=new Proxy(interaction,{get(target,key){if(key==='channel')return channel;if(key==='channelId')return channel.id;const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;}});
+  await decideCase(ctx,proxy,id,action);
+  const finished=ctx.store.caseById(id);
+  await editApplicationQueueCard(ctx,guild,finished,action==='accept'?'accepted':'rejected');
+  return;
 }
 
 export async function startInterview(ctx, interaction, id) {
@@ -455,7 +555,7 @@ export async function reconcileCases(ctx, guild) {
     if (channel.guildId !== guild.id || channel.type !== ChannelType.GuildText || !channel.topic?.includes(`dossier:${dossier.id} |`)) continue;
     const owner = await guild.members.fetch(dossier.owner_id).catch(() => null);
     if (owner) {
-      if(dossier.kind==='application'&&dossier.payload.queueAt)await synchronizeQueuedApplication(ctx,guild,dossier);
+      if(dossier.kind==='application'&&dossier.payload.queueAt&&dossier.payload.queueStatus!=='released')await synchronizeQueuedApplication(ctx,guild,dossier);
       else {
         const name = caseChannelName(dossier.kind, owner.user);
         if (channel.name !== name) await channel.setName(name, 'Bakarov ticketnaam met gebruikersnaam');
