@@ -1,6 +1,6 @@
 # Bakarov — Discord-bot voor Future RP
 
-## Beveiligingssysteem — 2.5.19
+## Beveiligingssysteem — 2.5.20
 
 De beveiliging staat standaard aan in beide servers. In de hoofdserver **`1555685630640652338`** is de **+-rol `1555685630770413643`** de uitzonderingsrol; in de community **`1555726440933363753`** is dit rol **`1555726440983437504`**. Alleen leden met de uitzonderingsrol van hun eigen server zijn vrijgesteld van automatische beveiligingsacties.
 
@@ -16,7 +16,9 @@ Beveiligingsmeldingen van de hoofdserver gaan naar **`1555685637129109586`**. De
 
 **Uitnodigingen aanmaken** is standaard toegestaan in de community, ook zonder uitzonderingsrol. Via **Uitnodigingen maken toestaan** in de beveiligingsmodule kun je dit per server aanpassen. De hoofdserver behoudt standaard de beveiliging tegen onbevoegde uitnodigingsaanmaak. Verwijderen van uitnodigingen blijft onder de beschermde beheeracties vallen; berichten met uitnodigingslinks volgen het linkfilter.
 
-**YouTube en Medal in media.** In de community zijn youtube.com-, youtu.be- en medal.tv-links toegestaan in kanaal **`1555726441944064011`**. Dit geldt ook voor echte subdomeinen en de ingesloten linkvoorbeelden. Toegestane medialinks tellen niet mee voor een linkban; andere links, gemengde berichten en links in andere kanalen volgen het gewone filter. Spam-, tag- en scheldcontroles blijven gelden. Een communityadministrator kan de bestemming wijzigen via **Modules instellen → Bestemmingskanalen → Media: YouTube & Medal**. De bot accepteert alleen een tekstkanaal binnen dezelfde community en bewaart de keuze bij herstarts.
+**YouTube en Medal per server.** In de hoofdserver **`1555685630640652338`** mogen youtube.com-, youtu.be- en medal.tv-links in alle tekstkanalen worden geplaatst. In de community zijn ze toegestaan in mediakanaal **`1555726441944064011`**. Dit geldt ook voor echte subdomeinen en de ingesloten linkvoorbeelden. Toegestane medialinks tellen niet mee voor een linkban; andere links en gemengde berichten volgen het gewone filter. Spam-, tag- en scheldcontroles blijven gelden. Een communityadministrator kan de bestemming wijzigen via **Modules instellen → Bestemmingskanalen → Media: YouTube & Medal**. De bot accepteert alleen een tekstkanaal binnen dezelfde community en bewaart de keuze bij herstarts.
+
+**Changelog 2.5.18 inhalen.** Vanaf 2.5.20 controleert de bot ook de expliciet opnieuw gevraagde aankondiging van 2.5.18 en plaatst die alsnog als ze nog niet was verstuurd. De aankondiging van de huidige versie wordt ook verwerkt. Beide berichten worden bij herstarts hergebruikt.
 
 De standaarddrempels en time-outs zijn aanpasbaar via het dashboard. Beveiliging vereist voor de bot **View Audit Log**, **Manage Messages**, **Moderate Members** en **Ban Members**; zet de botrol ook boven de rollen die hij moet kunnen straffen. Als deze rechten of de uitzonderingsrol ontbreken, meldt de bot dat in de console en bij **Botstatus**. Discord registreert alleen uitgevoerde acties; een geblokkeerde, mislukte poging is niet zichtbaar in het auditlog.
 

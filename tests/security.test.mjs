@@ -14,8 +14,8 @@ function fixture({trusted=false,overrides={}}={}){
   return{ctx,guild,member,bans,timeouts,audits,message};
 }
 
-const COMMUNITY='1555726440933363753',MEDIA_CHANNEL='1555726441944064011';
-function mediaFixture({guildId=COMMUNITY,channelId=MEDIA_CHANNEL}={}){
+const MAIN='1555685630640652338',COMMUNITY='1555726440933363753',MEDIA_CHANNEL='1555726441944064011';
+function mediaFixture({guildId=COMMUNITY,channelId=guildId===MAIN?'1555685632704249932':MEDIA_CHANNEL}={}){
   const config=loadConfig({},false),f=fixture(),message=f.message;
   f.ctx.config={...config,...config.guilds.find(guild=>guild.guildId===guildId),operations:{security:{}}};f.guild.id=guildId;
   f.message=(...args)=>Object.assign(message(...args),{channelId});
@@ -37,28 +37,48 @@ test('a dotted member name is not treated as a website by the media exception',a
   assert.equal(message.deleted,undefined);assert.equal(f.bans.length,0);
 });
 
-test('YouTube and Medal links and real subdomains are allowed only in the configured community media channel',async()=>{
+test('YouTube and Medal links and real subdomains are allowed in the configured community media channel but not other community channels',async()=>{
   for(const url of ['https://www.youtube.com/watch?v=video123','https://m.youtube.com/watch?v=video123','https://youtu.be/video123','https://www.medal.tv/games/example/clips/video123','https://clips.medal.tv/video123','www.youtube.com/watch?v=video123','www.medal.tv/clips/video123','youtube.com/watch?v=video123','youtu.be/video123','medal.tv/games/example/clips/video123']){
     resetSecurityState();const f=mediaFixture(),message=f.message(url);assert.equal(f.ctx.config.mediaChannelId,MEDIA_CHANNEL);
     await handleSecurityMessage(f.ctx,message,1000);assert.equal(message.deleted,undefined,url);assert.equal(f.bans.length,0,url);
   }
-  for(const options of [{channelId:'1555726441759375398'},{guildId:'1555685630640652338'}]){
+  for(const options of [{channelId:'1555726441759375398'}]){
     resetSecurityState();const f=mediaFixture(options);f.ctx.config.mediaChannelId=MEDIA_CHANNEL;
     const message=f.message('https://youtu.be/video123');await handleSecurityMessage(f.ctx,message,1000);assert.equal(message.deleted,true);
   }
 });
 
+test('main guild permits raw and embedded YouTube and Medal links in different channels',async()=>{
+  const examples=[
+    ['1555685632704249932','https://www.youtube.com/watch?v=video123',[{url:'https://www.youtube.com/watch?v=video123'}]],
+    ['1555685633266163793','https://medal.tv/clips/video123',[{url:'https://medal.tv/clips/video123'}]],
+    ['1555685632704249932','Bekijk deze video',[{url:'https://youtu.be/video123'}]],
+    ['1555685633266163793','https://youtu.be/video123 https://www.medal.tv/clips/other123',[]]
+  ];
+  for(const [channelId,content,embeds]of examples){resetSecurityState();const f=mediaFixture({guildId:MAIN,channelId}),message=f.message(content);message.embeds=embeds;
+    assert.equal(f.ctx.config.mediaChannelId,undefined);await handleSecurityMessage(f.ctx,message,1000);assert.equal(message.deleted,undefined,content);assert.equal(f.bans.length,0);}
+});
+
+test('media exceptions reject mismatched guild contexts and unknown guilds even when the media channel matches',async()=>{
+  for(const [configuredGuild,actualGuild]of [[MAIN,COMMUNITY],[COMMUNITY,MAIN],['1555685630640652399','1555685630640652399']]){
+    resetSecurityState();const f=mediaFixture({guildId:MAIN,channelId:MEDIA_CHANNEL});f.ctx.config.guildId=configuredGuild;f.ctx.config.mediaChannelId=MEDIA_CHANNEL;f.guild.id=actualGuild;
+    const message=f.message('https://youtu.be/video123');await handleSecurityMessage(f.ctx,message,1000);assert.equal(message.deleted,true,`${configuredGuild}/${actualGuild}`);
+  }
+});
+
 test('media exceptions reject spoofed hosts, credentials, custom ports, non-web schemes and YouTube redirect endpoints',async()=>{
   const urls=['https://youtube.com.evil.com/watch?v=video123','https://medal.tv.evil.com/video123','https://youtube.com@evil.com/video123','https://name:password@youtube.com/watch?v=video123','https://youtube.com:8443/watch?v=video123','ftp://youtube.com/video123','https://www.youtube.com/redirect?q=https%3A%2F%2Fevil.com'];
-  for(const url of urls){resetSecurityState();const f=mediaFixture(),message=f.message(url);await handleSecurityMessage(f.ctx,message,1000);assert.equal(message.deleted,true,url);}
+  for(const guildId of [COMMUNITY,MAIN])for(const url of urls){resetSecurityState();const f=mediaFixture({guildId}),message=f.message(url);await handleSecurityMessage(f.ctx,message,1000);assert.equal(message.deleted,true,`${guildId}: ${url}`);}
 });
 
 test('mixed media messages retain link penalties only for prohibited links and allowed media never counts toward the link ban threshold',async()=>{
-  resetSecurityState();const f=mediaFixture();
-  for(let i=0;i<3;i++){const allowed=f.message(`https://youtu.be/video${i} https://medal.tv/clips/video${i}`);await handleSecurityMessage(f.ctx,allowed,1000+i*20000);assert.equal(allowed.deleted,undefined);}
-  const mixed=f.message('https://youtu.be/allowed https://example.org/prohibited');await handleSecurityMessage(f.ctx,mixed,61000);
-  assert.equal(mixed.deleted,true);assert.equal(f.bans.length,0);
-  const prohibited=f.message('https://example.net/second');await handleSecurityMessage(f.ctx,prohibited,81000);assert.equal(prohibited.deleted,true);assert.equal(f.bans.length,1);
+  for(const guildId of [COMMUNITY,MAIN]){
+    resetSecurityState();const f=mediaFixture({guildId});
+    for(let i=0;i<3;i++){const allowed=f.message(`https://youtu.be/video${i} https://medal.tv/clips/video${i}`);await handleSecurityMessage(f.ctx,allowed,1000+i*20000);assert.equal(allowed.deleted,undefined);}
+    const mixed=f.message('https://youtu.be/allowed https://example.org/prohibited');await handleSecurityMessage(f.ctx,mixed,61000);
+    assert.equal(mixed.deleted,true);assert.equal(f.bans.length,0);
+    const prohibited=f.message('https://example.net/second');await handleSecurityMessage(f.ctx,prohibited,81000);assert.equal(prohibited.deleted,true);assert.equal(f.bans.length,1);
+  }
 });
 
 test('media embeds follow the same allowlist and an unrelated embed cannot hide behind an allowed video link',async()=>{
@@ -73,13 +93,15 @@ test('media embeds follow the same allowlist and an unrelated embed cannot hide 
 });
 
 test('allowed media links still receive ordinary mention, profanity and repeated-message enforcement',async()=>{
-  resetSecurityState();const f=mediaFixture(),mentions=f.message('https://youtu.be/video123',{users:4});
-  await handleSecurityMessage(f.ctx,mentions,1000);assert.equal(mentions.deleted,true);assert.equal(f.bans.length,1);
-  resetSecurityState();const g=mediaFixture(),curse=g.message('Dit is kut https://youtu.be/video123');await handleSecurityMessage(g.ctx,curse,1000);
-  assert.equal(curse.deleted,true);assert.equal(g.timeouts.length,1);
-  resetSecurityState();const h=mediaFixture();let repeated;
-  for(let i=0;i<3;i++){repeated=h.message('https://youtu.be/video123');await handleSecurityMessage(h.ctx,repeated,1000+i*1000);}
-  assert.equal(repeated.deleted,true);assert.equal(h.timeouts.length,1);assert.equal(h.bans.length,0);
+  for(const guildId of [COMMUNITY,MAIN]){
+    resetSecurityState();const f=mediaFixture({guildId}),mentions=f.message('https://youtu.be/video123',{users:4});
+    await handleSecurityMessage(f.ctx,mentions,1000);assert.equal(mentions.deleted,true);assert.equal(f.bans.length,1);
+    resetSecurityState();const g=mediaFixture({guildId}),curse=g.message('Dit is kut https://youtu.be/video123');await handleSecurityMessage(g.ctx,curse,1000);
+    assert.equal(curse.deleted,true);assert.equal(g.timeouts.length,1);
+    resetSecurityState();const h=mediaFixture({guildId});let repeated;
+    for(let i=0;i<3;i++){repeated=h.message('https://youtu.be/video123');await handleSecurityMessage(h.ctx,repeated,1000+i*1000);}
+    assert.equal(repeated.deleted,true);assert.equal(h.timeouts.length,1);assert.equal(h.bans.length,0);
+  }
 });
 
 test('up to three tags pass; four tags and mass mentions are removed and banned',async()=>{

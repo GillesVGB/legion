@@ -27,7 +27,7 @@ import {handleAbsenceCommand,handleAbsenceButton,syncAbsences} from './absence.m
 import {fishBookMessage,handleFishBookButton} from './fish-book.mjs';
 import {handleBotStatus} from './bot-status.mjs';
 import {recordInteraction,flushAuditLogs} from './audit-log.mjs';
-import {announceRelease} from './release-announcements.mjs';
+import {announceReleases} from './release-announcements.mjs';
 import {publishAbsencePanel,handleAbsencePanel,handleAbsenceSelection} from './absence-panel.mjs';
 import {handleMemberOverview} from './member-overview.mjs';
 import {runMaintenanceJobs} from './maintenance.mjs';
@@ -560,7 +560,7 @@ async function performMaintenance(){
       if(ctx.config.gangpot)jobs.push(['gangpot',()=>syncGangpot(ctx,client,Date.now(),contexts)]);
       jobs.push(['afmeldingen',()=>syncAbsences(ctx,guild)]);
       if(ctx.config.absencePanelChannelId)jobs.push(['afmeldpaneel',()=>publishAbsencePanel(ctx,guild)]);
-      jobs.push(['changelog',()=>announceRelease(ctx,guild)],['gesprekken',()=>cleanupInterviews(ctx,guild)],['check-ins',()=>syncActivityChecks(ctx,guild)],['planning',()=>syncActivities(ctx,guild)],['promoties',()=>syncPromotions(ctx,guild)]);
+      jobs.push(['changelog',()=>announceReleases(ctx,guild)],['gesprekken',()=>cleanupInterviews(ctx,guild)],['check-ins',()=>syncActivityChecks(ctx,guild)],['planning',()=>syncActivities(ctx,guild)],['promoties',()=>syncPromotions(ctx,guild)]);
       if(ctx.config.roster?.roleIds?.length)jobs.push(['proefperioden',()=>syncProbationReviews(ctx,guild)]);
       if(ctx.config.gangpot)jobs.push(['weekoverzicht',()=>syncWeeklyReports(ctx,guild)]);
       if(ctx.config.guildId==='1555685630640652338')jobs.push(['waarschuwingsrollen',()=>syncWarningRoles(ctx,guild)]);

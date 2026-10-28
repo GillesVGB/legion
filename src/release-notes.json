@@ -1,4 +1,11 @@
 {
+  "2.5.20": [
+    "🎬 **YouTube en Medal mogen overal in de hoofdserver**\nLeden mogen YouTube-, youtu.be- en Medal-links plaatsen in alle tekstkanalen van hoofdserver `1555685630640652338`. Hiervoor is geen uitzonderingsrol nodig. Ook meerdere geldige medialinks in één bericht en hun ingesloten voorbeelden zijn toegestaan.",
+    "📍 **Community: alleen in media**\nIn communityserver `1555726440933363753` zijn deze links alleen toegestaan in mediakanaal `1555726441944064011`, of het andere mediakanaal dat een administrator via het dashboard instelt. Buiten dat kanaal blijft het gewone linkfilter gelden.",
+    "🛡️ **Andere links en misleidende adressen blijven gefilterd**\nDe bot controleert de echte website achter elke link. Een YouTube-naam als onderdeel van een ander domein geeft geen uitzondering. Bevat een bericht ook een verboden link, dan gelden voor die link de bestaande verwijder- en banregels. Geldige YouTube- en Medal-links tellen niet mee als verboden linkbericht.",
+    "💬 **Spam, schelden en tagspam blijven gecontroleerd**\nDe toestemming geldt voor de link. De overige berichtcontroles blijven actief, zowel in de hoofdserver als in community-media. Beveiligingsmeldingen worden gelogd in het logkanaal van de betreffende server.",
+    "📝 **Ontbrekende changelog 2.5.18 alsnog plaatsen**\nDe bot controleert bij de volgende opstart en onderhoudsronde ook de changelog van 2.5.18. Ontbreekt die aankondiging, dan wordt hij alsnog in het ingestelde updatekanaal geplaatst. Een bestaand updatebericht wordt hergebruikt, zodat herstarts geen dubbele aankondigingen maken."
+  ],
   "2.5.19": [
     "🎬 **YouTube en Medal toegestaan in community-media**\nLeden mogen YouTube- en Medal-links plaatsen in mediakanaal `1555726441944064011` van communityserver `1555726440933363753`. Meerdere toegestane medialinks in één bericht zijn ook toegestaan en tellen niet mee als verboden linkbericht.",
     "🔗 **De uitzondering geldt alleen op die plek**\nBuiten het ingestelde mediakanaal geldt het gewone linkfilter. Ook in media blijven links naar andere websites en Discord-uitnodigingen onder dat filter vallen. De bestaande uitzonderingsrol van elke server behoudt haar vrijstelling.",

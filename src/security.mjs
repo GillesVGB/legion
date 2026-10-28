@@ -6,6 +6,7 @@ const spamByMember=new Map(),linkByMember=new Map();
 let lastMemoryPrune=0,lastIncidentCleanup=0;
 const LINK=/[a-z][a-z0-9+.-]*:\/\/[^\s<>]+|\bwww\.[^\s<>]+|\b(?:[a-z0-9-]+\.)+(?:com|net|org|nl|be|gg|io|me|tv|co|eu|xyz|site|app|dev)[a-z0-9.-]*(?::\d+)?(?:[/?#][^\s<>]*)?/giu;
 const COMMUNITY_GUILD_ID='1555726440933363753';
+const MAIN_GUILD_ID='1555685630640652338';
 const MEDIA_HOSTS=['youtube.com','youtu.be','medal.tv'];
 const PROFANITY=/\b(?:kanker|tering|tyfus|godverdomme|godver|kut|klootzak|eikel|lul|hoer|fuck(?:er|ing)?|shit|bitch|asshole|motherfucker)\b/iu;
 const protectedAuditActions=new Set([AuditLogEvent.ChannelCreate,AuditLogEvent.ChannelUpdate,AuditLogEvent.ChannelDelete,
@@ -22,7 +23,9 @@ function shortReason(reason){return safeText(reason).slice(0,300);}
 function settings(ctx){return operationSettings(ctx).security;}
 export function securityIsEnabled(ctx){return Boolean(ctx.config.security?.enabled&&settings(ctx).enabled);}
 function mediaLinkAllowed(ctx,message,value){
-  if(ctx.config.guildId!==COMMUNITY_GUILD_ID||message.guild?.id!==COMMUNITY_GUILD_ID||!ctx.config.mediaChannelId||message.channelId!==ctx.config.mediaChannelId)return false;
+  const guildId=message.guild?.id;
+  if(guildId!==ctx.config.guildId)return false;
+  if(guildId!==MAIN_GUILD_ID&&(guildId!==COMMUNITY_GUILD_ID||!ctx.config.mediaChannelId||message.channelId!==ctx.config.mediaChannelId))return false;
   try{
     const input=String(value).replace(/[)\]},.!?;]+$/u,'');
     const url=new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(input)?input:`https://${input}`);

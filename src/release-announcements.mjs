@@ -33,17 +33,26 @@ export async function announceRelease(ctx,guild,version=releaseVersion,notes=rel
     try{await renumberAnnouncements(ctx,guild);}catch(error){ctx.store.setSetting('release:renumber:error',String(error.code||error.name));}
     const description=`De bot is bijgewerkt.\n\n${(notes||['Onderhoud en verbeteringen.']).map(item=>`• ${item}`).join('\n\n')}`;
     const contentKey=`release:content:${version}`,contentHash=createHash('sha256').update(JSON.stringify([ctx.config.updateChannelId,version,description])).digest('hex');
-    const saved=ctx.store.db.prepare('SELECT message_id FROM release_announcements WHERE version=?').get(version)?.message_id;
-    if(saved&&ctx.store.setting(contentKey)===contentHash)return;
+    const verificationKey='release:requested-repair:2.5.18',verifyOnce=version==='2.5.18'&&ctx.store.setting(verificationKey)!=='1';
+    let saved=ctx.store.db.prepare('SELECT message_id FROM release_announcements WHERE version=?').get(version)?.message_id;
+    if(saved&&!verifyOnce&&ctx.store.setting(contentKey)===contentHash)return;
     ctx.store.db.prepare('INSERT OR IGNORE INTO release_announcements(version) VALUES(?)').run(version);
     try{const channel=await communityChannel(guild,ctx.config.updateChannelId),marker=`Bakarov • Botupdate ${version}`;
       let message=saved?await channel.messages.fetch(saved).catch(error=>{if(error.code===10008)return null;throw error;}):null;
-      if(saved&&!message){ctx.store.db.prepare("UPDATE release_announcements SET last_error='MESSAGE_DELETED' WHERE version=?").run(version);ctx.store.setSetting(contentKey,contentHash);return;}
+      if(saved&&!message){
+        if(verifyOnce){ctx.store.db.prepare('UPDATE release_announcements SET message_id=NULL,last_error=NULL WHERE version=?').run(version);saved=null;}
+        else{ctx.store.db.prepare("UPDATE release_announcements SET last_error='MESSAGE_DELETED' WHERE version=?").run(version);ctx.store.setSetting(contentKey,contentHash);return;}
+      }
       if(!message){const history=await channel.messages.fetch({limit:100});message=[...history.values()].find(item=>item.author.id===guild.members.me.id&&item.embeds?.some(card=>canonicalBrandText(card.footer?.text)===marker));}
       if(message&&(message.author.id!==guild.members.me.id||!message.embeds?.some(card=>canonicalBrandText(card.footer?.text)===marker)))throw Object.assign(new Error('Het opgeslagen bericht hoort niet bij deze botupdate.'),{code:'RELEASE_MESSAGE_MISMATCH'});
+      if(verifyOnce&&saved&&message&&ctx.store.setting(contentKey)===contentHash){ctx.store.db.prepare('UPDATE release_announcements SET last_error=NULL WHERE version=?').run(version);ctx.store.setSetting(verificationKey,'1');return;}
       const payload={embeds:[embed(ctx.config,`Bakarov — Botupdate ${version}`,description).setColor(0x22C55E).setFooter({text:marker})],allowedMentions:quiet};
       message=message?await editIfChanged(message,payload):await channel.send({...payload,nonce:`up:${version}`,enforceNonce:true});
-      ctx.store.db.prepare('UPDATE release_announcements SET message_id=?,last_error=NULL WHERE version=?').run(message.id,version);ctx.store.setSetting(contentKey,contentHash);ctx.store.audit('bot.update',guild.members.me.id,{version});
+      ctx.store.db.prepare('UPDATE release_announcements SET message_id=?,last_error=NULL WHERE version=?').run(message.id,version);ctx.store.setSetting(contentKey,contentHash);if(verifyOnce)ctx.store.setSetting(verificationKey,'1');ctx.store.audit('bot.update',guild.members.me.id,{version});
     }catch(error){ctx.store.db.prepare('UPDATE release_announcements SET last_error=? WHERE version=?').run(String(error.code||error.name),version);}
   });
+}
+export async function announceReleases(ctx,guild){
+  await announceRelease(ctx,guild,'2.5.18');
+  await announceRelease(ctx,guild);
 }

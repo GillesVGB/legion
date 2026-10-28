@@ -105,6 +105,7 @@ test('mediakanaal is alleen in de community instelbaar voor administrators en de
         assert.doesNotMatch(vm.runInContext('modulesPage()',context),/name="mediaChannelId"/);
       }else{
         assert.equal(data.channelSettings.mediaChannelId,undefined);assert.doesNotMatch(modules,/name="mediaChannelId"|Media: YouTube|YouTube- en Medal-links mogen alleen/);
+        assert.match(modules,/YouTube- en Medal-links mogen in deze server in alle tekstkanalen/);
       }
     }
   }finally{f.close();}

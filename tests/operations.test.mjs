@@ -10,7 +10,7 @@ import {operationSettings} from '../src/feature-settings.mjs';
 import {Dashboard} from '../src/dashboard.mjs';
 import {Locks} from '../src/locks.mjs';
 import {recordInteraction,flushAuditLogs,cleanAudit} from '../src/audit-log.mjs';
-import {announceRelease,releaseVersion,releaseNotes,renamedVersions} from '../src/release-announcements.mjs';
+import {announceRelease,announceReleases,releaseVersion,releaseNotes,renamedVersions} from '../src/release-announcements.mjs';
 import {botHealth} from '../src/bot-status.mjs';
 import {fishBookMessage,handleFishBookButton} from '../src/fish-book.mjs';
 import {commands} from '../src/commands.mjs';
@@ -189,6 +189,65 @@ test('changelog wordt één keer per versie geplaatst en herstelt een verstuurd 
   await announceRelease(f.ctx,f.guild);await announceRelease(f.ctx,f.guild);assert.equal(channel.posted.size,1);
   f.ctx.store.db.prepare('UPDATE release_announcements SET message_id=NULL WHERE version=?').run(releaseVersion);await announceRelease(f.ctx,f.guild);assert.equal(channel.posted.size,1);
   await announceRelease(f.ctx,f.guild,'9.9.9',['Een nieuwe verbetering.']);assert.equal(channel.posted.size,2);
+});
+
+test('de ontbrekende changelog 2.5.18 verschijnt naast de huidige versie eenmaal en herkent een bestaand historisch bericht',async t=>{
+  const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.updateChannelId),version='2.5.18';
+  assert.ok(releaseNotes[version]?.length);assert.notEqual(releaseVersion,version);
+  const existing=await channel.send({embeds:[new EmbedBuilder().setTitle(`Bakarov — Botupdate ${version}`).setDescription('Bestaande korte uitleg.').setFooter({text:`Bakarov • Botupdate ${version}`})]});
+  await announceReleases(f.ctx,f.guild);await announceReleases(f.ctx,f.guild);
+  const announcements=[...channel.posted.values()].map(message=>message.embeds[0]);
+  assert.equal(channel.posted.size,2);
+  for(const value of [version,releaseVersion])assert.equal(announcements.filter(card=>card.footer?.text===`Bakarov • Botupdate ${value}`).length,1);
+  assert.equal(f.ctx.store.db.prepare('SELECT message_id FROM release_announcements WHERE version=?').get(version).message_id,existing.id);
+  assert.ok(existing.embeds[0].description.includes(releaseNotes[version][0]));
+  assert.equal(f.ctx.store.db.prepare('SELECT COUNT(*) AS n FROM release_announcements WHERE message_id IS NOT NULL').get().n,2);
+});
+
+test('een mislukte historische changelog blokkeert de huidige niet en wordt bij de volgende onderhoudscyclus alsnog eenmaal geplaatst',async t=>{
+  const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.updateChannelId),send=channel.send,version='2.5.18';let attempts=0;
+  channel.send=async payload=>{if(payload.nonce===`up:${version}`&&++attempts===1)throw Object.assign(new Error('Tijdelijk'),{code:503});return send(payload);};
+  await announceReleases(f.ctx,f.guild);
+  assert.equal(channel.posted.size,1);assert.equal([...channel.posted.values()][0].embeds[0].footer.text,`Bakarov • Botupdate ${releaseVersion}`);
+  assert.equal(f.ctx.store.db.prepare('SELECT last_error FROM release_announcements WHERE version=?').get(version).last_error,'503');
+  await announceReleases(f.ctx,f.guild);await announceReleases(f.ctx,f.guild);
+  assert.equal(attempts,2);assert.equal(channel.posted.size,2);
+  assert.equal(f.ctx.store.db.prepare('SELECT last_error FROM release_announcements WHERE version=?').get(version).last_error,null);
+  assert.equal([...channel.posted.values()].filter(message=>message.embeds[0].footer.text===`Bakarov • Botupdate ${version}`).length,1);
+});
+
+test('de aangevraagde changelog 2.5.18 herstelt eenmaal een verdwenen bericht ondanks een opgeslagen ID en gelijke inhoudshash',async t=>{
+  const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.updateChannelId),version='2.5.18';
+  await announceRelease(f.ctx,f.guild,version);const old=[...channel.posted.values()][0];
+  f.ctx.store.db.prepare('DELETE FROM settings WHERE key=?').run('release:requested-repair:2.5.18');await old.delete();
+  await announceReleases(f.ctx,f.guild);
+  const restored=[...channel.posted.values()].find(message=>message.embeds[0].footer.text===`Bakarov • Botupdate ${version}`);
+  assert.ok(restored);assert.notEqual(restored.id,old.id);assert.equal(channel.posted.size,2);
+  assert.equal(f.ctx.store.db.prepare('SELECT message_id FROM release_announcements WHERE version=?').get(version).message_id,restored.id);
+  const fetch=channel.messages.fetch;let requests=0;channel.messages.fetch=async options=>{if(options===restored.id)requests++;return fetch(options);};
+  await restored.delete();await announceReleases(f.ctx,f.guild);
+  assert.equal(requests,0);assert.equal(channel.posted.size,1);
+});
+
+test('tijdelijk mislukte controle van een opgeslagen historische changelog laat de huidige doorgaan en probeert later opnieuw',async t=>{
+  const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.updateChannelId),version='2.5.18';
+  await announceRelease(f.ctx,f.guild,version);const existing=[...channel.posted.values()][0],fetch=channel.messages.fetch;let attempts=0;
+  f.ctx.store.db.prepare('DELETE FROM settings WHERE key=?').run('release:requested-repair:2.5.18');
+  channel.messages.fetch=async options=>{if(options===existing.id&&++attempts===1)throw Object.assign(new Error('Tijdelijk'),{code:503});return fetch(options);};
+  await announceReleases(f.ctx,f.guild);
+  assert.equal(channel.posted.size,2);assert.equal(f.ctx.store.db.prepare('SELECT last_error FROM release_announcements WHERE version=?').get(version).last_error,'503');
+  await announceReleases(f.ctx,f.guild);await announceReleases(f.ctx,f.guild);
+  assert.equal(attempts,2);assert.equal(channel.posted.size,2);assert.equal(f.ctx.store.db.prepare('SELECT last_error FROM release_announcements WHERE version=?').get(version).last_error,null);
+});
+
+test('eenmalige historische changelogcontrole overschrijft geen bericht van iemand anders bij een gelijke inhoudshash',async t=>{
+  const f=fixture(t),channel=f.guild.channels.cache.get(f.ctx.config.updateChannelId),version='2.5.18';
+  await announceRelease(f.ctx,f.guild,version);const existing=[...channel.posted.values()][0];
+  f.ctx.store.db.prepare('DELETE FROM settings WHERE key=?').run('release:requested-repair:2.5.18');existing.author={id:OTHER};
+  await announceReleases(f.ctx,f.guild);
+  assert.equal(channel.posted.size,2);assert.equal(f.calls.filter(call=>call.method==='message.edit'&&call.id===existing.id).length,0);
+  assert.equal(f.ctx.store.db.prepare('SELECT last_error FROM release_announcements WHERE version=?').get(version).last_error,'RELEASE_MESSAGE_MISMATCH');
+  assert.equal(f.ctx.store.setting('release:requested-repair:2.5.18'),undefined);
 });
 
 test('uitgebreide changelog past in Discord en werkt een bestaand updatebericht bij zonder duplicaten',async t=>{
