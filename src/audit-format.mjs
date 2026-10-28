@@ -3,6 +3,7 @@ import {cleanAudit} from './audit-sanitize.mjs';
 const names={
   'message.delete':'🗑️ Bericht verwijderd','message.edit':'✏️ Bericht aangepast',
   'security.invite_created':'🔗 Uitnodiging aangemaakt — toegestaan',
+  'security.media_links_allowed':'🎬 YouTube-/Medal-link toegestaan in media',
   'security.ready':'🛡️ Beveiligingscontrole gereed','security.unavailable':'⚠️ Beveiliging kan niet starten','security.messages_removed':'🗑️ Beveiliging: berichten verwijderd','security.notice_sent':'📨 Beveiligingsmelding via DM verstuurd','security.notice_failed':'⚠️ Beveiligingsmelding via DM niet bezorgd','security.check_failed':'⚠️ Beveiligingscontrole mislukt',
   'security.link_removed':'🔗 Linkbericht verwijderd','security.links_ban':'🚫 Meerdere links: ban','security.mention_ban':'🚫 Tagspam: ban','security.timeout':'⏳ Automatische time-out','security.ban':'⛔ Automatische ban','security.enforcement_failed':'⚠️ Beveiligingsactie mislukt','security.delete_failed':'⚠️ Beveiliging kon een bericht niet verwijderen','security.unauthorized_action':'🚫 Onbevoegde serveractie: ban','security.unauthorized_action_failed':'⚠️ Onbevoegde actie: ban mislukt','security.raid_detected':'🚨 Mogelijke serverraid','security.raid_timeout':'⏳ Raidbeveiliging: nieuw lid beperkt',
   'interaction.succeeded':'✅ Actie uitgevoerd','interaction.failed':'❌ Actie mislukt',

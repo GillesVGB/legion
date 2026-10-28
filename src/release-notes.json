@@ -1,4 +1,12 @@
 {
+  "2.5.19": [
+    "🎬 **YouTube en Medal toegestaan in community-media**\nLeden mogen YouTube- en Medal-links plaatsen in mediakanaal `1555726441944064011` van communityserver `1555726440933363753`. Meerdere toegestane medialinks in één bericht zijn ook toegestaan en tellen niet mee als verboden linkbericht.",
+    "🔗 **De uitzondering geldt alleen op die plek**\nBuiten het ingestelde mediakanaal geldt het gewone linkfilter. Ook in media blijven links naar andere websites en Discord-uitnodigingen onder dat filter vallen. De bestaande uitzonderingsrol van elke server behoudt haar vrijstelling.",
+    "🛡️ **Controle van de echte website**\nDe bot controleert het domein van elke link en gebruikt daarvoor youtube.com, youtu.be en medal.tv, inclusief hun echte subdomeinen. Misleidende adressen zoals youtube.com.anderewebsite.nl worden geblokkeerd. Links met inloggegevens, afwijkende poorten of een ander protocol worden niet toegelaten via de media-uitzondering.",
+    "🔎 **Berichten en linkvoorbeelden worden gecontroleerd**\nBevat een bericht naast een toegestane video ook een verboden link, dan wordt het bericht verwijderd en telt de verboden link mee voor de bestaande beveiligingsregels. De bot controleert ook de link van het ingesloten voorbeeld. YouTube-doorverwijsadressen krijgen geen uitzondering.",
+    "💬 **Spam- en tagcontroles blijven werken**\nEen toegestane medialink geeft geen vrijstelling voor spam, schelden of te veel tags. Deze controles blijven in het mediakanaal actief.",
+    "⚙️ **Mediakanaal aanpassen in het dashboard**\nEen communityadministrator kan onder Modules instellen → Bestemmingskanalen bij Media: YouTube & Medal een ander tekstkanaal uit dezelfde community kiezen. De keuze geldt direct en blijft bij herstarts bewaard. Toegestane medialinks worden in het eigen communitylog geregistreerd."
+  ],
   "2.5.18": [
     "🔗 **Uitnodigingen maken mag in de community**\nLeden mogen in de communityserver (`1555726440933363753`) een Discord-uitnodiging aanmaken zonder automatische beveiligingsban. Hiervoor is geen uitzonderingsrol nodig. De gewone Discordrechten bepalen wie de functie kan gebruiken.",
     "⚙️ **Per server instelbaar in het dashboard**\nOnder Modules instellen → Beveiliging & automatisch modereren staat Uitnodigingen maken toestaan. Deze instelling staat standaard aan in de community en uit in de hoofdserver. Aanpassingen gelden direct en blijven bewaard na een herstart.",

@@ -89,6 +89,27 @@ test('beveiligingsdashboard toont in beide servers actieve raidcontrole en houdt
   }finally{f.close();}
 });
 
+test('mediakanaal is alleen in de community instelbaar voor administrators en de beveiligingsuitleg noemt YouTube en Medal',()=>{
+  const f=dashboardFixture();try{
+    const dashboard=new Dashboard({...f,locks:new Locks()}),source=readFileSync(new URL('../src/dashboard-assets/app.js',import.meta.url),'utf8'),mediaChannelId='1555726441944064011';
+    for(const ctx of f.contexts.values()){
+      const guild=f.guilds.get(ctx.config.guildId);if(ctx.config.ticketsEnabled)guild.makeChannel(mediaChannelId,'media');
+      const data=dashboard.summary(ctx,guild,guild.members.cache.get('100000000000000001'));
+      const context=vm.createContext({data,Intl,Date,Number,String,Math,URL,console});
+      vm.runInContext(source.slice(0,source.indexOf("document.addEventListener('click'"))+`\nstate.data=data;`,context);
+      const modules=vm.runInContext('modulesPage()',context);
+      if(ctx.config.ticketsEnabled){
+        assert.equal(data.channelSettings.mediaChannelId,mediaChannelId);assert.match(modules,/Media: YouTube &amp; Medal/);assert.match(modules,/name="mediaChannelId"/);
+        assert.ok(modules.includes(`option value="${mediaChannelId}" selected`));assert.match(modules,/YouTube- en Medal-links mogen alleen in het ingestelde mediakanaal/);
+        context.data=dashboard.summary(ctx,guild,guild.members.cache.get('100000000000000099'));vm.runInContext('state.data=data;',context);
+        assert.doesNotMatch(vm.runInContext('modulesPage()',context),/name="mediaChannelId"/);
+      }else{
+        assert.equal(data.channelSettings.mediaChannelId,undefined);assert.doesNotMatch(modules,/name="mediaChannelId"|Media: YouTube|YouTube- en Medal-links mogen alleen/);
+      }
+    }
+  }finally{f.close();}
+});
+
 test('gangpotdashboard toont betaalmeldingen met Lead-vinkjes, escapt tekst en houdt de community gescheiden',async()=>{
   const f=dashboardFixture();
   try{

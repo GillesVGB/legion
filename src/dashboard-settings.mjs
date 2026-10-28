@@ -10,7 +10,7 @@ export function validateDashboardSettings(value) {
   assertUser(Object.keys(value).every(key => allowed.includes(key)), 'Een instelling in dit verzoek mag niet via het dashboard worden gewijzigd.');
   const result = {};
   if(Object.hasOwn(value,'color')){assertUser(typeof value.color==='string'&&/^#[a-f0-9]{6}$/i.test(value.color),'Gebruik een geldige embedkleur.');result.color=value.color;}
-  if(Object.hasOwn(value,'channels')){assertUser(value.channels&&typeof value.channels==='object'&&!Array.isArray(value.channels),'Ongeldige kanalen.');result.channels={};for(const [key,id] of Object.entries(value.channels)){assertUser(['logChannelId','botLogChannelId','updateChannelId','absencePanelChannelId','planningChannelId','warnLogChannelId','panelChannelId','gangpotInfo','gangpotPayments','gangpotTotal','monthlyReportChannelId','weeklyReportChannelId'].includes(key)&&typeof id==='string'&&/^\d{17,20}$/.test(id),'Kies een geldig ingesteld kanaal.');result.channels[key]=id;}}
+  if(Object.hasOwn(value,'channels')){assertUser(value.channels&&typeof value.channels==='object'&&!Array.isArray(value.channels),'Ongeldige kanalen.');result.channels={};for(const [key,id] of Object.entries(value.channels)){assertUser(['logChannelId','botLogChannelId','updateChannelId','absencePanelChannelId','planningChannelId','warnLogChannelId','panelChannelId','gangpotInfo','gangpotPayments','gangpotTotal','monthlyReportChannelId','weeklyReportChannelId','mediaChannelId'].includes(key)&&typeof id==='string'&&/^\d{17,20}$/.test(id),'Kies een geldig ingesteld kanaal.');result.channels[key]=id;}}
   if(Object.hasOwn(value,'operations'))result.operations=validateOperations(value.operations);
   for (const [key, [min,max]] of Object.entries(limits)) if (Object.hasOwn(value,key)) {
     assertUser(Number.isSafeInteger(value[key]) && value[key] >= min && value[key] <= max, `${key}: kies een geheel getal tussen ${min} en ${max}.`);
@@ -36,6 +36,7 @@ export function applyDashboardSettings(ctx, value) {
   const checked = validateDashboardSettings(value);
   const { content,operations,channels,color, ...settings } = checked;
   assertUser(!Object.keys(channels||{}).some(key=>key.startsWith('gangpot'))||ctx.config.gangpot,'Gangpotkanalen zijn alleen in de hoofdserver instelbaar.');
+  assertUser(!Object.hasOwn(channels||{},'mediaChannelId')||ctx.config.guildId==='1555726440933363753','Het mediakanaal voor YouTube en Medal is alleen in de community instelbaar.');
   if(operations)applyOperations(ctx,operations);
   if(color)ctx.config.color=Number.parseInt(color.slice(1),16);
   for(const [key,id] of Object.entries(channels||{})){if(key.startsWith('gangpot')){assertUser(ctx.config.gangpot,'Gangpotkanalen zijn alleen in de hoofdserver instelbaar.');ctx.config.gangpot[{gangpotInfo:'infoChannelId',gangpotPayments:'paymentsChannelId',gangpotTotal:'totalChannelId'}[key]]=id;}else ctx.config[key]=id;}

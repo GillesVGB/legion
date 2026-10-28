@@ -107,6 +107,20 @@ test('beveiliging staat in beide servers aan; dashboardschakelaars en raiddrempe
   assert.throws(()=>validateDashboardSettings({operations:{security:{raidModeMinutes:0}}}));
 });
 
+test('een administrator kan het communitymediakanaal bewaren en herladen; verkeerde guild of onbevoegde wijzigingen worden geweigerd',async t=>{
+  const f=fixture(t),community=f.source,guild=f.guilds.get(community.config.guildId),dashboard=new Dashboard({...f,locks:new Locks()}),original='1555726441944064011',changed='1555726441944064099';
+  assert.equal(community.config.mediaChannelId,original);assert.equal(f.ctx.config.mediaChannelId,undefined);
+  guild.makeChannel(changed,'media');
+  await dashboard.action(community,guild,guild.members.cache.get(ACTOR),{action:'settings.save',settings:{channels:{mediaChannelId:changed}}});
+  assert.equal(community.config.mediaChannelId,changed);
+  const restored={config:{...community.config,mediaChannelId:original},store:community.store};loadDashboardSettings(restored);assert.equal(restored.config.mediaChannelId,changed);
+  await assert.rejects(dashboard.action(community,guild,guild.members.cache.get(OTHER),{action:'settings.save',settings:{channels:{mediaChannelId:changed}}}),/administrator/);
+  await assert.rejects(dashboard.action(community,guild,guild.members.cache.get(ACTOR),{action:'settings.save',settings:{channels:{mediaChannelId:f.ctx.config.planningChannelId}}}));
+  assert.equal(community.config.mediaChannelId,changed);
+  await assert.rejects(dashboard.action(f.ctx,f.guild,f.lead,{action:'settings.save',settings:{channels:{mediaChannelId:f.ctx.config.planningChannelId}}}));
+  assert.equal(f.ctx.config.mediaChannelId,undefined);
+});
+
 test('botstatus onderscheidt actieve raidcontrole, een gedetecteerde raid en uitgeschakelde beveiliging',t=>{
   const f=fixture(t);f.ctx.securityReady=true;
   let status=botHealth(f.ctx,f.client).security;
