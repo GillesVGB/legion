@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { AuditLogEvent } from 'discord.js';
 import { handleSecurityAudit,handleSecurityJoin,handleSecurityMessage,resetSecurityState } from '../src/security.mjs';
+import { loadConfig } from '../src/config.mjs';
 
 function fixture({trusted=false,overrides={}}={}){
   const incidents=[],audits=[],bans=[],timeouts=[];
@@ -43,6 +44,23 @@ test('unauthorized channel actions ban the executor, while the trusted role is e
   resetSecurityState();const f=fixture();let member=f.member;const entry={action:AuditLogEvent.ChannelDelete,executorId:member.id,targetId:'channel',id:'audit-1',executor:{bot:false}};
   await handleSecurityAudit(f.ctx,entry,f.guild);assert.equal(f.bans.length,1);assert.equal(f.audits.some(row=>row[0]==='security.unauthorized_action'),true);
   const g=fixture({trusted:true});await handleSecurityAudit(g.ctx,entry,g.guild);assert.equal(g.bans.length,0);
+});
+
+test('community guild permits and logs invite creation while main guild and other protected actions retain bans',async()=>{
+  resetSecurityState();const config=loadConfig({},false);
+  const forGuild=(guildId,overrides={})=>{const f=fixture({overrides});f.ctx.config={...config,...config.guilds.find(guild=>guild.guildId===guildId),operations:{security:overrides}};f.guild.id=guildId;return f;};
+  const entry=(f,action)=>({action,executorId:f.member.id,targetId:'private-invite-code',id:`audit-${action}`,executor:{bot:false}});
+  const community=forGuild('1555726440933363753');
+  await handleSecurityAudit(community.ctx,entry(community,AuditLogEvent.InviteCreate),community.guild);
+  assert.equal(community.bans.length,0);
+  const allowed=community.audits.find(row=>row[0]==='security.invite_created');assert.ok(allowed);assert.equal(allowed[2].status,'Toegestaan');
+  assert.ok(!JSON.stringify(community.audits).includes('private-invite-code'));
+  for(const action of [AuditLogEvent.InviteDelete,AuditLogEvent.ChannelDelete])await handleSecurityAudit(community.ctx,entry(community,action),community.guild);
+  assert.equal(community.bans.length,2);
+  const main=forGuild('1555685630640652338');await handleSecurityAudit(main.ctx,entry(main,AuditLogEvent.InviteCreate),main.guild);
+  assert.equal(main.bans.length,1);assert.equal(main.audits.some(row=>row[0]==='security.invite_created'),false);
+  const restricted=forGuild('1555726440933363753',{allowInviteCreation:false});await handleSecurityAudit(restricted.ctx,entry(restricted,AuditLogEvent.InviteCreate),restricted.guild);
+  assert.equal(restricted.bans.length,1);assert.equal(restricted.audits.some(row=>row[0]==='security.invite_created'),false);
 });
 
 test('a join burst starts raid mode and temporarily times out further joins',async()=>{

@@ -1,4 +1,10 @@
 {
+  "2.5.18": [
+    "🔗 **Uitnodigingen maken mag in de community**\nLeden mogen in de communityserver (`1555726440933363753`) een Discord-uitnodiging aanmaken zonder automatische beveiligingsban. Hiervoor is geen uitzonderingsrol nodig. De gewone Discordrechten bepalen wie de functie kan gebruiken.",
+    "⚙️ **Per server instelbaar in het dashboard**\nOnder Modules instellen → Beveiliging & automatisch modereren staat Uitnodigingen maken toestaan. Deze instelling staat standaard aan in de community en uit in de hoofdserver. Aanpassingen gelden direct en blijven bewaard na een herstart.",
+    "📋 **Toegestane uitnodigingsacties worden gelogd**\nDe bot registreert dat een lid een uitnodiging mocht aanmaken in het eigen logkanaal van de community (`1556781560320102432`). De uitnodigingscode en uitnodigingslink worden niet in deze beveiligingsmelding opgeslagen.",
+    "🛡️ **De uitzondering geldt voor aanmaken**\nHet verwijderen van uitnodigingen en andere beschermde beheeracties vallen nog onder de bestaande beveiligingsregels. Het plaatsen van een uitnodigingslink in een bericht wordt beoordeeld door het linkfilter."
+  ],
   "2.5.17": [
     "🛡️ **Beveiliging staat aan in beide Discords**\nDe hoofdserver en de community hebben elk hun eigen beveiligingsinstellingen. In de hoofdserver is de +-rol `1555685630770413643` vrijgesteld; in de community geldt rol `1555726440983437504`.",
     "🚨 **Raidcontrole staat standaard aan**\nNieuwe leden worden automatisch gecontroleerd. Zonder aanval toont de status nu Aan — controleert nieuwe leden. De melding Geen raid gedetecteerd beschrijft alleen de tijdelijke beschermmodus; de controle blijft actief.",

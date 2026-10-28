@@ -74,7 +74,8 @@
     "ticketsEnabled": true,
     "security": {
       "enabled": true,
-      "trustedRoleId": "1555726440983437504"
+      "trustedRoleId": "1555726440983437504",
+      "allowInviteCreation": true
     },
     "panelChannelId": "1555726441759375398",
     "staffRoleIds": [

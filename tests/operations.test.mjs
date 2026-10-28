@@ -93,12 +93,13 @@ test('dashboardinstellingen bewaren bedrag en tijden; lopende gangpotweek verand
 test('beveiliging staat in beide servers aan; dashboardschakelaars en raiddrempels blijven per server bewaard na herladen',async t=>{
   const f=fixture(t),community=f.source,communityGuild=f.guilds.get(community.config.guildId),dashboard=new Dashboard({...f,locks:new Locks()});
   assert.deepEqual(f.ctx.config.security,{enabled:true,trustedRoleId:'1555685630770413643'});
-  assert.deepEqual(community.config.security,{enabled:true,trustedRoleId:'1555726440983437504'});
+  assert.deepEqual(community.config.security,{enabled:true,trustedRoleId:'1555726440983437504',allowInviteCreation:true});
   for(const ctx of [f.ctx,community]){const id=ctx.config.security.trustedRoleId;f.guilds.get(ctx.config.guildId).roles.cache.set(id,{id,name:'+'});assert.equal(operationSettings(ctx).security.enabled,true);assert.equal(operationSettings(ctx).security.raidEnabled,true);}
-  await dashboard.action(f.ctx,f.guild,f.lead,{action:'settings.save',settings:{operations:{security:{enabled:false,raidEnabled:true,raidModeMinutes:15,raidJoinCount:9}}}});
+  assert.equal(operationSettings(f.ctx).security.allowInviteCreation,false);assert.equal(operationSettings(community).security.allowInviteCreation,true);
+  await dashboard.action(f.ctx,f.guild,f.lead,{action:'settings.save',settings:{operations:{security:{enabled:false,raidEnabled:true,raidModeMinutes:15,raidJoinCount:9,allowInviteCreation:true}}}});
   assert.equal(operationSettings(community).security.enabled,true);assert.equal(operationSettings(community).security.raidModeMinutes,10);
-  await dashboard.action(community,communityGuild,communityGuild.members.cache.get(ACTOR),{action:'settings.save',settings:{operations:{security:{enabled:true,raidEnabled:false,raidModeMinutes:20,raidJoinCount:12}}}});
-  for(const [ctx,expected]of [[f.ctx,{enabled:false,raidEnabled:true,raidModeMinutes:15,raidJoinCount:9}],[community,{enabled:true,raidEnabled:false,raidModeMinutes:20,raidJoinCount:12}]]){
+  await dashboard.action(community,communityGuild,communityGuild.members.cache.get(ACTOR),{action:'settings.save',settings:{operations:{security:{enabled:true,raidEnabled:false,raidModeMinutes:20,raidJoinCount:12,allowInviteCreation:false}}}});
+  for(const [ctx,expected]of [[f.ctx,{enabled:false,raidEnabled:true,raidModeMinutes:15,raidJoinCount:9,allowInviteCreation:true}],[community,{enabled:true,raidEnabled:false,raidModeMinutes:20,raidJoinCount:12,allowInviteCreation:false}]]){
     const restored={config:{...ctx.config,operations:undefined},store:ctx.store};loadDashboardSettings(restored);
     for(const [key,value]of Object.entries(expected))assert.equal(operationSettings(restored).security[key],value);
   }

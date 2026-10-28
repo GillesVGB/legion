@@ -149,6 +149,7 @@ export async function handleSecurityAudit(ctx,entry,guild){
   if(!risky)return;
   let actor=await guild.members.fetch(entry.executorId).catch(()=>null);
   if(actor?.user.bot||entry.executor?.bot||trusted(ctx,actor))return;
+  if(entry.action===AuditLogEvent.InviteCreate&&settings(ctx).allowInviteCreation){audit(ctx,'security.invite_created',entry.executorId,{action:'Uitnodiging aangemaakt',status:'Toegestaan'});return;}
   const action=entry.action===AuditLogEvent.MemberKick?'iemand kicken':entry.action===AuditLogEvent.MemberBanAdd?'iemand bannen':entry.action===AuditLogEvent.MemberBanRemove?'een ban intrekken':entry.action===AuditLogEvent.MemberUpdate?'iemand time-outen':entry.action===AuditLogEvent.ChannelOverwriteCreate||entry.action===AuditLogEvent.ChannelOverwriteUpdate||entry.action===AuditLogEvent.ChannelOverwriteDelete?'kanaalrechten wijzigen':entry.action===AuditLogEvent.MemberPrune?'leden verwijderen via prune':entry.action===AuditLogEvent.InviteCreate?'een uitnodiging maken':entry.action===AuditLogEvent.InviteDelete?'een uitnodiging verwijderen':entry.action===AuditLogEvent.MessageBulkDelete?'berichten in bulk verwijderen':`serveronderdeel wijzigen (${entry.action})`;
   const reason=`onbevoegde actie: ${action}`;
   if(!actor)actor={id:entry.executorId,send:async()=>{throw new Error('DM_UNAVAILABLE');}};
