@@ -35,8 +35,7 @@ function linkHostAllowed(value,hosts,blockRedirects=false){
 }
 function mediaLinkAllowed(ctx,message,value){
   const guildId=message.guild?.id;
-  if(guildId!==ctx.config.guildId)return false;
-  if(guildId!==MAIN_GUILD_ID&&(guildId!==COMMUNITY_GUILD_ID||!ctx.config.mediaChannelId||message.channelId!==ctx.config.mediaChannelId))return false;
+  if(guildId!==ctx.config.guildId||guildId!==COMMUNITY_GUILD_ID||!ctx.config.mediaChannelId||message.channelId!==ctx.config.mediaChannelId)return false;
   return linkHostAllowed(value,MEDIA_HOSTS,true);
 }
 function registeredTicket(ctx,message){
@@ -98,7 +97,8 @@ export async function handleSecurityMessage(ctx,message,now=Date.now()){
   if(!member||trusted(ctx,member))return;
   const policy=settings(ctx),id=key(message.guild.id,member.id),allURLs=[...(message.content||'').matchAll(LINK)].map(match=>match[0]);
   const embedURLs=(message.embeds||[]).map(embed=>embed.url).filter(Boolean),inTicket=Boolean((allURLs.length||embedURLs.length)&&registeredTicket(ctx,message));
-  const classify=url=>inTicket?'ticket':mediaLinkAllowed(ctx,message,url)?'media':null;
+  const mainLinksAllowed=ctx.config.guildId===MAIN_GUILD_ID&&message.guild.id===MAIN_GUILD_ID;
+  const classify=url=>inTicket?'ticket':mainLinksAllowed?'guild':mediaLinkAllowed(ctx,message,url)?'media':null;
   const contentLinks=allURLs.map(url=>({url,kind:classify(url)})),previewLinks=embedURLs.map(url=>({url,kind:classify(url)}));
   const urls=contentLinks.filter(link=>!link.kind).map(link=>link.url),blockedEmbedURLs=previewLinks.filter(link=>!link.kind);
   const linkHistory=(linkByMember.get(id)||[]).filter(entry=>now-entry.at<policy.linkWindowMinutes*60*1000);
@@ -117,7 +117,7 @@ export async function handleSecurityMessage(ctx,message,now=Date.now()){
     }
     return;
   }
-  for(const [kind,event]of [['media','security.media_links_allowed'],['ticket','security.ticket_links_allowed']]){
+  for(const [kind,event]of [['guild','security.guild_links_allowed'],['media','security.media_links_allowed'],['ticket','security.ticket_links_allowed']]){
     const count=contentLinks.filter(link=>link.kind===kind).length||previewLinks.filter(link=>link.kind===kind).length;
     if(count)audit(ctx,event,member.id,{user:member.id,channel:message.channelId,urls:count});
   }

@@ -47,7 +47,7 @@ test('Lead roles in both guilds bypass message and server-action penalties witho
     }
     assert.equal(f.bans.length,0);assert.equal(f.timeouts.length,0);
     f.member.roles.cache.delete(leadId);f.member.permissions=new PermissionsBitField(P.Administrator);
-    const removedLead=f.message('https://example.org/one https://example.net/two');await handleSecurityMessage(f.ctx,removedLead,2000);
+    const removedLead=f.message('Deze melding is voor iedereen',{users:4,everyone:true});await handleSecurityMessage(f.ctx,removedLead,2000);
     assert.equal(removedLead.deleted,true);assert.equal(f.bans.length,1);
     await handleSecurityAudit(f.ctx,{action:AuditLogEvent.ChannelDelete,executorId:f.member.id,targetId:'target',id:'former-lead-action',executor:{bot:false}},f.guild);
     assert.equal(f.bans.length,2);
@@ -127,15 +127,34 @@ test('YouTube and Medal links and real subdomains are allowed in the configured 
   }
 });
 
-test('main guild permits raw and embedded YouTube and Medal links in different channels',async()=>{
+test('main guild permits all raw and embedded links for ordinary members in different channels',async()=>{
   const examples=[
     ['1555685632704249932','https://www.youtube.com/watch?v=video123',[{url:'https://www.youtube.com/watch?v=video123'}]],
     ['1555685633266163793','https://medal.tv/clips/video123',[{url:'https://medal.tv/clips/video123'}]],
     ['1555685632704249932','Bekijk deze video',[{url:'https://youtu.be/video123'}]],
-    ['1555685633266163793','https://youtu.be/video123 https://www.medal.tv/clips/other123',[]]
+    ['1555685633266163793','https://youtu.be/video123 https://www.medal.tv/clips/other123',[]],
+    ['1555685632704249932','https://example.org/documents https://example.net/photos https://discord.gg/example123',[]],
+    ['1555685633266163793','example.com/documents www.example.net/photos discord.gg/example123',[]],
+    ['1555685632704249932','Bekijk deze documenten',[{url:'https://example.org/documents'},{url:'https://discord.gg/example123'}]],
+    ['1555685633266163793','ftp://example.org/documents https://example.net:8443/documents https://www.youtube.com/redirect?q=https%3A%2F%2Fexample.com',[]]
   ];
   for(const [channelId,content,embeds]of examples){resetSecurityState();const f=mediaFixture({guildId:MAIN,channelId}),message=f.message(content);message.embeds=embeds;
-    assert.equal(f.ctx.config.mediaChannelId,undefined);await handleSecurityMessage(f.ctx,message,1000);assert.equal(message.deleted,undefined,content);assert.equal(f.bans.length,0);}
+    assert.equal(f.member.roles.cache.has(f.ctx.config.security.trustedRoleId),false);assert.equal(f.ctx.config.mediaChannelId,undefined);
+    await handleSecurityMessage(f.ctx,message,1000);assert.equal(message.deleted,undefined,content);assert.equal(f.bans.length,0);
+    const logged=f.audits.find(row=>row[0]==='security.guild_links_allowed');assert.ok(logged,content);assert.equal(logged[2].channel,channelId);assert.equal(logged[2].user,f.member.id);}
+});
+
+test('main links never create link incidents or carry link-ban history between channels or guilds',async()=>{
+  resetSecurityState();const f=mediaFixture({guildId:MAIN});
+  for(let i=0;i<4;i++){const allowed=f.message(`https://example.org/documents/${i} https://discord.gg/example${i}`);allowed.channelId=`main-channel-${i}`;
+    allowed.embeds=[{url:`https://example.net/preview/${i}`}];await handleSecurityMessage(f.ctx,allowed,1000+i*20000);assert.equal(allowed.deleted,undefined);}
+  assert.equal(f.bans.length,0);assert.equal(f.audits.filter(row=>row[0]==='security.guild_links_allowed').length,4);
+  assert.equal(f.audits.some(row=>['security.links_ban','security.link_removed'].includes(row[0])),false);
+  f.ctx.config.guildId=COMMUNITY;f.guild.id=COMMUNITY;
+  const prohibited=f.message('https://example.org/community');await handleSecurityMessage(f.ctx,prohibited,81000);
+  assert.equal(prohibited.deleted,true);assert.equal(f.bans.length,0);
+  const second=f.message('https://example.net/community');await handleSecurityMessage(f.ctx,second,101000);
+  assert.equal(second.deleted,true);assert.equal(f.bans.length,1);
 });
 
 test('media exceptions reject mismatched guild contexts and unknown guilds even when the media channel matches',async()=>{
@@ -147,12 +166,12 @@ test('media exceptions reject mismatched guild contexts and unknown guilds even 
 
 test('media exceptions reject spoofed hosts, credentials, custom ports, non-web schemes and YouTube redirect endpoints',async()=>{
   const urls=['https://youtube.com.evil.com/watch?v=video123','https://medal.tv.evil.com/video123','https://youtube.com@evil.com/video123','https://name:password@youtube.com/watch?v=video123','https://youtube.com:8443/watch?v=video123','ftp://youtube.com/video123','https://www.youtube.com/redirect?q=https%3A%2F%2Fevil.com'];
-  for(const guildId of [COMMUNITY,MAIN])for(const url of urls){resetSecurityState();const f=mediaFixture({guildId}),message=f.message(url);await handleSecurityMessage(f.ctx,message,1000);assert.equal(message.deleted,true,`${guildId}: ${url}`);}
+  for(const url of urls){resetSecurityState();const f=mediaFixture(),message=f.message(url);await handleSecurityMessage(f.ctx,message,1000);assert.equal(message.deleted,true,url);}
 });
 
 test('mixed media messages retain link penalties only for prohibited links and allowed media never counts toward the link ban threshold',async()=>{
-  for(const guildId of [COMMUNITY,MAIN]){
-    resetSecurityState();const f=mediaFixture({guildId});
+  {
+    resetSecurityState();const f=mediaFixture();
     for(let i=0;i<3;i++){const allowed=f.message(`https://youtu.be/video${i} https://medal.tv/clips/video${i}`);await handleSecurityMessage(f.ctx,allowed,1000+i*20000);assert.equal(allowed.deleted,undefined);}
     const mixed=f.message('https://youtu.be/allowed https://example.org/prohibited');await handleSecurityMessage(f.ctx,mixed,61000);
     assert.equal(mixed.deleted,true);assert.equal(f.bans.length,0);
@@ -171,14 +190,15 @@ test('media embeds follow the same allowlist and an unrelated embed cannot hide 
   await handleSecurityMessage(f.ctx,hidden,61000);assert.equal(hidden.deleted,true);assert.equal(f.bans.length,1);
 });
 
-test('allowed media links still receive ordinary mention, profanity and repeated-message enforcement',async()=>{
+test('allowed main links and community media still receive ordinary mention, profanity and repeated-message enforcement',async()=>{
   for(const guildId of [COMMUNITY,MAIN]){
-    resetSecurityState();const f=mediaFixture({guildId}),mentions=f.message('https://youtu.be/video123',{users:4});
+    const url=guildId===MAIN?'https://example.org/documents':'https://youtu.be/video123';
+    resetSecurityState();const f=mediaFixture({guildId}),mentions=f.message(url,{users:4});
     await handleSecurityMessage(f.ctx,mentions,1000);assert.equal(mentions.deleted,true);assert.equal(f.bans.length,1);
-    resetSecurityState();const g=mediaFixture({guildId}),curse=g.message('Dit is kut https://youtu.be/video123');await handleSecurityMessage(g.ctx,curse,1000);
+    resetSecurityState();const g=mediaFixture({guildId}),curse=g.message(`Dit is kut ${url}`);await handleSecurityMessage(g.ctx,curse,1000);
     assert.equal(curse.deleted,true);assert.equal(g.timeouts.length,1);
     resetSecurityState();const h=mediaFixture({guildId});let repeated;
-    for(let i=0;i<3;i++){repeated=h.message('https://youtu.be/video123');await handleSecurityMessage(h.ctx,repeated,1000+i*1000);}
+    for(let i=0;i<3;i++){repeated=h.message(url);await handleSecurityMessage(h.ctx,repeated,1000+i*1000);}
     assert.equal(repeated.deleted,true);assert.equal(h.timeouts.length,1);assert.equal(h.bans.length,0);
   }
 });

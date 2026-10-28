@@ -1,4 +1,11 @@
 {
+  "2.5.23": [
+    "🔗 **Alle leden mogen overal links plaatsen in de hoofdserver**\nIn hoofdserver `1555685630640652338` mogen alle leden voortaan links naar alle websites delen in alle tekstkanalen. Dit geldt voor onder andere Discord-uitnodigingen, YouTube, Medal en andere websites. Een Lead- of uitzonderingsrol is hiervoor niet nodig.",
+    "✅ **Geen verwijdering of linkban in de hoofdserver**\nHet linkfilter verwijdert deze berichten niet en registreert ze niet als verboden linkbericht. Meerdere links in één bericht, links in verschillende kanalen en ingesloten linkvoorbeelden zijn ook toegestaan.",
+    "🛡️ **De overige beveiliging blijft werken**\nSpam, schelden, meer dan drie tags en @everyone/@here blijven voor gewone leden gecontroleerd. De beveiliging van beheeracties en de bestaande vrijstelling voor Lead en de uitzonderingsrol blijven gelden.",
+    "📍 **Community houdt haar eigen regels**\nDeze verruiming geldt voor de hoofdserver. In de community blijven alle links toegestaan in geregistreerde tickets en sollicitaties; daarbuiten mogen YouTube en Medal alleen in het ingestelde mediakanaal. Andere links volgen daar het bestaande filter.",
+    "📋 **Dashboard en logs verduidelijkt**\nHet dashboard vermeldt nu expliciet dat alle leden overal in de hoofdserver alle links mogen plaatsen. Toegestane links worden geregistreerd in het botlogkanaal van de betreffende server."
+  ],
   "2.5.22": [
     "🎫 **Alle links toegestaan in tickets**\nIn geregistreerde gewone tickets en sollicitatietickets mogen voortaan links naar alle websites worden gedeeld. Dit geldt ook voor meerdere links in één bericht, combinaties van verschillende websites en ingesloten linkvoorbeelden.",
     "✅ **Geen linkban door delen binnen een ticket**\nLinks in een geregistreerd ticket worden niet verwijderd door het linkfilter en tellen niet mee voor een linkban. De uitzondering blijft gelden zolang het geregistreerde ticketkanaal bestaat. Een kanaal alleen ticket noemen geeft geen vrijstelling.",
