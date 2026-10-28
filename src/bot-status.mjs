@@ -2,7 +2,7 @@ import {MessageFlags} from 'discord.js';
 import {requireStaff,quiet} from './service.mjs';
 import {embed} from './ui.mjs';
 import {operationSettings} from './feature-settings.mjs';
-import {securityIsEnabled} from './security.mjs';
+import {securityIsEnabled,securityTrustedRoleIds} from './security.mjs';
 export function botHealth(ctx,client){
   const db=ctx.store.db,counts={
     transcripts:db.prepare("SELECT COUNT(*) AS n FROM transcripts WHERE state NOT IN ('done','unavailable')").get().n,
@@ -24,6 +24,23 @@ export function botHealth(ctx,client){
   if(ctx.store.setting('absence:panel:error'))errors.push({module:'Afmeldpaneel',code:ctx.store.setting('absence:panel:error')});
   for(const item of db.prepare("SELECT key,value FROM settings WHERE key LIKE 'maintenance:error:%'").all())try{errors.unshift({module:item.key.split(':').at(-1),code:JSON.parse(item.value).code});}catch{}
   const enabled=securityIsEnabled(ctx),active=enabled&&Boolean(ctx.securityReady),raidEnabled=enabled&&operationSettings(ctx).security.raidEnabled,raidActive=active&&raidEnabled,raidMode=Boolean(raidActive&&ctx.securityRaidUntil>Date.now());
-  return{ready:ctx.ready&&client.isReady(),uptime:Math.round(process.uptime()),latency:Math.max(0,client.ws?.ping||0),memoryMB:Math.round(process.memoryUsage().rss/1048576),security:{enabled,active,trustedRoleId:ctx.config.security?.trustedRoleId||null,incidents30d:db.prepare('SELECT COUNT(*) AS n FROM security_incidents WHERE created_at>=?').get(Date.now()-30*86400000).n,raidEnabled,raidActive,raidMode,raidUntil:raidMode?ctx.securityRaidUntil:null},counts,errors:errors.slice(0,20)};
+  return{ready:ctx.ready&&client.isReady(),uptime:Math.round(process.uptime()),latency:Math.max(0,client.ws?.ping||0),memoryMB:Math.round(process.memoryUsage().rss/1048576),security:{enabled,active,trustedRoleId:ctx.config.security?.trustedRoleId||null,trustedRoleIds:securityTrustedRoleIds(ctx.config),incidents30d:db.prepare('SELECT COUNT(*) AS n FROM security_incidents WHERE created_at>=?').get(Date.now()-30*86400000).n,raidEnabled,raidActive,raidMode,raidUntil:raidMode?ctx.securityRaidUntil:null},counts,errors:errors.slice(0,20)};
 }
-export async function handleBotStatus(ctx,interaction){requireStaff(interaction,ctx.config);const health=botHealth(ctx,interaction.client);return interaction.reply({flags:MessageFlags.Ephemeral,embeds:[embed(ctx.config,'Bakarov — Botstatus',`**Verbinding:** ${health.ready?'🟢 Online':'🟠 Starten / herstellen'}\n**Uptime:** ${Math.floor(health.uptime/60)} minuten\n**Vertraging:** ${health.latency} ms\n**Geheugen:** ${health.memoryMB} MB\n**Beveiliging:** ${health.security.enabled?(health.security.active?'🟢 Actief':'🔴 Niet actief — controleer botrechten en vertrouwensrol'):'Uit'}\n**Vertrouwensrol:** ${health.security.trustedRoleId?`<@&${health.security.trustedRoleId}>`:'Niet ingesteld'}\n**Beveiligingsincidenten (30 dagen):** ${health.security.incidents30d}\n**Raidcontrole:** ${health.security.raidEnabled?(health.security.raidActive?'🟢 Aan — controleert nieuwe leden':'🟠 Ingeschakeld — controleer botrechten en vertrouwensrol'):'Uit via instellingen'}\n**Beschermmodus:** ${health.security.raidMode?`🟠 Actief tot <t:${Math.floor(health.security.raidUntil/1000)}:t>`:health.security.raidActive?'Geen raid gedetecteerd':'Niet actief'}\n\n**Wachten op verwerking**\n${Object.entries(health.counts).map(([name,n])=>`${name}: ${n}`).join('\n')}\n\n**Laatste problemen:**\n${health.errors.map(item=>`${item.module}: ${item.code}`).join('\n')||'Geen geregistreerde problemen.'}`)],allowedMentions:quiet});}
+export async function handleBotStatus(ctx,interaction){
+  requireStaff(interaction,ctx.config);
+  const health=botHealth(ctx,interaction.client),roles=health.security.trustedRoleIds.map(id=>`<@&${id}>`).join(', ')||'Niet ingesteld';
+  const description=[
+    `**Verbinding:** ${health.ready?'🟢 Online':'🟠 Starten / herstellen'}`,
+    `**Uptime:** ${Math.floor(health.uptime/60)} minuten`,
+    `**Vertraging:** ${health.latency} ms`,
+    `**Geheugen:** ${health.memoryMB} MB`,
+    `**Beveiliging:** ${health.security.enabled?(health.security.active?'🟢 Actief':'🔴 Niet actief — controleer botrechten en vertrouwensrol'):'Uit'}`,
+    `**Vrijgestelde rollen:** ${roles}`,
+    `**Beveiligingsincidenten (30 dagen):** ${health.security.incidents30d}`,
+    `**Raidcontrole:** ${health.security.raidEnabled?(health.security.raidActive?'🟢 Aan — controleert nieuwe leden':'🟠 Ingeschakeld — controleer botrechten en vertrouwensrol'):'Uit via instellingen'}`,
+    `**Beschermmodus:** ${health.security.raidMode?`🟠 Actief tot <t:${Math.floor(health.security.raidUntil/1000)}:t>`:health.security.raidActive?'Geen raid gedetecteerd':'Niet actief'}`,
+    '', '**Wachten op verwerking**',Object.entries(health.counts).map(([name,n])=>`${name}: ${n}`).join('\n'),
+    '', '**Laatste problemen:**',health.errors.map(item=>`${item.module}: ${item.code}`).join('\n')||'Geen geregistreerde problemen.'
+  ].join('\n');
+  return interaction.reply({flags:MessageFlags.Ephemeral,embeds:[embed(ctx.config,'Bakarov — Botstatus',description)],allowedMentions:quiet});
+}

@@ -132,6 +132,21 @@ test('botstatus onderscheidt actieve raidcontrole, een gedetecteerde raid en uit
   assert.equal(status.enabled,false);assert.equal(status.active,false);assert.equal(status.raidActive,false);assert.equal(status.raidMode,false);
 });
 
+test('botstatus en dashboard tonen zowel de plusrol als de Lead-rollen als beveiligingsvrijstelling in beide servers',t=>{
+  const f=fixture(t),dashboard=new Dashboard({...f,locks:new Locks()});
+  for(const ctx of [f.ctx,f.source]){
+    const guild=f.guilds.get(ctx.config.guildId),plusId=ctx.config.security.trustedRoleId;guild.roles.cache.set(plusId,{id:plusId,name:'Plus'});ctx.securityReady=true;
+    const ids=[plusId,...ctx.config.staffRoleIds],status=botHealth(ctx,f.client).security;
+    assert.deepEqual(new Set(status.trustedRoleIds),new Set(ids));assert.equal(status.trustedRoleIds.length,ids.length);
+    const summary=dashboard.summary(ctx,guild,guild.members.cache.get(ACTOR));
+    const names=ids.map(id=>guild.roles.cache.get(id).name);assert.deepEqual(summary.guild.securityTrustedRoleNames,names);
+    for(const name of names)assert.ok(summary.guild.securityTrustedRoleName.includes(name));
+    ctx.config.staffRoleIds.push(plusId,ctx.config.staffRoleIds[0]);
+    assert.deepEqual(botHealth(ctx,f.client).security.trustedRoleIds,ids);
+    assert.deepEqual(dashboard.summary(ctx,guild,guild.members.cache.get(ACTOR)).guild.securityTrustedRoleNames,names);
+  }
+});
+
 test('oude gangpot-DM-tijden worden naar vrijdag en zaterdag gemigreerd; de nieuwe deadline is zaterdag 23:59',t=>{
   const f=fixture(t);f.ctx.store.setSetting('dashboard-config',JSON.stringify({operations:{gangpot:{deadlineTime:'21:00',fridayTime:'17:00',saturdayTime:'19:00'}}}));
   loadDashboardSettings(f.ctx);const settings=operationSettings(f.ctx).gangpot;

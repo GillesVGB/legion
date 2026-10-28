@@ -89,6 +89,25 @@ test('beveiligingsdashboard toont in beide servers actieve raidcontrole en houdt
   }finally{f.close();}
 });
 
+test('beveiligingsdashboard toont de +-rol en Lead als vrijgestelde rollen en vermeldt toegestane Discord-links in tickets',()=>{
+  const f=dashboardFixture();try{
+    const dashboard=new Dashboard({...f,locks:new Locks()}),source=readFileSync(new URL('../src/dashboard-assets/app.js',import.meta.url),'utf8');
+    for(const ctx of f.contexts.values()){
+      const guild=f.guilds.get(ctx.config.guildId);ctx.securityReady=true;
+      guild.roles.cache.set(ctx.config.security.trustedRoleId,{id:ctx.config.security.trustedRoleId,name:'+'});
+      guild.roles.cache.get(ctx.config.staffRoleIds[0]).name='Bakarov Lead';
+      const data=dashboard.summary(ctx,guild),context=vm.createContext({data,Intl,Date,Number,String,Math,URL,console});
+      vm.runInContext(source.slice(0,source.indexOf("document.addEventListener('click'"))+`\nstate.data=data;`,context);
+      const modules=vm.runInContext('modulesPage()',context),health=vm.runInContext('healthPage()',context);
+      for(const html of [modules,health]){
+        assert.match(html,/Vrijgestelde rollen:/);assert.match(html,/\+ en Bakarov Lead/);
+        assert.match(html,/Lead is vrijgesteld van automatische beveiligingsstraffen/);assert.match(html,/juiste Discordrechten en rolvolgorde/);
+      }
+      assert.match(modules,/Discord-uitnodigingen en Discord-berichtlinks zijn altijd toegestaan in geregistreerde gewone tickets en sollicitatietickets/);
+    }
+  }finally{f.close();}
+});
+
 test('mediakanaal is alleen in de community instelbaar voor administrators en de beveiligingsuitleg noemt YouTube en Medal',()=>{
   const f=dashboardFixture();try{
     const dashboard=new Dashboard({...f,locks:new Locks()}),source=readFileSync(new URL('../src/dashboard-assets/app.js',import.meta.url),'utf8'),mediaChannelId='1555726441944064011';

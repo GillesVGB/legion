@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AuditLogEvent } from 'discord.js';
+import { AuditLogEvent, PermissionsBitField, PermissionFlagsBits as P } from 'discord.js';
 import { handleSecurityAudit,handleSecurityJoin,handleSecurityMessage,resetSecurityState } from '../src/security.mjs';
 import { loadConfig } from '../src/config.mjs';
 
@@ -21,6 +21,11 @@ function mediaFixture({guildId=COMMUNITY,channelId=guildId===MAIN?'1555685632704
   f.message=(...args)=>Object.assign(message(...args),{channelId});
   return f;
 }
+function ticketFixture({kind='ticket',status='open',channelId='100000000000000100'}={}){
+  const f=mediaFixture({channelId}),dossier={id:'registered-case',kind,status,channel_id:channelId};
+  f.ctx.store.caseByChannel=id=>id===channelId?dossier:null;
+  return{...f,dossier};
+}
 
 test('trusted role bypasses message automod; ordinary users have a link removed and repeated links ban them',async()=>{
   resetSecurityState();const f=fixture({trusted:true});const trustedMessage=f.message('https://example.com');
@@ -29,6 +34,76 @@ test('trusted role bypasses message automod; ordinary users have a link removed 
   assert.equal(first.deleted,true);assert.equal(g.bans.length,0);
   const second=g.message('https://example.org');await handleSecurityMessage(g.ctx,second,2000);
   assert.equal(second.deleted,true);assert.equal(g.bans.length,1);assert.equal(g.bans[0].id,g.member.id);
+});
+
+test('Lead roles in both guilds bypass message and server-action penalties without needing the plus role',async()=>{
+  for(const [guildId,leadId]of [[MAIN,'1555685630707769382'],[COMMUNITY,'1555726440933363761']]){
+    resetSecurityState();const f=mediaFixture({guildId});assert.ok(f.ctx.config.staffRoleIds.includes(leadId));
+    f.member.roles.cache=new Map([[leadId,{}]]);assert.equal(f.member.roles.cache.has(f.ctx.config.security.trustedRoleId),false);
+    const messages=[f.message('https://example.org/one https://example.net/two'),f.message('Deze melding is voor iedereen',{users:4,everyone:true}),f.message('Dit is kut')];
+    for(const [index,message]of messages.entries()){await handleSecurityMessage(f.ctx,message,1000+index*100);assert.equal(message.deleted,undefined);}
+    for(const action of [AuditLogEvent.ChannelCreate,AuditLogEvent.ChannelDelete,AuditLogEvent.MemberKick,AuditLogEvent.MemberBanAdd,AuditLogEvent.MemberUpdate,AuditLogEvent.InviteCreate,AuditLogEvent.InviteDelete]){
+      await handleSecurityAudit(f.ctx,{action,executorId:f.member.id,targetId:'target',id:`lead-${action}`,executor:{bot:false},changes:[{key:'communication_disabled_until',old:null,new:'2026-10-29T12:00:00Z'}]},f.guild);
+    }
+    assert.equal(f.bans.length,0);assert.equal(f.timeouts.length,0);
+    f.member.roles.cache.delete(leadId);f.member.permissions=new PermissionsBitField(P.Administrator);
+    const removedLead=f.message('https://example.org/one https://example.net/two');await handleSecurityMessage(f.ctx,removedLead,2000);
+    assert.equal(removedLead.deleted,true);assert.equal(f.bans.length,1);
+    await handleSecurityAudit(f.ctx,{action:AuditLogEvent.ChannelDelete,executorId:f.member.id,targetId:'target',id:'former-lead-action',executor:{bot:false}},f.guild);
+    assert.equal(f.bans.length,2);
+  }
+});
+
+test('Lead joiners are exempt during a raid but administrator permissions alone do not grant exemption',async()=>{
+  for(const [guildId,leadId]of [[MAIN,'1555685630707769382'],[COMMUNITY,'1555726440933363761']]){
+    resetSecurityState();const f=mediaFixture({guildId});f.ctx.securityRaidUntil=600000;
+    f.member.roles.cache=new Map([[leadId,{}]]);f.member.permissions=new PermissionsBitField(P.Administrator);
+    await handleSecurityJoin(f.ctx,f.member,1000);assert.equal(f.timeouts.length,0);
+    f.member.roles.cache.delete(leadId);await handleSecurityJoin(f.ctx,f.member,2000);assert.equal(f.timeouts.length,1);
+  }
+});
+
+test('registered tickets and applications permit multiple raw and embedded Discord links even after closing',async()=>{
+  for(const [kind,status]of [['ticket','open'],['application','open'],['ticket','closed'],['application','accepted']]){
+    resetSecurityState();const f=ticketFixture({kind,status}),message=f.message('https://discord.gg/example123 https://discord.com/invite/example123 https://discordapp.com/invite/example123');
+    message.embeds=[{url:'https://discord.gg/example123'},{url:'https://support.discord.com/hc/nl'},{url:'https://media.discordapp.net/attachments/123/456/foto.png'}];
+    await handleSecurityMessage(f.ctx,message,1000);assert.equal(message.deleted,undefined,`${kind}/${status}`);assert.equal(f.bans.length,0);
+    const bare=f.message('discord.gg/another123 https://ptb.discordapp.com/channels/123 https://cdn.discordapp.com/attachments/123/456/foto.png https://media.discordapp.net/attachments/123/456/foto.png');await handleSecurityMessage(f.ctx,bare,21000);
+    assert.equal(bare.deleted,undefined);assert.equal(f.bans.length,0);
+  }
+});
+
+test('ticket names, category names, unrelated dossiers and mismatched guilds do not create a Discord link exception',async()=>{
+  const scenarios=[
+    f=>{delete f.ctx.store.caseByChannel;},
+    f=>{f.dossier.channel_id='100000000000000199';},
+    f=>{f.dossier.kind='other';},
+    f=>{f.guild.id=MAIN;}
+  ];
+  for(const mutate of scenarios){resetSecurityState();const f=ticketFixture();mutate(f);f.ctx.config.ticketCategoryId='ticket-category';
+    const message=f.message('https://discord.gg/example123');message.channel={name:'ticket-sollicitatie',parentId:'ticket-category'};
+    await handleSecurityMessage(f.ctx,message,1000);assert.equal(message.deleted,true);}
+});
+
+test('Discord links in tickets do not count toward bans but mixed and spoofed links remain blocked',async()=>{
+  resetSecurityState();const f=ticketFixture();
+  for(let i=0;i<3;i++){const allowed=f.message(`https://discord.gg/example${i} https://discord.com/channels/123/${i}`);await handleSecurityMessage(f.ctx,allowed,1000+i*20000);assert.equal(allowed.deleted,undefined);}
+  const mixed=f.message('https://discord.gg/allowed https://example.org/prohibited');await handleSecurityMessage(f.ctx,mixed,61000);
+  assert.equal(mixed.deleted,true);assert.equal(f.bans.length,0);
+  const other=f.message('https://example.net/second');await handleSecurityMessage(f.ctx,other,81000);assert.equal(other.deleted,true);assert.equal(f.bans.length,1);
+  for(const url of ['https://discord.gg.evil.com/example','https://discord.com@evil.com/example','https://name:password@discord.com/invite/example','https://discord.gg:8443/example']){
+    resetSecurityState();const g=ticketFixture(),message=g.message(url);await handleSecurityMessage(g.ctx,message,1000);assert.equal(message.deleted,true,url);
+  }
+});
+
+test('allowed ticket Discord links cannot hide prohibited embed URLs or skip tag and spam checks',async()=>{
+  resetSecurityState();const f=ticketFixture(),mixed=f.message('https://discord.gg/example');mixed.embeds=[{url:'https://example.com/prohibited'}];
+  await handleSecurityMessage(f.ctx,mixed,1000);assert.equal(mixed.deleted,true);assert.equal(f.bans.length,0);
+  resetSecurityState();const g=ticketFixture(),mentions=g.message('https://discord.gg/example',{users:4});await handleSecurityMessage(g.ctx,mentions,1000);
+  assert.equal(mentions.deleted,true);assert.equal(g.bans.length,1);
+  resetSecurityState();const h=ticketFixture();let repeated;
+  for(let i=0;i<3;i++){repeated=h.message('https://discord.gg/example');await handleSecurityMessage(h.ctx,repeated,1000+i*1000);}
+  assert.equal(repeated.deleted,true);assert.equal(h.timeouts.length,1);assert.equal(h.bans.length,0);
 });
 
 test('a dotted member name is not treated as a website by the media exception',async()=>{

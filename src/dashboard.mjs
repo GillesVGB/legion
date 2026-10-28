@@ -37,7 +37,7 @@ import {syncWarningRoles} from './warning-roles.mjs';
 import {monthlyReport,monthlyReportIndex} from './monthly-reports.mjs';
 import {weeklyReport,weeklyReportIndex} from './weekly-reports.mjs';
 import {DiscordLogin,DiscordLoginError} from './discord-login.mjs';
-import {initializeSecurity} from './security.mjs';
+import {initializeSecurity,securityTrustedRoleIds} from './security.mjs';
 
 const secret = () => randomBytes(32).toString('base64url');
 const digest = value => createHash('sha256').update(value).digest('hex');
@@ -151,7 +151,8 @@ export class Dashboard {
     const invitations = store.db.prepare('SELECT case_id,owner_id,target_guild_id,status,expires_at,last_error FROM acceptance_notifications ORDER BY rowid DESC LIMIT 100').all().map(item => ({ ...item, owner_name: name(item.owner_id) }));
     const activity = store.db.prepare("SELECT * FROM audit WHERE event NOT LIKE '%.started' ORDER BY id DESC LIMIT 80").all().map(item=>dashboardAuditItem(ctx,guild,item));
     const totals = store.db.prepare("SELECT COALESCE(SUM(kind='ticket' AND status='open'),0) AS tickets,COALESCE(SUM(kind='application' AND status='open'),0) AS applications,COALESCE(SUM(status='accepted'),0) AS accepted FROM cases").get();
-    return { guild: { id: guild.id, name: guild.name, ticketsEnabled: config.ticketsEnabled, warningsEnabled: Boolean(config.warnLogChannelId), securityEnabled:Boolean(config.security?.enabled), securityTrustedRoleName:config.security?.trustedRoleId?guild.roles.cache.get(config.security.trustedRoleId)?.name||config.security.trustedRoleId:null, memberRoleId: config.memberRoleId, staffRoleNames: config.staffRoleIds.map(id => guild.roles.cache.get(id)?.name || id) },
+    const securityTrustedRoleNames=securityTrustedRoleIds(config).map(id=>guild.roles.cache.get(id)?.name||id);
+    return { guild: { id: guild.id, name: guild.name, ticketsEnabled: config.ticketsEnabled, warningsEnabled: Boolean(config.warnLogChannelId), securityEnabled:Boolean(config.security?.enabled), securityTrustedRoleNames, securityTrustedRoleName:securityTrustedRoleNames.length?securityTrustedRoleNames.join(' en '):null, memberRoleId: config.memberRoleId, staffRoleNames: config.staffRoleIds.map(id => guild.roles.cache.get(id)?.name || id) },
       overview: { members: members.length, legionMembers: members.filter(member => member.legion).length, openTickets: totals.tickets,
         openApplications: totals.applications, accepted: totals.accepted,
         savedTranscripts: store.db.prepare('SELECT COUNT(*) AS total FROM transcript_views').get().total, activeWarns: store.db.prepare('SELECT COUNT(*) AS total FROM warnings WHERE removed_at IS NULL').get().total,

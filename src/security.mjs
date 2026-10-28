@@ -8,6 +8,7 @@ const LINK=/[a-z][a-z0-9+.-]*:\/\/[^\s<>]+|\bwww\.[^\s<>]+|\b(?:[a-z0-9-]+\.)+(?
 const COMMUNITY_GUILD_ID='1555726440933363753';
 const MAIN_GUILD_ID='1555685630640652338';
 const MEDIA_HOSTS=['youtube.com','youtu.be','medal.tv'];
+const DISCORD_HOSTS=['discord.gg','discord.com','discordapp.com','discordapp.net'];
 const PROFANITY=/\b(?:kanker|tering|tyfus|godverdomme|godver|kut|klootzak|eikel|lul|hoer|fuck(?:er|ing)?|shit|bitch|asshole|motherfucker)\b/iu;
 const protectedAuditActions=new Set([AuditLogEvent.ChannelCreate,AuditLogEvent.ChannelUpdate,AuditLogEvent.ChannelDelete,
   AuditLogEvent.ChannelOverwriteCreate,AuditLogEvent.ChannelOverwriteUpdate,AuditLogEvent.ChannelOverwriteDelete,
@@ -18,22 +19,31 @@ const protectedAuditActions=new Set([AuditLogEvent.ChannelCreate,AuditLogEvent.C
 
 const key=(guildId,userId)=>`${guildId}:${userId}`;
 function audit(ctx,event,actor,details){ctx.store.audit(event,actor||'',details);}
-function trusted(ctx,member){return Boolean(member&&ctx.config.security?.trustedRoleId&&member.roles?.cache?.has(ctx.config.security.trustedRoleId));}
+export function securityTrustedRoleIds(config){return[...new Set([config.security?.trustedRoleId,...(config.staffRoleIds||[])].filter(id=>typeof id==='string'&&id&&id!==config.guildId))];}
+function trusted(ctx,member){return Boolean(member&&securityTrustedRoleIds(ctx.config).some(id=>member.roles?.cache?.has(id)));}
 function shortReason(reason){return safeText(reason).slice(0,300);}
 function settings(ctx){return operationSettings(ctx).security;}
 export function securityIsEnabled(ctx){return Boolean(ctx.config.security?.enabled&&settings(ctx).enabled);}
-function mediaLinkAllowed(ctx,message,value){
-  const guildId=message.guild?.id;
-  if(guildId!==ctx.config.guildId)return false;
-  if(guildId!==MAIN_GUILD_ID&&(guildId!==COMMUNITY_GUILD_ID||!ctx.config.mediaChannelId||message.channelId!==ctx.config.mediaChannelId))return false;
+function linkHostAllowed(value,hosts,blockRedirects=false){
   try{
     const input=String(value).replace(/[)\]},.!?;]+$/u,'');
     const url=new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(input)?input:`https://${input}`);
     if(!['http:','https:'].includes(url.protocol)||url.username||url.password||url.port)return false;
     const host=url.hostname.toLowerCase().replace(/\.$/,''),path=decodeURIComponent(url.pathname).toLowerCase();
-    if(/^\/(?:redirect|attribution_link)(?:\/|$)/.test(path))return false;
-    return MEDIA_HOSTS.some(domain=>host===domain||host.endsWith(`.${domain}`));
+    if(blockRedirects&&/^\/(?:redirect|attribution_link)(?:\/|$)/.test(path))return false;
+    return hosts.some(domain=>host===domain||host.endsWith(`.${domain}`));
   }catch{return false;}
+}
+function mediaLinkAllowed(ctx,message,value){
+  const guildId=message.guild?.id;
+  if(guildId!==ctx.config.guildId)return false;
+  if(guildId!==MAIN_GUILD_ID&&(guildId!==COMMUNITY_GUILD_ID||!ctx.config.mediaChannelId||message.channelId!==ctx.config.mediaChannelId))return false;
+  return linkHostAllowed(value,MEDIA_HOSTS,true);
+}
+function registeredTicket(ctx,message){
+  if(message.guild?.id!==ctx.config.guildId)return false;
+  const dossier=ctx.store.caseByChannel?.(message.channelId);
+  return Boolean(dossier&&['ticket','application'].includes(dossier.kind)&&dossier.channel_id===message.channelId);
 }
 function incidentCount(ctx,userId,kind,now,days){
   const since=now-days*24*60*60*1000;
@@ -88,8 +98,10 @@ export async function handleSecurityMessage(ctx,message,now=Date.now()){
   const member=message.member||await message.guild.members.fetch(message.author.id).catch(()=>null);
   if(!member||trusted(ctx,member))return;
   const policy=settings(ctx),id=key(message.guild.id,member.id),allURLs=[...(message.content||'').matchAll(LINK)].map(match=>match[0]);
-  const embedURLs=(message.embeds||[]).map(embed=>embed.url).filter(Boolean),urls=allURLs.filter(url=>!mediaLinkAllowed(ctx,message,url));
-  const blockedEmbedURLs=embedURLs.filter(url=>!mediaLinkAllowed(ctx,message,url));
+  const embedURLs=(message.embeds||[]).map(embed=>embed.url).filter(Boolean),inTicket=Boolean((allURLs.length||embedURLs.length)&&registeredTicket(ctx,message));
+  const classify=url=>mediaLinkAllowed(ctx,message,url)?'media':inTicket&&linkHostAllowed(url,DISCORD_HOSTS)?'ticket':null;
+  const contentLinks=allURLs.map(url=>({url,kind:classify(url)})),previewLinks=embedURLs.map(url=>({url,kind:classify(url)}));
+  const urls=contentLinks.filter(link=>!link.kind).map(link=>link.url),blockedEmbedURLs=previewLinks.filter(link=>!link.kind);
   const linkHistory=(linkByMember.get(id)||[]).filter(entry=>now-entry.at<policy.linkWindowMinutes*60*1000);
   if(urls.length||blockedEmbedURLs.length){
     const entries=[...linkHistory,{at:now,message}],count=incidentCount(ctx,member.id,'links',now,policy.linkWindowMinutes/1440);
@@ -102,11 +114,14 @@ export async function handleSecurityMessage(ctx,message,now=Date.now()){
     }else{
       await removeMessages(ctx,[message]);
       audit(ctx,'security.link_removed',member.id,{channel:message.channelId,urls:1});
-      await notify(ctx,member,`Links zijn niet toegestaan. Je bericht is verwijderd. ${policy.linkBanCount} linkberichten binnen ${policy.linkWindowMinutes} minuten leiden tot een ban.`);
+      await notify(ctx,member,`Je bericht bevat een niet-toegestane link en is verwijderd. Bij ${policy.linkBanCount} verboden linkberichten binnen ${policy.linkWindowMinutes} minuten volgt een ban.`);
     }
     return;
   }
-  if(allURLs.length||embedURLs.length)audit(ctx,'security.media_links_allowed',member.id,{user:member.id,channel:message.channelId,urls:allURLs.length||embedURLs.length});
+  for(const [kind,event]of [['media','security.media_links_allowed'],['ticket','security.ticket_links_allowed']]){
+    const count=contentLinks.filter(link=>link.kind===kind).length||previewLinks.filter(link=>link.kind===kind).length;
+    if(count)audit(ctx,event,member.id,{user:member.id,channel:message.channelId,urls:count});
+  }
   const mentionCount=message.mentions.users.size+message.mentions.roles.size;
   if(message.mentions.everyone||mentionCount>policy.allowedMentions){
     await removeMessages(ctx,[message]);
