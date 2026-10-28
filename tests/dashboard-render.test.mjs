@@ -89,7 +89,7 @@ test('beveiligingsdashboard toont in beide servers actieve raidcontrole en houdt
   }finally{f.close();}
 });
 
-test('beveiligingsdashboard toont de +-rol en Lead als vrijgestelde rollen en vermeldt toegestane Discord-links in tickets',()=>{
+test('beveiligingsdashboard toont de +-rol en Lead als vrijgestelde rollen en vermeldt alle links als toegestaan in tickets',()=>{
   const f=dashboardFixture();try{
     const dashboard=new Dashboard({...f,locks:new Locks()}),source=readFileSync(new URL('../src/dashboard-assets/app.js',import.meta.url),'utf8');
     for(const ctx of f.contexts.values()){
@@ -103,7 +103,7 @@ test('beveiligingsdashboard toont de +-rol en Lead als vrijgestelde rollen en ve
         assert.match(html,/Vrijgestelde rollen:/);assert.match(html,/\+ en Bakarov Lead/);
         assert.match(html,/Lead is vrijgesteld van automatische beveiligingsstraffen/);assert.match(html,/juiste Discordrechten en rolvolgorde/);
       }
-      assert.match(modules,/Discord-uitnodigingen en Discord-berichtlinks zijn altijd toegestaan in geregistreerde gewone tickets en sollicitatietickets/);
+      assert.match(modules,/Alle links zijn toegestaan in geregistreerde gewone tickets en sollicitatietickets/);
     }
   }finally{f.close();}
 });

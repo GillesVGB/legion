@@ -1,4 +1,10 @@
 {
+  "2.5.22": [
+    "🎫 **Alle links toegestaan in tickets**\nIn geregistreerde gewone tickets en sollicitatietickets mogen voortaan links naar alle websites worden gedeeld. Dit geldt ook voor meerdere links in één bericht, combinaties van verschillende websites en ingesloten linkvoorbeelden.",
+    "✅ **Geen linkban door delen binnen een ticket**\nLinks in een geregistreerd ticket worden niet verwijderd door het linkfilter en tellen niet mee voor een linkban. De uitzondering blijft gelden zolang het geregistreerde ticketkanaal bestaat. Een kanaal alleen ticket noemen geeft geen vrijstelling.",
+    "🛡️ **Overige controles blijven actief**\nVoor gewone leden blijven spam-, tag- en scheldcontroles ook in tickets gelden. Buiten tickets blijven de bestaande linkregels gelden: YouTube en Medal mogen overal in de hoofdserver en alleen in media in de community.",
+    "📋 **Dashboard en logs bijgewerkt**\nHet dashboard vermeldt nu dat alle links in tickets zijn toegestaan. Toegestane ticketlinks worden in het logkanaal van de betreffende server geregistreerd. Lead en de bestaande uitzonderingsrollen blijven vrijgesteld van automatische beveiligingsstraffen."
+  ],
   "2.5.21": [
     "👑 **Lead is vrijgesteld van automatische beveiligingsstraffen**\nIn beide Discords geeft de ingestelde Lead-rol voortaan dezelfde beveiligingsvrijstelling als de bestaande +-rol. Lead kan links plaatsen en beheeracties uitvoeren zonder daarvoor automatisch te worden geband of getime-out. De gewone Discordrechten en rolvolgorde bepalen welke acties daadwerkelijk mogelijk zijn.",
     "🏷️ **De vrijstelling gebruikt de Lead-rol van de juiste server**\nIn de hoofdserver geldt rol `1555685630707769382`; in de community is dat `1555726440933363761`. De bestaande uitzonderingsrollen blijven ook vrijgesteld. Botstatus en het dashboard tonen alle vrijgestelde rollen. Een Administrator-recht zonder een vrijgestelde rol geeft geen extra beveiligingsvrijstelling.",

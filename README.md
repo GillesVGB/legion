@@ -1,6 +1,6 @@
 # Bakarov — Discord-bot voor Future RP
 
-## Beveiligingssysteem — 2.5.21
+## Beveiligingssysteem — 2.5.22
 
 De beveiliging staat standaard aan in beide servers. In de hoofdserver **`1555685630640652338`** zijn de **+-rol `1555685630770413643`** en **Lead `1555685630707769382`** vrijgesteld. In de community **`1555726440933363753`** geldt dit voor rol **`1555726440983437504`** en **Lead `1555726440933363761`**. De vrijstelling voor Lead volgt de ingestelde `staffRoleIds` van de eigen server. Een Administrator-recht zonder vrijgestelde rol geeft geen beveiligingsvrijstelling; de gewone Discordrechten blijven nodig voor beheeracties.
 
@@ -18,7 +18,7 @@ Beveiligingsmeldingen van de hoofdserver gaan naar **`1555685637129109586`**. De
 
 **YouTube en Medal per server.** In de hoofdserver **`1555685630640652338`** mogen youtube.com-, youtu.be- en medal.tv-links in alle tekstkanalen worden geplaatst. In de community zijn ze toegestaan in mediakanaal **`1555726441944064011`**. Dit geldt ook voor echte subdomeinen en de ingesloten linkvoorbeelden. Toegestane medialinks tellen niet mee voor een linkban; andere links en gemengde berichten volgen het gewone filter. Spam-, tag- en scheldcontroles blijven gelden. Een communityadministrator kan de bestemming wijzigen via **Modules instellen → Bestemmingskanalen → Media: YouTube & Medal**. De bot accepteert alleen een tekstkanaal binnen dezelfde community en bewaart de keuze bij herstarts.
 
-**Discord-links in tickets.** In geregistreerde gewone tickets en sollicitatietickets zijn discord.gg-, discord.com-, discordapp.com- en discordapp.net-links met echte subdomeinen toegestaan, inclusief Discord-bijlagen en meerdere links of hun ingesloten voorbeelden. De kanaalregistratie in de eigen botdatabase bepaalt of dit een ticket is; een kanaalnaam of categorie geeft geen vrijstelling. Zolang het geregistreerde ticketkanaal bestaat blijft de uitzondering gelden. Deze links verhogen geen linkincidentteller. Andere websites, misleidende domeinen en gemengde berichten volgen het bestaande filter; voor gewone leden blijven ook de spam-, scheld- en tagregels gelden.
+**Alle links in tickets.** In geregistreerde gewone tickets en sollicitatietickets zijn links naar alle websites toegestaan, ook meerdere links, gemengde websites en ingesloten voorbeelden. De kanaalregistratie in de eigen botdatabase bepaalt of dit een ticket is; een kanaalnaam of categorie geeft geen vrijstelling. Zolang het geregistreerde ticketkanaal bestaat blijft de uitzondering gelden. Deze links verhogen geen linkincidentteller en veroorzaken geen linkban. Voor gewone leden blijven de spam-, scheld- en tagregels gelden. Buiten tickets gelden de gewone linkregels van de betreffende server.
 
 **Changelog 2.5.18 inhalen.** Vanaf 2.5.20 controleert de bot ook de expliciet opnieuw gevraagde aankondiging van 2.5.18 en plaatst die alsnog als ze nog niet was verstuurd. De aankondiging van de huidige versie wordt ook verwerkt. Beide berichten worden bij herstarts hergebruikt.
 

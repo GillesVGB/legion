@@ -63,17 +63,17 @@ test('Lead joiners are exempt during a raid but administrator permissions alone 
   }
 });
 
-test('registered tickets and applications permit multiple raw and embedded Discord links even after closing',async()=>{
+test('registered tickets and applications permit all raw and embedded links even after closing',async()=>{
   for(const [kind,status]of [['ticket','open'],['application','open'],['ticket','closed'],['application','accepted']]){
-    resetSecurityState();const f=ticketFixture({kind,status}),message=f.message('https://discord.gg/example123 https://discord.com/invite/example123 https://discordapp.com/invite/example123');
-    message.embeds=[{url:'https://discord.gg/example123'},{url:'https://support.discord.com/hc/nl'},{url:'https://media.discordapp.net/attachments/123/456/foto.png'}];
+    resetSecurityState();const f=ticketFixture({kind,status}),message=f.message('https://discord.gg/example123 https://discord.com/invite/example123 https://example.org/documents https://www.tiktok.com/@voorbeeld');
+    message.embeds=[{url:'https://discord.gg/example123'},{url:'https://example.net/preview'},{url:'https://media.discordapp.net/attachments/123/456/foto.png'}];
     await handleSecurityMessage(f.ctx,message,1000);assert.equal(message.deleted,undefined,`${kind}/${status}`);assert.equal(f.bans.length,0);
-    const bare=f.message('discord.gg/another123 https://ptb.discordapp.com/channels/123 https://cdn.discordapp.com/attachments/123/456/foto.png https://media.discordapp.net/attachments/123/456/foto.png');await handleSecurityMessage(f.ctx,bare,21000);
+    const bare=f.message('example.com/documents discord.gg/another123 https://cdn.discordapp.com/attachments/123/456/foto.png https://media.discordapp.net/attachments/123/456/foto.png');await handleSecurityMessage(f.ctx,bare,21000);
     assert.equal(bare.deleted,undefined);assert.equal(f.bans.length,0);
   }
 });
 
-test('ticket names, category names, unrelated dossiers and mismatched guilds do not create a Discord link exception',async()=>{
+test('ticket names, category names, unrelated dossiers and mismatched guilds do not create a link exception',async()=>{
   const scenarios=[
     f=>{delete f.ctx.store.caseByChannel;},
     f=>{f.dossier.channel_id='100000000000000199';},
@@ -81,28 +81,32 @@ test('ticket names, category names, unrelated dossiers and mismatched guilds do 
     f=>{f.guild.id=MAIN;}
   ];
   for(const mutate of scenarios){resetSecurityState();const f=ticketFixture();mutate(f);f.ctx.config.ticketCategoryId='ticket-category';
-    const message=f.message('https://discord.gg/example123');message.channel={name:'ticket-sollicitatie',parentId:'ticket-category'};
+    const message=f.message('https://example.org/documents');message.channel={name:'ticket-sollicitatie',parentId:'ticket-category'};
     await handleSecurityMessage(f.ctx,message,1000);assert.equal(message.deleted,true);}
 });
 
-test('Discord links in tickets do not count toward bans but mixed and spoofed links remain blocked',async()=>{
+test('all ticket links including mixed websites never count toward link bans, while the same public links are blocked',async()=>{
   resetSecurityState();const f=ticketFixture();
-  for(let i=0;i<3;i++){const allowed=f.message(`https://discord.gg/example${i} https://discord.com/channels/123/${i}`);await handleSecurityMessage(f.ctx,allowed,1000+i*20000);assert.equal(allowed.deleted,undefined);}
-  const mixed=f.message('https://discord.gg/allowed https://example.org/prohibited');await handleSecurityMessage(f.ctx,mixed,61000);
-  assert.equal(mixed.deleted,true);assert.equal(f.bans.length,0);
-  const other=f.message('https://example.net/second');await handleSecurityMessage(f.ctx,other,81000);assert.equal(other.deleted,true);assert.equal(f.bans.length,1);
-  for(const url of ['https://discord.gg.evil.com/example','https://discord.com@evil.com/example','https://name:password@discord.com/invite/example','https://discord.gg:8443/example']){
-    resetSecurityState();const g=ticketFixture(),message=g.message(url);await handleSecurityMessage(g.ctx,message,1000);assert.equal(message.deleted,true,url);
+  for(let i=0;i<3;i++){const allowed=f.message(`https://discord.gg/example${i} https://example.org/documents/${i}`);await handleSecurityMessage(f.ctx,allowed,1000+i*20000);assert.equal(allowed.deleted,undefined);}
+  const mixed=f.message('https://discord.gg/allowed https://example.net/documents');await handleSecurityMessage(f.ctx,mixed,61000);
+  assert.equal(mixed.deleted,undefined);assert.equal(f.bans.length,0);
+  delete f.ctx.store.caseByChannel;
+  const publicLink=f.message('https://example.org/documents/0');await handleSecurityMessage(f.ctx,publicLink,81000);assert.equal(publicLink.deleted,true);assert.equal(f.bans.length,0);
+  const secondPublicLink=f.message('https://example.net/documents');await handleSecurityMessage(f.ctx,secondPublicLink,101000);assert.equal(secondPublicLink.deleted,true);assert.equal(f.bans.length,1);
+  for(const url of ['https://discord.gg.evil.com/example','https://discord.com@evil.com/example','https://name:password@discord.com/invite/example','https://discord.gg:8443/example','ftp://example.org/documents']){
+    resetSecurityState();const g=ticketFixture(),message=g.message(url);await handleSecurityMessage(g.ctx,message,1000);assert.equal(message.deleted,undefined,url);assert.equal(g.bans.length,0);
   }
 });
 
-test('allowed ticket Discord links cannot hide prohibited embed URLs or skip tag and spam checks',async()=>{
-  resetSecurityState();const f=ticketFixture(),mixed=f.message('https://discord.gg/example');mixed.embeds=[{url:'https://example.com/prohibited'}];
-  await handleSecurityMessage(f.ctx,mixed,1000);assert.equal(mixed.deleted,true);assert.equal(f.bans.length,0);
-  resetSecurityState();const g=ticketFixture(),mentions=g.message('https://discord.gg/example',{users:4});await handleSecurityMessage(g.ctx,mentions,1000);
+test('allowed ticket links and embeds still receive ordinary tag, profanity and spam penalties',async()=>{
+  resetSecurityState();const f=ticketFixture(),mixed=f.message('https://discord.gg/example');mixed.embeds=[{url:'https://example.com/preview'}];
+  await handleSecurityMessage(f.ctx,mixed,1000);assert.equal(mixed.deleted,undefined);assert.equal(f.bans.length,0);
+  resetSecurityState();const g=ticketFixture(),mentions=g.message('https://example.org/documents',{users:4});await handleSecurityMessage(g.ctx,mentions,1000);
   assert.equal(mentions.deleted,true);assert.equal(g.bans.length,1);
+  resetSecurityState();const curse=ticketFixture(),insult=curse.message('Dit is kut https://example.net/documents');await handleSecurityMessage(curse.ctx,insult,1000);
+  assert.equal(insult.deleted,true);assert.equal(curse.timeouts.length,1);
   resetSecurityState();const h=ticketFixture();let repeated;
-  for(let i=0;i<3;i++){repeated=h.message('https://discord.gg/example');await handleSecurityMessage(h.ctx,repeated,1000+i*1000);}
+  for(let i=0;i<3;i++){repeated=h.message('https://example.org/documents');await handleSecurityMessage(h.ctx,repeated,1000+i*1000);}
   assert.equal(repeated.deleted,true);assert.equal(h.timeouts.length,1);assert.equal(h.bans.length,0);
 });
 

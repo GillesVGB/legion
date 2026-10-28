@@ -8,7 +8,6 @@ const LINK=/[a-z][a-z0-9+.-]*:\/\/[^\s<>]+|\bwww\.[^\s<>]+|\b(?:[a-z0-9-]+\.)+(?
 const COMMUNITY_GUILD_ID='1555726440933363753';
 const MAIN_GUILD_ID='1555685630640652338';
 const MEDIA_HOSTS=['youtube.com','youtu.be','medal.tv'];
-const DISCORD_HOSTS=['discord.gg','discord.com','discordapp.com','discordapp.net'];
 const PROFANITY=/\b(?:kanker|tering|tyfus|godverdomme|godver|kut|klootzak|eikel|lul|hoer|fuck(?:er|ing)?|shit|bitch|asshole|motherfucker)\b/iu;
 const protectedAuditActions=new Set([AuditLogEvent.ChannelCreate,AuditLogEvent.ChannelUpdate,AuditLogEvent.ChannelDelete,
   AuditLogEvent.ChannelOverwriteCreate,AuditLogEvent.ChannelOverwriteUpdate,AuditLogEvent.ChannelOverwriteDelete,
@@ -99,7 +98,7 @@ export async function handleSecurityMessage(ctx,message,now=Date.now()){
   if(!member||trusted(ctx,member))return;
   const policy=settings(ctx),id=key(message.guild.id,member.id),allURLs=[...(message.content||'').matchAll(LINK)].map(match=>match[0]);
   const embedURLs=(message.embeds||[]).map(embed=>embed.url).filter(Boolean),inTicket=Boolean((allURLs.length||embedURLs.length)&&registeredTicket(ctx,message));
-  const classify=url=>mediaLinkAllowed(ctx,message,url)?'media':inTicket&&linkHostAllowed(url,DISCORD_HOSTS)?'ticket':null;
+  const classify=url=>inTicket?'ticket':mediaLinkAllowed(ctx,message,url)?'media':null;
   const contentLinks=allURLs.map(url=>({url,kind:classify(url)})),previewLinks=embedURLs.map(url=>({url,kind:classify(url)}));
   const urls=contentLinks.filter(link=>!link.kind).map(link=>link.url),blockedEmbedURLs=previewLinks.filter(link=>!link.kind);
   const linkHistory=(linkByMember.get(id)||[]).filter(entry=>now-entry.at<policy.linkWindowMinutes*60*1000);
