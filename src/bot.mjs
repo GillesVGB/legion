@@ -43,7 +43,7 @@ import {warnAppealRow,warnAppealRows} from './warn-appeal-ui.mjs';
 import {syncWarningRoles} from './warning-roles.mjs';
 import {initializeSecurity,securityIsEnabled,handleSecurityMessage,handleSecurityAudit,handleSecurityJoin} from './security.mjs';
 import { quiet, isStaff, requireStaff, requireAdmin, requireTickets, configureGuild, publishPanel,
-  createCase, requestCaseDecision, decideCase, handleApplicationQueueButton, handleApplicationQueueBoardButton, syncApplicationQueue, startInterview, cleanupInterviews, cleanupClosedCases, warningMessage, staffLogChannel, warnLogChannel, writeWarnLog, reconcileCases } from './service.mjs';
+  createCase, requestCaseDecision, decideCase, handleApplicationQueueButton, handleApplicationQueueBoardButton, handleApplicationQueueLeadMessage, syncApplicationQueue, startInterview, cleanupInterviews, cleanupClosedCases, warningMessage, staffLogChannel, warnLogChannel, writeWarnLog, reconcileCases } from './service.mjs';
 
 const base = loadConfig();
 console.log(`Bakarov versie ${JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version}: dashboard ${base.dashboardPublicURL ? 'via hostingadres' : 'via tunnel'}.`);
@@ -494,6 +494,10 @@ client.on(Events.MessageCreate,message=>{
   const ctx=contexts.get(message.guildId);
   if(ctx&&!shuttingDown)try{rememberMessage(ctx,message);}catch(error){console.error(`Berichtsnapshot niet opgeslagen (${error.code||error.name}).`);}
   if(ctx&&!shuttingDown)handleSecurityMessage(ctx,message).catch(error=>securityFailure(ctx,'Berichtencontrole',error));
+  if(ctx&&!shuttingDown&&!message.author?.bot){
+    const dossier=ctx.store.caseByChannel(message.channelId);
+    if(dossier?.payload.queueAt)locks.run(`${message.guildId}:case-decision:${dossier.id}`,()=>handleApplicationQueueLeadMessage(ctx,message),{wait:true}).catch(error=>console.error(`Antwoorden in wachtrijticket activeren mislukt (${error.code||error.name}).`));
+  }
 });
 client.on(Events.GuildAuditLogEntryCreate,(entry,guild)=>{
   const ctx=contexts.get(guild.id);

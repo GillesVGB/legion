@@ -338,19 +338,42 @@ async function postApplicationQueueTicketNotice(ctx,channel,dossier){
   const current=ctx.store.caseById(dossier.id);
   if(current?.payload.queueTicketNoticeSent)return;
   const card=embed(ctx.config,'Sollicitatie in de wachtrij',
-    `De sollicitatie van <@${current.owner_id}> staat in de wachtrij. De sollicitant kan dit kanaal blijven lezen, maar kan tijdelijk niet reageren. De leiding kan het dossier verder beoordelen.`).setColor(0xF59E0B);
+    `De sollicitatie van <@${current.owner_id}> staat in de wachtrij. De sollicitant kan dit kanaal blijven lezen, maar kan tijdelijk niet reageren. Zodra de leiding hier een bericht stuurt, kan de sollicitant weer antwoorden. De sollicitatie blijft daarbij in de wachtrij staan.`).setColor(0xF59E0B);
   const nonce=createHash('sha256').update(`application-queue-ticket:${current.id}:${current.payload.queueAt}`).digest('hex').slice(0,24);
   await channel.send({embeds:[card],allowedMentions:quiet,nonce,enforceNonce:true});
   ctx.store.markApplicationQueueTicketNoticeSent(current.id);
 }
 
 async function lockQueuedApplication(ctx,channel,dossier){
+  dossier=ctx.store.caseById(dossier.id);
+  if(!dossier||dossier.status!=='open'||!dossier.payload.queueAt||dossier.payload.queueStatus==='released')return;
   const ownerOverwrite=channel.permissionOverwrites.cache.get(dossier.owner_id);
+  if(dossier.payload.queueReplyFor===dossier.payload.queueAt){
+    if(!ownerOverwrite?.allow.has(P.SendMessages)||ownerOverwrite.deny.has(P.SendMessages)){
+      assertUser(channel.permissionsFor(channel.guild.members.me)?.has(P.ManageRoles),'De bot mist Rollen beheren om antwoorden in het wachtrijticket toe te staan.');
+      await channel.permissionOverwrites.edit(dossier.owner_id,{SendMessages:true},'Lead heeft gereageerd; sollicitant mag antwoorden in de wachtrij');
+    }
+    return;
+  }
   const blocked=[P.SendMessages,P.AddReactions,P.SendMessagesInThreads,P.CreatePublicThreads,P.CreatePrivateThreads];
   if(!ownerOverwrite||!ownerOverwrite.deny.has(blocked)){
     assertUser(channel.permissionsFor(channel.guild.members.me)?.has(P.ManageRoles),'De bot mist Rollen beheren om de sollicitant tijdelijk te blokkeren in het wachtrijkanaal.');
     await channel.permissionOverwrites.edit(dossier.owner_id,{SendMessages:false,AddReactions:false,SendMessagesInThreads:false,CreatePublicThreads:false,CreatePrivateThreads:false},'Bakarov sollicitatie staat in de wachtrij');
   }
+}
+
+export async function handleApplicationQueueLeadMessage(ctx,message){
+  if(!ctx.config.ticketsEnabled||message.guild?.id!==ctx.config.guildId||message.author?.bot||message.webhookId||!message.author?.id||(!message.content?.trim()&&!message.attachments?.size))return false;
+  const dossier=ctx.store.caseByChannel(message.channelId);
+  if(dossier?.kind!=='application'||dossier.status!=='open'||!dossier.payload.queueAt||dossier.payload.queueStatus==='released')return false;
+  const member=message.member||await message.guild.members.fetch(message.author.id).catch(()=>null);
+  if(!member||!isStaff({member,memberPermissions:member.permissions},ctx.config))return false;
+  const channel=message.channel;
+  if(channel?.id!==dossier.channel_id||channel.guildId!==ctx.config.guildId||!channel.topic?.includes(`dossier:${dossier.id} | application`))return false;
+  const updated=ctx.store.openApplicationQueueReplies(dossier.id,message.author.id);
+  if(!updated)return false;
+  await lockQueuedApplication(ctx,channel,updated);
+  return true;
 }
 
 async function synchronizeQueuedApplication(ctx,guild,dossier){

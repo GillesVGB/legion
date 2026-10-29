@@ -1,6 +1,7 @@
 import {embed,safeText} from './ui.mjs';
 import {cleanAudit} from './audit-sanitize.mjs';
 const names={
+  'application.queue_replies_opened':'💬 Antwoorden toegestaan na bericht van Lead',
   'message.delete':'🗑️ Bericht verwijderd','message.edit':'✏️ Bericht aangepast',
   'security.invite_created':'🔗 Uitnodiging aangemaakt — toegestaan',
   'security.media_links_allowed':'🎬 YouTube-/Medal-link toegestaan',

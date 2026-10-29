@@ -647,6 +647,7 @@ export class Store {
       assertUser(dossier?.kind==='application'&&dossier.status==='open','Alleen een open sollicitatie kan in de wachtrij worden geplaatst.');
       if(dossier.payload.queueAt&&dossier.payload.queueStatus!=='released')return dossier;
       const payload={...dossier.payload,queueAt:now,queueStatus:'queued',queueBy:actor,queueNoticeSent:false,queueTicketNoticeSent:false};
+      delete payload.queueReplyFor;delete payload.queueReplyOpenedAt;delete payload.queueReplyOpenedBy;
       this.db.prepare('UPDATE cases SET payload=? WHERE id=? AND status=\'open\'').run(JSON.stringify(payload),id);
       this.audit('application.queued',actor,{id,owner:dossier.owner_id,queuedAt:now});
       return this.caseById(id);
@@ -674,6 +675,17 @@ export class Store {
     this.db.prepare('UPDATE cases SET payload=? WHERE id=?').run(JSON.stringify(payload),id);
     this.audit('application.queue_dm_failed',this.config.clientId,{id,owner:dossier.owner_id,error:String(error)});
     return this.caseById(id);
+  }
+  openApplicationQueueReplies(id,actor,now=Date.now()) {
+    return this.transaction(()=>{
+      const dossier=this.caseById(id);
+      if(dossier?.kind!=='application'||dossier.status!=='open'||!dossier.payload.queueAt||dossier.payload.queueStatus==='released')return null;
+      if(dossier.payload.queueReplyFor===dossier.payload.queueAt)return dossier;
+      const payload={...dossier.payload,queueReplyFor:dossier.payload.queueAt,queueReplyOpenedAt:now,queueReplyOpenedBy:actor};
+      this.db.prepare('UPDATE cases SET payload=? WHERE id=?').run(JSON.stringify(payload),id);
+      this.audit('application.queue_replies_opened',actor,{id,owner:dossier.owner_id,channel:dossier.channel_id});
+      return this.caseById(id);
+    });
   }
   pendingApplicationQueueNotices(now=Date.now()) { return this.activeCases().filter(item=>item.kind==='application'&&item.payload.queueAt&&item.payload.queueStatus!=='released'&&!item.payload.queueNoticeSent&&(item.payload.queueNoticeRetryAt||0)<=now); }
   queuedApplications() { return this.activeCases().filter(item=>item.kind==='application'&&item.payload.queueAt&&item.payload.queueStatus!=='released'); }

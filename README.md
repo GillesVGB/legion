@@ -1,5 +1,11 @@
 # Bakarov — Discord-bot voor Future RP
 
+## Antwoorden in wachtrijtickets — 2.5.25
+
+Zodra Lead een gewoon bericht of een bijlage stuurt in een open, geregistreerd sollicitatieticket in de wachtrij, mag de sollicitant daar weer typen. Dit werkt ook voor bestaande wachtrijtickets. Het dossier blijft in dezelfde categorie, met dezelfde naam en wachtrijpositie. Botmeldingen en berichten van gewone leden openen het ticket niet.
+
+De toestemming wordt opgeslagen en blijft bij herstarts en synchronisatie behouden. Een tijdelijke rechtenfout wordt opnieuw geprobeerd; de bot heeft Rollen beheren nodig. Opnieuw in de wachtrij zetten blokkeert antwoorden weer totdat Lead opnieuw reageert. Gesloten of afgehandelde dossiers worden niet heropend. De knop **Ticket heropenen** blijft het dossier volledig uit de wachtrij halen.
+
 ## Geheugen en opslag — 2.5.24
 
 De Discordcache is begrensd op 25 berichten per kanaal; een opruimronde per minuut begrenst het totaal op 500 en verwijdert berichten ouder dan 15 minuten. De leden-, rollen- en kanaalcaches blijven intact. Voor berichtlogs bewaart een geredigeerde schijfcache maximaal 1.000 ledenberichten per guild gedurende 24 uur. Uitgeschakelde logs schrijven geen nieuwe berichtinhoud.
