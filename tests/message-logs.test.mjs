@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Collection,PermissionsBitField,PermissionFlagsBits as P} from 'discord.js';
 import {dashboardFixture,OTHER} from './dashboard-fixture.mjs';
-import {recordMessageEvent,redactMessageText} from '../src/message-logs.mjs';
+import {recordMessageEvent,redactMessageText,rememberMessage} from '../src/message-logs.mjs';
 import {auditPayloads,auditPresentation,dashboardAuditItem} from '../src/audit-format.mjs';
 import {flushAuditLogs} from '../src/audit-log.mjs';
 import {saveDashboardSettings} from '../src/dashboard-settings.mjs';
@@ -23,7 +23,8 @@ test('verwijderde berichten tonen hun tekst, auteur, kanaal en bijlagen met een 
 test('bewerkte berichten tonen de oude en nieuwe tekst; een onbekende oude inhoud wordt niet verzonnen',t=>{
   const f=fixture(t),before=message(f,'Oorspronkelijke tekst'),after=message(f,'Aangepaste tekst'),id=recordMessageEvent(f.ctx,'message.edit',after,before),view=auditPresentation(row(f,id),snapshot(f,id));
   assert.deepEqual(view.sections.map(item=>item.text),['Oorspronkelijke tekst','Aangepaste tekst']);
-  const unknown=recordMessageEvent(f.ctx,'message.edit',after,{...before,partial:true,content:null});assert.ok(auditPresentation(row(f,unknown),snapshot(f,unknown)).sections[0].text.includes('niet beschikbaar'));
+  const unknownAfter={...after,id:'100000000000001235'},unknownBefore={...before,id:unknownAfter.id,partial:true,content:null};
+  const unknown=recordMessageEvent(f.ctx,'message.edit',unknownAfter,unknownBefore);assert.ok(auditPresentation(row(f,unknown),snapshot(f,unknown)).sections[0].text.includes('niet beschikbaar'));
   const count=f.ctx.store.db.prepare('SELECT COUNT(*) AS n FROM audit').get().n;recordMessageEvent(f.ctx,'message.edit',after,after);recordMessageEvent(f.ctx,'message.delete',{...after,author:{bot:true}});assert.equal(f.ctx.store.db.prepare('SELECT COUNT(*) AS n FROM audit').get().n,count);
 });
 test('lege tekst en een niet gecachet bericht krijgen verschillende duidelijke meldingen',t=>{
@@ -59,4 +60,55 @@ test('tokens, wachtwoorden en toegangssleutels blijven verborgen, gewone tekst e
 test('uitgeschakelde logs bewaren geen nieuwe berichtinhoud; oude metadata blijft leesbaar zonder gefingeerde tekst',t=>{
   const f=fixture(t);saveDashboardSettings(f.ctx,{operations:{logs:{enabled:false}}},'100000000000000001');const id=recordMessageEvent(f.ctx,'message.delete',message(f,'Niet bewaren'));assert.equal(f.ctx.store.db.prepare('SELECT * FROM message_audit WHERE audit_id=?').get(id),undefined);
   const view=dashboardAuditItem(f.ctx,f.guild,row(f,id));assert.ok(view.presentation.sections[0].text.includes('niet beschikbaar'));
+});
+
+test('een verwijderd bericht buiten de Discordcache behoudt tekst en bijlagen via de begrensde schijfcache',t=>{
+  const f=fixture(t),item=message(f,'Bewaard voor een verwijderingslog');item.attachments.set('file',{name:'bewijs.png',url:'https://cdn.discordapp.com/attachments/1/2/bewijs.png',size:123});
+  assert.equal(rememberMessage(f.ctx,item,NOW),true);
+  const partial={id:item.id,guildId:f.guild.id,channelId:item.channelId,partial:true,content:null,attachments:new Collection()};
+  const id=recordMessageEvent(f.ctx,'message.delete',partial,null,{now:NOW+1000}),saved=snapshot(f,id);
+  assert.equal(saved.after.text,item.content);assert.equal(saved.authorId,item.author.id);assert.equal(saved.authorName,item.member.displayName);
+  assert.equal(saved.after.attachments[0].name,'bewijs.png');assert.equal(f.ctx.store.db.prepare('SELECT COUNT(*) AS n FROM recent_messages').get().n,0);
+});
+
+test('wijzigingen gebruiken de laatste bekende tekst en werken de schijfcache bij voor een latere verwijdering',t=>{
+  const f=fixture(t),before=message(f,'Eerste tekst'),after=message(f,'Tweede tekst');rememberMessage(f.ctx,before,NOW);
+  const partial={...before,partial:true,content:null,author:null,member:null};
+  const edit=recordMessageEvent(f.ctx,'message.edit',after,partial,{now:NOW+1000});
+  assert.equal(snapshot(f,edit).before.text,'Eerste tekst');assert.equal(snapshot(f,edit).after.text,'Tweede tekst');
+  const deleted=recordMessageEvent(f.ctx,'message.delete',partial,null,{now:NOW+2000});assert.equal(snapshot(f,deleted).after.text,'Tweede tekst');
+});
+
+test('oude berichten vervallen na 24 uur en de schijfcache bewaart maximaal duizend berichten per server',t=>{
+  const f=fixture(t),item=message(f,'Te oud');rememberMessage(f.ctx,item,NOW);
+  const partial={...item,partial:true,content:null,author:null,member:null};
+  const expired=recordMessageEvent(f.ctx,'message.delete',partial,null,{now:NOW+24*60*60*1000});assert.equal(snapshot(f,expired).after.available,false);
+  for(let i=0;i<1002;i++)rememberMessage(f.ctx,{...item,id:String(BigInt(item.id)+BigInt(i)),content:`Bericht ${i}`},NOW+i);
+  assert.equal(f.ctx.store.db.prepare('SELECT COUNT(*) AS n FROM recent_messages').get().n,1000);
+  assert.equal(f.ctx.store.db.prepare('SELECT message_id FROM recent_messages WHERE message_id=?').get(item.id),undefined);
+  rememberMessage(f.ctx,{...item,id:'100000000000009999'},NOW+24*60*60*1000+1002);
+  assert.equal(f.ctx.store.db.prepare('SELECT COUNT(*) AS n FROM recent_messages').get().n,1);
+});
+
+test('de schijfcache schermt geheimen af en deelt geen inhoud tussen kanalen, auteurs of servers',t=>{
+  const f=fixture(t),item=message(f,`Normale tekst ${f.ctx.config.token} wachtwoord=geheim https://example.com/#k=privaat`);
+  rememberMessage(f.ctx,item,NOW);const stored=f.ctx.store.db.prepare('SELECT snapshot FROM recent_messages WHERE message_id=?').get(item.id).snapshot;
+  assert.ok(!stored.includes(f.ctx.config.token)&&!stored.includes('geheim')&&!stored.includes('privaat'));
+  const partial={...item,partial:true,content:null,author:null,member:null};
+  const wrongChannel=recordMessageEvent(f.ctx,'message.delete',{...partial,channelId:'other-channel'},null,{now:NOW+1});assert.equal(snapshot(f,wrongChannel).after.available,false);
+  const wrongAuthor=recordMessageEvent(f.ctx,'message.delete',{...partial,author:{id:'100000000000000088'}},null,{now:NOW+2});assert.equal(snapshot(f,wrongAuthor).after.available,false);
+  rememberMessage(f.ctx,item,NOW+3);
+  assert.equal(recordMessageEvent(f.ctx,'message.delete',{...partial,guildId:'other-guild'},null,{now:NOW+4}),undefined);
+  assert.equal(recordMessageEvent(f.ctx,'message.delete',{...partial,guildId:f.guild.id,guild:{id:'other-guild'}},null,{now:NOW+4}),undefined);
+  assert.equal(rememberMessage(f.ctx,{...item,guildId:'other-guild'},NOW+4),false);
+});
+
+test('bots en uitgeschakelde logs schrijven geen nieuwe berichtinhoud in de schijfcache',t=>{
+  const f=fixture(t),item=message(f,'Niet opslaan');
+  assert.equal(rememberMessage(f.ctx,{...item,author:{id:'bot',bot:true}},NOW),false);
+  rememberMessage(f.ctx,item,NOW);saveDashboardSettings(f.ctx,{operations:{logs:{enabled:false}}},'100000000000000001');
+  assert.equal(rememberMessage(f.ctx,{...item,id:'100000000000009999'},NOW+1),false);
+  const id=recordMessageEvent(f.ctx,'message.delete',{...item,partial:true,content:null,author:null},null,{now:NOW+2});
+  assert.equal(f.ctx.store.db.prepare('SELECT * FROM message_audit WHERE audit_id=?').get(id),undefined);
+  assert.equal(f.ctx.store.db.prepare('SELECT COUNT(*) AS n FROM recent_messages').get().n,0);
 });

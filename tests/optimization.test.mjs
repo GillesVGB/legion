@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,readdirSync,rmSync} from 'node:fs';
 import {join} from 'node:path';
-import {tmpdir} from 'node:os';
+import {gunzipSync} from 'node:zlib';
 import {DatabaseSync} from 'node:sqlite';
 import {Collection} from 'discord.js';
 import {dashboardFixture,ACTOR,OTHER} from './dashboard-fixture.mjs';
@@ -16,14 +16,15 @@ import {publishRoster} from '../src/roster.mjs';
 import {memberOverview,handleMemberOverview} from '../src/member-overview.mjs';
 import {Store} from '../src/store.mjs';
 const MAIN='1555685630640652338';
-function temp(t){const path=mkdtempSync(join(tmpdir(),'legion private backup '));t.after(()=>rmSync(path,{recursive:true,force:true}));return path;}
+function temp(t){const root=join(process.cwd(),'.test-tmp');mkdirSync(root,{recursive:true});const path=mkdtempSync(join(root,'legion private backup '));t.after(()=>rmSync(path,{recursive:true,force:true}));return path;}
+function backupFile(path,id,name){const folder=join(path,'backups',id),manifest=JSON.parse(readFileSync(join(folder,'manifest.json'),'utf8'));return gunzipSync(readFileSync(join(folder,manifest.storage[name])));}
 
 test('een back-up neemt gecommitteerde SQLite-WAL-data mee, bewaart bestanden privé en migreert de bron niet',t=>{
   const path=temp(t),source=join(path,`legion-${MAIN}.sqlite`),db=new DatabaseSync(source);db.exec('PRAGMA journal_mode=WAL; PRAGMA user_version=13; CREATE TABLE wallets(user_id TEXT,balance INTEGER); INSERT INTO wallets VALUES(\'lid\',750);');
   mkdirSync(join(path,'transcripts'));writeFileSync(join(path,'transcripts','case.txt'),'Gesprek');writeFileSync(join(path,'.env'),'GEHEIM');
-  const result=createDataBackup(path,'1.8.0',{automatic:true,now:1000});const backup=new DatabaseSync(join(path,'backups',result.id,`legion-${MAIN}.sqlite`),{readOnly:true});
+  const result=createDataBackup(path,'1.8.0',{automatic:true,now:1000}),restored=join(path,'restored-copy.sqlite');writeFileSync(restored,backupFile(path,result.id,`legion-${MAIN}.sqlite`));const backup=new DatabaseSync(restored,{readOnly:true});
   try{assert.equal(backup.prepare('SELECT balance FROM wallets').get().balance,750);assert.equal(backup.prepare('PRAGMA user_version').get().user_version,13);assert.equal(db.prepare('PRAGMA user_version').get().user_version,13);}finally{backup.close();db.close();}
-  const manifest=JSON.parse(readFileSync(join(path,'backups',result.id,'manifest.json'),'utf8'));assert.ok(!manifest.files.some(file=>file==='.env'||file.endsWith('-wal')||file.endsWith('-shm')));assert.equal(readFileSync(join(path,'backups',result.id,'transcripts','case.txt'),'utf8'),'Gesprek');
+  const manifest=JSON.parse(readFileSync(join(path,'backups',result.id,'manifest.json'),'utf8'));assert.equal(manifest.format,2);assert.ok(!manifest.files.some(file=>file==='.env'||file.endsWith('-wal')||file.endsWith('-shm')));assert.equal(backupFile(path,result.id,'transcripts/case.txt').toString(),'Gesprek');
   assert.equal(createDataBackup(path,'1.8.0',{automatic:true,now:2000}).reason,'current');assert.equal(backupSummary(path).length,1);
 });
 

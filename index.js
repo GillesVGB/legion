@@ -2,11 +2,14 @@ import { existsSync, chmodSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname } from 'node:path';
 import { loadEnvFile } from 'node:process';
+import {hostingNodeOptions} from './src/startup-memory.mjs';
 
 process.chdir(dirname(fileURLToPath(import.meta.url)));
 const envFile = fileURLToPath(new URL('.env', import.meta.url));
 if (existsSync(envFile)) loadEnvFile(envFile);
-// FPS.ms start index.js rechtstreeks. Pas NODE_OPTIONS uit .env toe vóór de bot laadt.
+const hostingOptions=hostingNodeOptions();
+if(hostingOptions)process.env.NODE_OPTIONS=hostingOptions;
+// Pas de hostinggeheugeninstellingen toe voordat de bot en zijn dependencies laden.
 if (process.platform === 'linux' && process.env.NODE_OPTIONS && !process.env.LEGION_ENV_APPLIED && typeof process.execve === 'function') {
   process.execve(process.execPath, [process.execPath, ...process.execArgv, ...process.argv.slice(1)], { ...process.env, LEGION_ENV_APPLIED: '1' });
 }
@@ -15,6 +18,10 @@ if (process.platform !== 'win32') {
   const executable = cloudflaredExecutable();
   if (executable && existsSync(executable)) chmodSync(executable, 0o755);
 }
+const {cleanupRuntimeCaches}=await import('./src/storage-maintenance.mjs');
+const cacheCleanup=cleanupRuntimeCaches(dirname(fileURLToPath(import.meta.url)));
+if(cacheCleanup.removedBytes)console.log(`Tijdelijke installatiecache opgeruimd: ${(cacheCleanup.removedBytes/1024/1024).toFixed(1)} MB vrijgemaakt.`);
+if(cacheCleanup.failures.length)console.warn(`Tijdelijke installatiecache kon niet volledig worden opgeruimd (${cacheCleanup.failures.length} locaties). De bot start verder.`);
 try { await import('discord.js'); }
 catch (error) {
   if (error.code !== 'ERR_MODULE_NOT_FOUND') throw error;

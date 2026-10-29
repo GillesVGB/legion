@@ -22,6 +22,11 @@ export class Store {
     this.db.exec(`
       PRAGMA journal_mode = WAL;
       PRAGMA busy_timeout = 5000;
+      PRAGMA cache_size = -2048;
+      PRAGMA mmap_size = 0;
+      PRAGMA temp_store = FILE;
+      PRAGMA journal_size_limit = 1048576;
+      PRAGMA wal_autocheckpoint = 256;
       CREATE TABLE IF NOT EXISTS warnings (
         id TEXT PRIMARY KEY, user_id TEXT NOT NULL, reason TEXT NOT NULL,
         actor_id TEXT NOT NULL, created_at INTEGER NOT NULL,
@@ -212,6 +217,10 @@ export class Store {
         message_id TEXT,next_attempt INTEGER NOT NULL DEFAULT 0,last_error TEXT
       );
       CREATE TABLE IF NOT EXISTS message_audit (audit_id INTEGER PRIMARY KEY,snapshot TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS recent_messages (message_id TEXT PRIMARY KEY,channel_id TEXT NOT NULL,snapshot TEXT NOT NULL,updated_at INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS recent_messages_updated ON recent_messages(updated_at);
+      CREATE INDEX IF NOT EXISTS audit_created ON audit(created_at);
+      CREATE INDEX IF NOT EXISTS audit_delivery_range ON audit_deliveries(last_id);
       CREATE TABLE IF NOT EXISTS release_announcements (version TEXT PRIMARY KEY,message_id TEXT,last_error TEXT);
       CREATE TABLE IF NOT EXISTS monthly_reports (
         month TEXT PRIMARY KEY,payload TEXT NOT NULL,created_at INTEGER NOT NULL,

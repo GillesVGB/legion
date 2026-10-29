@@ -31,7 +31,9 @@ import {announceReleases} from './release-announcements.mjs';
 import {publishAbsencePanel,handleAbsencePanel,handleAbsenceSelection} from './absence-panel.mjs';
 import {handleMemberOverview} from './member-overview.mjs';
 import {runMaintenanceJobs} from './maintenance.mjs';
-import {recordMessageEvent} from './message-logs.mjs';
+import {recordMessageEvent,rememberMessage} from './message-logs.mjs';
+import {createRuntimeClientOptions,startRuntimeCacheMaintenance} from './runtime-limits.mjs';
+import {maintainStorage} from './storage-maintenance.mjs';
 import {syncBotBranding} from './branding.mjs';
 import {handleMonthlyReport} from './monthly-reports.mjs';
 import {syncWeeklyReports,handleWeeklyReport} from './weekly-reports.mjs';
@@ -45,7 +47,8 @@ import { quiet, isStaff, requireStaff, requireAdmin, requireTickets, configureGu
 
 const base = loadConfig();
 console.log(`Bakarov versie ${JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version}: dashboard ${base.dashboardPublicURL ? 'via hostingadres' : 'via tunnel'}.`);
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMessageReactions, GatewayIntentBits.GuildModeration], partials:[Partials.Message,Partials.Channel,Partials.Reaction,Partials.User], allowedMentions: quiet });
+const client = new Client({ ...createRuntimeClientOptions(), intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMessageReactions, GatewayIntentBits.GuildModeration], partials:[Partials.Message,Partials.Channel,Partials.Reaction,Partials.User], allowedMentions: quiet });
+const stopRuntimeCaches=startRuntimeCacheMaintenance(client);
 const locks = new Locks();
 const contexts = new Map();
 const cooldowns = new Map();
@@ -489,6 +492,7 @@ client.on(Events.ChannelUpdate,(before,after)=>{if(after.guild)logGuildEvent(aft
 client.on(Events.GuildRoleUpdate,(before,after)=>logGuildEvent(after.guild,'role.update',{id:after.id,nameChanged:before.name!==after.name,permissionsChanged:before.permissions.bitfield!==after.permissions.bitfield}));
 client.on(Events.MessageCreate,message=>{
   const ctx=contexts.get(message.guildId);
+  if(ctx&&!shuttingDown)try{rememberMessage(ctx,message);}catch(error){console.error(`Berichtsnapshot niet opgeslagen (${error.code||error.name}).`);}
   if(ctx&&!shuttingDown)handleSecurityMessage(ctx,message).catch(error=>securityFailure(ctx,'Berichtencontrole',error));
 });
 client.on(Events.GuildAuditLogEntryCreate,(entry,guild)=>{
@@ -571,6 +575,7 @@ async function performMaintenance(){
       ['transcripts',async()=>{for(const delivery of ctx.store.pendingTranscripts())await locks.run(`${ctx.config.guildId}:transcript:${delivery.case_id}`,()=>archiveTranscript(ctx,client,delivery.case_id,staffLogChannel)).catch(()=>{});}],
       ['gesloten-dossiers',()=>cleanupClosedCases(ctx,client)]);
     if(guild)jobs.push(['botlogs',()=>flushAuditLogs(ctx,guild)]);
+    jobs.push(['opslagonderhoud',()=>maintainStorage(ctx)]);
     await runMaintenanceJobs(ctx,jobs,{shouldStop:()=>shuttingDown});
   }
 }
@@ -588,6 +593,7 @@ client.on(Events.MessageReactionRemoveEmoji,reaction=>{const ctx=contexts.get(re
 async function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
+  stopRuntimeCaches();
   clearInterval(timer);
   clearInterval(transcriptTimer);
   clearInterval(rosterTimer);

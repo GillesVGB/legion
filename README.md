@@ -1,5 +1,13 @@
 # Bakarov — Discord-bot voor Future RP
 
+## Geheugen en opslag — 2.5.24
+
+De Discordcache is begrensd op 25 berichten per kanaal; een opruimronde per minuut begrenst het totaal op 500 en verwijdert berichten ouder dan 15 minuten. De leden-, rollen- en kanaalcaches blijven intact. Voor berichtlogs bewaart een geredigeerde schijfcache maximaal 1.000 ledenberichten per guild gedurende 24 uur. Uitgeschakelde logs schrijven geen nieuwe berichtinhoud.
+
+Back-ups worden met kleine gzipblokken gecomprimeerd. Standaard blijven twee kopieën binnen een budget van 96 MB; de nieuwste complete kopie wordt altijd behouden. Bestaande opgeslagen aantallen blijven gelden. Aantal, bytebudget en de lokale bewaartermijn van afgeleverde bericht-/actielogs zijn instelbaar via Modules instellen. Die logtermijn is standaard 90 dagen. Waarschuwingen, gangpot, transcripts, wachtende logs en historisch bewijs voor afmeldingen en lidmaatschap blijven behouden.
+
+De bot ruimt bekende installatiecaches op, beperkt de SQLite-paginacache en verkleint WAL-bestanden. Databasecompactie gebeurt alleen wanneer er voldoende vrije ruimte is. Dit verlaagt het verbruik; de geheugen- en opslagquota van het hostingabonnement blijven gelijk. Privé databases en herstelbestanden worden nooit naar GitHub gepusht.
+
 ## Beveiligingssysteem — 2.5.23
 
 De beveiliging staat standaard aan in beide servers. In de hoofdserver **`1555685630640652338`** zijn de **+-rol `1555685630770413643`** en **Lead `1555685630707769382`** vrijgesteld. In de community **`1555726440933363753`** geldt dit voor rol **`1555726440983437504`** en **Lead `1555726440933363761`**. De vrijstelling voor Lead volgt de ingestelde `staffRoleIds` van de eigen server. Een Administrator-recht zonder vrijgestelde rol geeft geen beveiligingsvrijstelling; de gewone Discordrechten blijven nodig voor beheeracties.
