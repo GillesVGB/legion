@@ -1,5 +1,11 @@
 # Bakarov — Discord-bot voor Future RP
 
+## Ticketmelding na antwoord van Lead — 2.5.26
+
+Met **`/gangpot openstaand`** ziet de leiding privé wie nog moet betalen en welke meldingen op goedkeuring wachten, inclusief het resterende bedrag per lid en het totaal. `termijn` is optioneel en gebruikt dezelfde zaterdagdatum als de andere gangpotcommando's. Lead, goedgekeurde vrijstellingen, instapweken en vertrokken leden worden uitgesloten. Lange lijsten worden volledig over meerdere privépagina's getoond.
+
+Wanneer een wachtrijticket na een bericht van Lead weer antwoorden toestaat, plaatst de bot ook een bericht in dat ticket en tagt uitsluitend de sollicitant: **De leiding heeft gereageerd. Je kunt in dit ticket weer antwoorden. Je sollicitatie blijft in de wachtrij staan.** De melding wordt per wachtrijronde opgeslagen. Herstarts en volgende Leadberichten plaatsen haar niet opnieuw; mislukte verzending wordt herhaald. Bestaande vrijgegeven wachtrijtickets krijgen hun ontbrekende melding bij de normale synchronisatie.
+
 ## Antwoorden in wachtrijtickets — 2.5.25
 
 Zodra Lead een gewoon bericht of een bijlage stuurt in een open, geregistreerd sollicitatieticket in de wachtrij, mag de sollicitant daar weer typen. Dit werkt ook voor bestaande wachtrijtickets. Het dossier blijft in dezelfde categorie, met dezelfde naam en wachtrijpositie. Botmeldingen en berichten van gewone leden openen het ticket niet.

@@ -648,6 +648,7 @@ export class Store {
       if(dossier.payload.queueAt&&dossier.payload.queueStatus!=='released')return dossier;
       const payload={...dossier.payload,queueAt:now,queueStatus:'queued',queueBy:actor,queueNoticeSent:false,queueTicketNoticeSent:false};
       delete payload.queueReplyFor;delete payload.queueReplyOpenedAt;delete payload.queueReplyOpenedBy;
+      delete payload.queueReplyNoticeFor;delete payload.queueReplyNoticeId;
       this.db.prepare('UPDATE cases SET payload=? WHERE id=? AND status=\'open\'').run(JSON.stringify(payload),id);
       this.audit('application.queued',actor,{id,owner:dossier.owner_id,queuedAt:now});
       return this.caseById(id);
@@ -685,6 +686,15 @@ export class Store {
       this.db.prepare('UPDATE cases SET payload=? WHERE id=?').run(JSON.stringify(payload),id);
       this.audit('application.queue_replies_opened',actor,{id,owner:dossier.owner_id,channel:dossier.channel_id});
       return this.caseById(id);
+    });
+  }
+  markApplicationQueueReplyNoticeSent(id,queueAt,messageId) {
+    return this.transaction(()=>{
+      const dossier=this.caseById(id);
+      if(dossier?.kind!=='application'||dossier.status!=='open'||dossier.payload.queueStatus==='released'||dossier.payload.queueAt!==queueAt||dossier.payload.queueReplyFor!==queueAt||dossier.payload.queueReplyNoticeFor===queueAt)return;
+      const payload={...dossier.payload,queueReplyNoticeFor:queueAt,queueReplyNoticeId:messageId};
+      this.db.prepare('UPDATE cases SET payload=? WHERE id=?').run(JSON.stringify(payload),id);
+      this.audit('application.queue_reply_notice',this.config.clientId,{id,owner:dossier.owner_id,channel:dossier.channel_id,message:messageId});
     });
   }
   pendingApplicationQueueNotices(now=Date.now()) { return this.activeCases().filter(item=>item.kind==='application'&&item.payload.queueAt&&item.payload.queueStatus!=='released'&&!item.payload.queueNoticeSent&&(item.payload.queueNoticeRetryAt||0)<=now); }

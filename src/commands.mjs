@@ -78,6 +78,8 @@ export function commands(maxBet, ticketsEnabled = true) {
     cmd('gangpot','Gangpotbijdragen en bevestigde in-game betalingen beheren')
       .addSubcommand(s=>s.setName('status').setDescription('Bekijk privé je eigen weekbijdrage en deadline'))
       .addSubcommand(s=>s.setName('refresh').setDescription('Werk gangpotinformatie en betaaloverzicht direct bij (leiding)'))
+      .addSubcommand(s=>s.setName('openstaand').setDescription('Bekijk wie nog moet betalen of op goedkeuring wacht (leiding)')
+        .addStringOption(o=>o.setName('termijn').setDescription('Zaterdag: DD-MM-JJJJ; standaard huidige week').setMaxLength(10)))
       .addSubcommand(s=>s.setName('betaling').setDescription('Meld je eigen in-game betaling; Lead zet het vinkje')
         .addIntegerOption(o=>o.setName('bedrag').setDescription('Betaald bedrag; standaard 25000').setMinValue(1).setMaxValue(100000000))
         .addStringOption(o=>o.setName('termijn').setDescription('Zaterdag van de termijn: DD-MM-JJJJ; standaard huidige week').setMaxLength(10))

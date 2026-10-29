@@ -23,15 +23,20 @@ async function fixture(t){
 }
 
 test('een gewoon Leadbericht opent alleen antwoorden voor de sollicitant en onderhoud vergrendelt het ticket niet opnieuw',async t=>{
-  const f=await fixture(t);assert.equal(await handleApplicationQueueLeadMessage(f.ctx,f.message()),true);
+  const f=await fixture(t),send=f.channel.send;let noticePayload;
+  f.channel.send=async payload=>{noticePayload=payload;return send(payload);};
+  assert.equal(await handleApplicationQueueLeadMessage(f.ctx,f.message()),true);
   const saved=f.ctx.store.caseById(f.dossier.id),overwrite=f.channel.permissionOverwrites.cache.get(APPLICANT);
   assert.equal(overwrite.allow.has(P.SendMessages),true);assert.equal(overwrite.deny.has(P.CreatePrivateThreads),true);
   assert.equal(saved.payload.queueReplyFor,saved.payload.queueAt);assert.equal(saved.payload.queueReplyOpenedBy,ACTOR);assert.equal(saved.payload.queueStatus,'queued');
+  assert.equal(saved.payload.queueReplyNoticeFor,saved.payload.queueAt);assert.ok(saved.payload.queueReplyNoticeId);
+  assert.deepEqual(noticePayload.allowedMentions,{parse:[],users:[APPLICANT],repliedUser:false});assert.match(noticePayload.content,/De leiding heeft gereageerd.*weer antwoorden/);
   assert.equal(f.channel.name,'wachtrij-kai-mercier');
   await syncApplicationQueue({...f.ctx},f.guild);
   assert.equal(f.channel.permissionOverwrites.cache.get(APPLICANT).allow.has(P.SendMessages),true);
   await handleApplicationQueueLeadMessage(f.ctx,f.message());
   assert.equal(f.ctx.store.db.prepare("SELECT COUNT(*) AS n FROM audit WHERE event='application.queue_replies_opened'").get().n,1);
+  assert.equal([...f.channel.posted.values()].filter(item=>item.content.includes('De leiding heeft gereageerd.')).length,1);
 });
 
 test('sollicitant, gewone leden, botmeldingen en berichten in een ander dossier openen de wachtrij niet',async t=>{
@@ -67,4 +72,25 @@ test('een Leadbericht tijdens een lopende dossieractie wacht tot die is afgerond
   assert.equal(f.channel.permissionOverwrites.cache.get(APPLICANT).deny.has(P.SendMessages),true);
   release();await processing;assert.equal(await answer,true);
   assert.equal(f.channel.permissionOverwrites.cache.get(APPLICANT).allow.has(P.SendMessages),true);
+});
+
+test('een mislukte ticketmelding wordt bij onderhoud opnieuw geprobeerd zonder het typen te blokkeren',async t=>{
+  const f=await fixture(t),send=f.channel.send;
+  f.channel.send=async()=>{throw new Error('Versturen tijdelijk mislukt');};
+  await assert.rejects(handleApplicationQueueLeadMessage(f.ctx,f.message()),/Versturen tijdelijk mislukt/);
+  assert.equal(f.channel.permissionOverwrites.cache.get(APPLICANT).allow.has(P.SendMessages),true);
+  assert.equal(f.ctx.store.caseById(f.dossier.id).payload.queueReplyNoticeFor,undefined);
+  f.channel.send=send;await syncApplicationQueue(f.ctx,f.guild);await syncApplicationQueue(f.ctx,f.guild);
+  assert.equal([...f.channel.posted.values()].filter(item=>item.content.includes('De leiding heeft gereageerd.')).length,1);
+  assert.ok(f.ctx.store.caseById(f.dossier.id).payload.queueReplyNoticeId);
+});
+
+test('een reeds verstuurde melding wordt na een opslagfout teruggevonden in plaats van dubbel geplaatst',async t=>{
+  const f=await fixture(t),mark=f.ctx.store.markApplicationQueueReplyNoticeSent.bind(f.ctx.store);
+  f.ctx.store.markApplicationQueueReplyNoticeSent=()=>{throw new Error('Opslag tijdelijk mislukt');};
+  await assert.rejects(handleApplicationQueueLeadMessage(f.ctx,f.message()),/Opslag tijdelijk mislukt/);
+  const posted=[...f.channel.posted.values()].find(item=>item.content.includes('De leiding heeft gereageerd.'));assert.ok(posted);
+  f.ctx.store.markApplicationQueueReplyNoticeSent=mark;await syncApplicationQueue(f.ctx,f.guild);
+  assert.equal([...f.channel.posted.values()].filter(item=>item.content.includes('De leiding heeft gereageerd.')).length,1);
+  assert.equal(f.ctx.store.caseById(f.dossier.id).payload.queueReplyNoticeId,posted.id);
 });

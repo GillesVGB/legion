@@ -10,6 +10,7 @@ import { deliverAcceptance } from './admissions.mjs';
 import { requireOpenCase, recoverGuildCases } from './case-recovery.mjs';
 import {editIfChanged} from './message-updates.mjs';
 import {canonicalBrandText,brandLogoURL} from './branding.mjs';
+import {serializeCommunity} from './community-posts.mjs';
 
 const APPLICATION_QUEUE_BOARD_CHANNEL_ID='1564738761026441316';
 export const quiet = { parse: [], repliedUser: false };
@@ -344,6 +345,23 @@ async function postApplicationQueueTicketNotice(ctx,channel,dossier){
   ctx.store.markApplicationQueueTicketNoticeSent(current.id);
 }
 
+async function postQueueReplyNotice(ctx,channel,dossier){
+  return serializeCommunity(`${ctx.config.guildId}:queue-reply-notice:${dossier.id}`,async()=>{
+    const current=ctx.store.caseById(dossier.id);
+    if(current?.status!=='open'||current.payload.queueStatus==='released'||!current.payload.queueAt||current.payload.queueReplyFor!==current.payload.queueAt||current.payload.queueReplyNoticeFor===current.payload.queueAt)return;
+    const content=`<@${current.owner_id}> De leiding heeft gereageerd. Je kunt in dit ticket weer antwoorden. Je sollicitatie blijft in de wachtrij staan.`;
+    const history=await channel.messages.fetch({limit:100});
+    let posted=[...history.values()].find(item=>item.author?.id===channel.guild.members.me.id&&item.content===content&&item.createdTimestamp>=current.payload.queueAt);
+    const latest=ctx.store.caseById(current.id);
+    if(latest?.status!=='open'||latest.payload.queueStatus==='released'||latest.payload.queueAt!==current.payload.queueAt)return;
+    if(!posted){
+      const nonce=createHash('sha256').update(`queue-reply:${ctx.config.guildId}:${current.id}:${current.payload.queueAt}`).digest('hex').slice(0,24);
+      posted=await channel.send({content,allowedMentions:{parse:[],users:[current.owner_id],repliedUser:false},nonce,enforceNonce:true});
+    }
+    ctx.store.markApplicationQueueReplyNoticeSent(current.id,current.payload.queueAt,posted.id);
+  });
+}
+
 async function lockQueuedApplication(ctx,channel,dossier){
   dossier=ctx.store.caseById(dossier.id);
   if(!dossier||dossier.status!=='open'||!dossier.payload.queueAt||dossier.payload.queueStatus==='released')return;
@@ -353,6 +371,7 @@ async function lockQueuedApplication(ctx,channel,dossier){
       assertUser(channel.permissionsFor(channel.guild.members.me)?.has(P.ManageRoles),'De bot mist Rollen beheren om antwoorden in het wachtrijticket toe te staan.');
       await channel.permissionOverwrites.edit(dossier.owner_id,{SendMessages:true},'Lead heeft gereageerd; sollicitant mag antwoorden in de wachtrij');
     }
+    await postQueueReplyNotice(ctx,channel,dossier);
     return;
   }
   const blocked=[P.SendMessages,P.AddReactions,P.SendMessagesInThreads,P.CreatePublicThreads,P.CreatePrivateThreads];

@@ -1,6 +1,6 @@
 {
   "name": "bakarov-future-rp-bot",
-  "version": "2.5.25",
+  "version": "2.5.26",
   "private": true,
   "description": "Nederlandstalige Discord-bot voor Bakarov in Future RP",
   "type": "module",

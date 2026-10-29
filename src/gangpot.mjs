@@ -407,6 +407,24 @@ export async function syncGangpot(ctx,client,now=Date.now(),contexts=new Map()){
   });
 }
 function selectPeriod(ctx,value,now){const period=value?periodById(ctx,gangpotPeriodId(value)):currentPeriod(ctx,now);assertUser(period,'De gangpottermijn wordt nog gestart. Probeer over een minuut opnieuw.');return period;}
+export function gangpotOutstandingMessages(ctx,period,now=Date.now()){
+  requireGangPot(ctx);assertUser(period,'Deze gangpottermijn bestaat niet.');
+  const pending=new Map(ctx.store.db.prepare("SELECT user_id,SUM(amount) AS amount FROM gangpot_claims WHERE period_id=? AND status='pending' AND withdrawn_at IS NULL GROUP BY user_id").all(period.id).map(item=>[item.user_id,item.amount]));
+  const outstanding=gangpotMembers(ctx,period,now).filter(item=>item.active&&item.required&&!item.exempt&&item.remaining>0);
+  const awaiting=outstanding.filter(item=>pending.has(item.user_id)),unpaid=outstanding.filter(item=>!pending.has(item.user_id));
+  const total=outstanding.reduce((sum,item)=>sum+item.remaining,0);
+  const summary=`**Termijn:** t/m ${period.id}\n**Deadline:** <t:${Math.floor((period.ends_at-60000)/1000)}:F>\n**Openstaand:** ${outstanding.length} leden · ${gangpotMoney(total)}\n\n`;
+  const lines=outstanding.length?[
+    `**Nog betalen / geen open betaalmelding (${unpaid.length})**`,
+    ...(unpaid.length?unpaid.map(item=>`• <@${item.user_id}> — nog ${gangpotMoney(item.remaining)}`):['Geen.']),
+    '',`**Wacht op Lead-goedkeuring (${awaiting.length})**`,
+    ...(awaiting.length?awaiting.map(item=>`• <@${item.user_id}> — nog ${gangpotMoney(item.remaining)} · gemeld ${gangpotMoney(pending.get(item.user_id))}`):['Geen.']),
+    '', 'Een betaalmelding telt pas mee na goedkeuring. Lead, vrijgestelde leden, instapweken en vertrokken leden staan niet in deze lijst.'
+  ]:['✅ Geen openstaande verplichte bijdragen voor deze termijn.'];
+  const pages=[];let page='';
+  for(const line of lines){if(page.length+line.length+1>3000){pages.push(page);page='';}page+=(page?'\n':'')+line;}if(page)pages.push(page);
+  return pages.map((description,index)=>({embeds:[embed(ctx.config,'Bakarov — Openstaande gangpot',summary+description).setColor(outstanding.length?0xF59E0B:0x22C55E).setFooter({text:`Bakarov • Pagina ${index+1}/${pages.length}`})],allowedMentions:quiet}));
+}
 export function gangpotStatusMessage(ctx,user,now=Date.now()){
   const period=currentPeriod(ctx,now);assertUser(period,'De gangpottermijn wordt nog gestart. Probeer over een minuut opnieuw.');
   const item=gangpotMembers(ctx,period,now).find(item=>item.user_id===user);assertUser(item,'Je staat nog niet in het betaaloverzicht. Probeer over een minuut opnieuw.');
@@ -422,6 +440,12 @@ export async function handleGangpotCommand(ctx,interaction){
   const submittedAt=interaction.createdTimestamp??Date.now();
   await syncGangpot(ctx,interaction.client,submittedAt);
   if(action==='refresh')return interaction.editReply({content:'Gangpotinformatie, totaal en betaaloverzicht zijn bijgewerkt.',allowedMentions:quiet});
+  if(action==='openstaand'){
+    const messages=gangpotOutstandingMessages(ctx,selectPeriod(ctx,interaction.options.getString('termijn'),submittedAt),submittedAt);
+    await interaction.editReply(messages[0]);
+    for(const message of messages.slice(1))await interaction.followUp({...message,flags:MessageFlags.Ephemeral});
+    return;
+  }
   if(action==='betaling-verwijderen'){
     const period=selectPeriod(ctx,interaction.options.getString('termijn'),submittedAt);
     const result=removeGangpotPayment(ctx,{userId:interaction.options.getUser('gebruiker',true).id,periodId:period.id,actor:interaction.user.id,requestId:interaction.id,reason:interaction.options.getString('reden')},Date.now());
