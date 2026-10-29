@@ -6,6 +6,6 @@ export function removeGangpotExemptions(store,now=Date.now()){
       store.setSetting('gangpot:exemptions-removed-at',String(now));
       store.audit('gangpot.exemptions.removed',store.config.clientId,{at:now});
     }
-    store.db.prepare("UPDATE gangpot_exemptions SET revoked_at=?,revoked_by=?,revoke_reason='Gangpotvrijstellingen zijn afgeschaft.' WHERE revoked_at IS NULL").run(now,store.config.clientId||'system');
+    store.db.prepare("UPDATE gangpot_exemptions SET revoked_at=?,revoked_by=?,revoke_reason='Losse gangpotvrijstellingen zijn afgeschaft.' WHERE revoked_at IS NULL").run(now,store.config.clientId||'system');
   });
 }

@@ -1,5 +1,11 @@
 # Bakarov — Discord-bot voor Future RP
 
+## Goedgekeurde afmeldingen blijven vrijgesteld — 2.5.28
+
+Een door Lead goedgekeurde **langere afwezigheidsperiode** geeft gangpotvrijstelling voor de bijbehorende weken. Dit volgt rechtstreeks uit de goedgekeurde aanvraag, zodat ook bestaande afmeldingen weer meetellen na 2.5.27. Die leden krijgen voor de betreffende weken geen gangpotwarn of betaalherinnering en staan niet bij openstaande verplichte bijdragen.
+
+Een losse planningsafmelding, een onbeoordeelde aanvraag of een afwijzing geeft geen gangpotvrijstelling. Losse weekvrijstellingen, de instapweek en de automatische vrijstelling voor Lead blijven verwijderd. Lead met de betaalrol moet dus betalen, tenzij er een goedgekeurde langere afmelding voor die week is.
+
 ## Geen gangpotvrijstellingen — 2.5.27
 
 Iedereen met de betaalrol moet betalen, ook Lead, nieuwe leden en goedgekeurd afwezige leden. De instapweek en handmatige vrijstellingen zijn afgeschaft. Bestaande vrijstellingsregistraties worden bij starten ingetrokken en blijven als historie bewaard. De vrijstellingscommando's en dashboardknoppen zijn verwijderd; oude API-acties worden geweigerd.

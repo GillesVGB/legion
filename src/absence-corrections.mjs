@@ -1,4 +1,4 @@
-import {exemptionRemovalTime} from './gangpot-policy.mjs';
+import {exemptionFor} from './absence.mjs';
 import {PermissionFlagsBits as P} from 'discord.js';
 import {missionDay} from './mission-definitions.mjs';
 import {embed} from './ui.mjs';
@@ -49,9 +49,8 @@ export function repairApprovedAbsenceWarnings(ctx,guild,now=Date.now()){
       JOIN gangpot_periods p ON p.id=d.period_id WHERE w.removed_at IS NULL AND w.actor_id=?
       AND NOT EXISTS(SELECT 1 FROM absence_warn_corrections x WHERE x.warn_id=w.id)`).all(actor);
     for(const warning of debts){
-      if(warning.ends_at>exemptionRemovalTime(ctx))continue;
-      const exemption=db.prepare('SELECT * FROM gangpot_exemptions WHERE user_id=? AND period_id=? AND revoked_at IS NULL').get(warning.user_id,warning.period_id);
-      if(!exemption||exemption.created_at>warning.created_at)continue;
+      const exemption=exemptionFor(ctx,warning.user_id,warning.period_id);
+      if(!exemption)continue;
       const request=approved.find(item=>item.id===exemption.request_id&&item.approvedAt<=warning.created_at);
       if(exemption.request_id&&!request)continue;
       remove(warning,request,'gangpot');db.prepare('UPDATE gangpot_dues SET warn_cleared_by_payment=1 WHERE period_id=? AND user_id=?').run(warning.period_id,warning.user_id);

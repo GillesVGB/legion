@@ -1,4 +1,9 @@
 {
+  "2.5.28": [
+    "🌴 **Goedgekeurde langere afmeldingen geven wél gangpotvrijstelling**\nEen langere afwezigheidsperiode die door Lead is goedgekeurd geeft weer vrijstelling voor de gangpotweken die bij die aanvraag horen. Bestaande goedgekeurde afmeldingen tellen automatisch weer mee, ook als de losse vrijstellingsregistratie door 2.5.27 was ingetrokken.",
+    "📅 **Planning en onbeoordeelde aanvragen blijven gescheiden**\nEen losse planningsafmelding geeft alleen toestemming om die activiteit te missen. Een aanvraag die nog op goedkeuring wacht of is afgewezen geeft geen gangpotvrijstelling. Losse weekvrijstellingen, de instapweek en automatische vrijstelling voor Lead blijven afgeschaft.",
+    "💰 **Overzichten en automatische controles aangepast**\nGoedgekeurd afgemelde leden hebben voor de betrokken weken geen openstaande verplichte bijdrage en krijgen daarvoor geen gangpotwarn of betaalherinnering. De bot toont de vrijstelling in de betaalstatus en het gangpotoverzicht. Een betaling in die week is vrijwillig. Afmeldpaneel, dashboard en berichten leggen de uitzondering uit."
+  ],
   "2.5.27": [
     "💰 **Gangpotvrijstellingen volledig afgeschaft**\nIedereen met de betaalrol moet dezelfde weekbijdrage betalen, ook Lead en nieuwe leden. Een goedgekeurde afmelding of langere afwezigheid geeft geen gangpotvrijstelling meer. Zonder betaalrol ontstaat geen verplichte bijdrage.",
     "🧹 **Bestaande vrijstellingen ingetrokken**\nDe bot trekt bij starten bestaande vrijstellingsregistraties in, met behoud van historie. Afmeldingen en herstarts maken geen nieuwe gangpotvrijstellingen aan. De instapweek geeft geen uitstel meer.",

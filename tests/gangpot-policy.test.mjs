@@ -5,7 +5,7 @@ import {readFileSync} from 'node:fs';
 import {dashboardFixture,ACTOR,OTHER} from './dashboard-fixture.mjs';
 import {removeGangpotExemptions,exemptionRemovalTime} from '../src/gangpot-policy.mjs';
 import {createAbsence,decideAbsence,syncAbsenceExemptions,setExemption,exemptionFor,approvedAway} from '../src/absence.mjs';
-import {gangpotWindow,gangpotRequired,reconcileGangpotDebt,GANGPOT_LEAD_ROLE_ID} from '../src/gangpot.mjs';
+import {gangpotWindow,gangpotRequired,gangpotMembers,gangpotTotalMessage,reconcileGangpotDebt,GANGPOT_LEAD_ROLE_ID} from '../src/gangpot.mjs';
 import {gangpotIntroduction} from '../src/gangpot-membership.mjs';
 import {commands} from '../src/commands.mjs';
 import {Dashboard} from '../src/dashboard.mjs';
@@ -22,13 +22,26 @@ test('bestaande vrijstellingen worden ingetrokken en blijven weg na herhaalde mi
  assert.equal(gangpotIntroduction(f.ctx,OTHER,period),null);
 });
 
-test('goedkeuring van een afwezigheidsperiode blijft bruikbaar voor activiteiten maar geeft geen gangpotvrijstelling',async t=>{
+test('alleen een goedgekeurde langere afmelding geeft gangpotvrijstelling en blijft bruikbaar voor activiteiten',async t=>{
  const f=fixture(t),now=Date.now(),today=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Brussels'}).format(new Date(now));
  const request=await createAbsence(f.ctx,f.guild,OTHER,{start:today,end:today,reason:'Training'},now);
+  const week=JSON.parse(request.weeks)[0];assert.equal(exemptionFor(f.ctx,OTHER,week),null);
  const approved=await decideAbsence(f.ctx,f.guild,f.guild.members.cache.get(ACTOR),request.id,'approve',now+1);
  assert.equal(approved.status,'approved');assert.ok(approvedAway(f.ctx,{id:'planning',starts_at:now},OTHER));
+  assert.equal(exemptionFor(f.ctx,OTHER,week).id,request.id);
+  removeGangpotExemptions(f.ctx.store,now+2);syncAbsenceExemptions(f.ctx,f.ctx.config.clientId,now+3);
+  assert.equal(exemptionFor(f.ctx,OTHER,week).id,request.id);
+  assert.equal(exemptionFor(f.ctx,OTHER,'2099-10-31'),null);
+  const period=gangpotWindow(f.ctx.config.gangpot,now);
+  f.db.prepare('INSERT INTO gangpot_periods(id,starts_at,ends_at,weekly_amount) VALUES(?,?,?,?)').run(period.id,period.starts_at,period.ends_at,period.weekly_amount);
+  f.db.prepare('INSERT INTO gangpot_dues(period_id,user_id,enrolled_at,active) VALUES(?,?,?,1)').run(period.id,OTHER,now);
+  assert.equal(gangpotMembers(f.ctx,period,now).find(item=>item.user_id===OTHER).status,'exempt');
+  assert.match(gangpotTotalMessage(f.ctx,f.guild,now).embeds[0].toJSON().description,/Goedgekeurd afgemeld:\*\* 1/);
+  const warnings=f.ctx.store.warnCount(OTHER);reconcileGangpotDebt(f.ctx,period.id,OTHER,f.ctx.config.clientId,period.ends_at+1);assert.equal(f.ctx.store.warnCount(OTHER),warnings);
  assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM gangpot_exemptions WHERE revoked_at IS NULL').get().n,0);
  await assert.rejects(setExemption(f.ctx,f.guild,null,OTHER,'31-10-2026','Reden'),/afgeschaft/);
+  f.db.prepare("UPDATE absence_requests SET kind='planning' WHERE id=?").run(request.id);assert.equal(exemptionFor(f.ctx,OTHER,week),null);
+  f.db.prepare("UPDATE absence_requests SET kind='range',status='rejected' WHERE id=?").run(request.id);assert.equal(exemptionFor(f.ctx,OTHER,week),null);
 });
 
 test('de beleidswijziging geeft geen nieuwe warns voor verlopen weken en heractiveert geen ingetrokken warn',t=>{
@@ -45,10 +58,10 @@ test('vrijstellingscommando’s en dashboardknoppen zijn verwijderd; afmelden bl
  const f=fixture(t),absence=commands(10000,false).find(item=>item.name==='afwezig');assert.deepEqual(absence.options.map(item=>item.name),['aanvragen','status']);
  const data=new Dashboard({...f,locks:new Locks()}).summary(f.ctx,f.guild),source=readFileSync(new URL('../src/dashboard-assets/app.js',import.meta.url),'utf8'),context=vm.createContext({data,Intl,Date,Number,String,Math,URL,console});
  vm.runInContext(source.slice(0,source.indexOf("document.addEventListener('click'"))+'\nstate.data=data;',context);
- const html=vm.runInContext('absencesPage()',context);assert.match(html,/Afwezigheid aanvragen/);assert.match(html,/gangpotbijdrage verplicht/);assert.doesNotMatch(html,/Weekvrijstelling geven|Gangpotvrijstellingen|absence\.exempt-new|absence\.revoke-form/);
+ const html=vm.runInContext('absencesPage()',context);assert.match(html,/Afwezigheid aanvragen/);assert.match(html,/goedgekeurde langere afmelding geeft gangpotvrijstelling/);assert.doesNotMatch(html,/Weekvrijstelling geven|Gangpotvrijstellingen|absence\.exempt-new|absence\.revoke-form/);
 });
 
-test('na een nieuwe deadline krijgen ook Lead en een nieuw of afgemeld lid zonder betaling één gangpotwarn',t=>{
+test('na een nieuwe deadline krijgen ook Lead en een nieuw lid zonder goedgekeurde afmelding één gangpotwarn',t=>{
  const f=fixture(t),now=Date.now(),period=gangpotWindow(f.ctx.config.gangpot,now);
  f.db.prepare('INSERT INTO gangpot_periods(id,starts_at,ends_at,weekly_amount) VALUES(?,?,?,?)').run(period.id,period.starts_at,period.ends_at,period.weekly_amount);
  f.guild.members.cache.get(ACTOR).roles.cache.set(f.ctx.config.gangpot.memberRoleId,f.guild.roles.cache.get(f.ctx.config.gangpot.memberRoleId));
