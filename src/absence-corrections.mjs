@@ -1,4 +1,4 @@
-import {randomBytes} from 'node:crypto';
+import {exemptionRemovalTime} from './gangpot-policy.mjs';
 import {PermissionFlagsBits as P} from 'discord.js';
 import {missionDay} from './mission-definitions.mjs';
 import {embed} from './ui.mjs';
@@ -24,13 +24,6 @@ export function repairApprovedAbsenceWarnings(ctx,guild,now=Date.now()){
   const db=ctx.store.db,actor=guild.members.me.id;
   return ctx.store.transaction(()=>{
     const approved=db.prepare("SELECT * FROM absence_requests WHERE status='approved'").all().map(item=>({...item,approvedAt:approvalTime(db,item)})).filter(item=>item.approvedAt!==null&&item.approvedAt>=item.created_at&&item.approvedAt<=now);
-    // Rebuild missing exemption rows from existing approvals, without overriding a revoked exemption.
-    for(const period of db.prepare('SELECT * FROM gangpot_periods').all())for(const item of approved){
-      if(item.kind!=='range'||item.approvedAt>=period.ends_at||!coversWeek(item,period))continue;
-      if(db.prepare('SELECT 1 FROM gangpot_exemptions WHERE user_id=? AND period_id=?').get(item.user_id,period.id))continue;
-      db.prepare('INSERT INTO gangpot_exemptions(id,user_id,period_id,request_id,actor_id,reason,created_at) VALUES(?,?,?,?,?,?,?)').run(randomBytes(6).toString('hex'),item.user_id,period.id,item.id,item.reviewer_id||actor,'Bestaande goedgekeurde afwezigheid hersteld.',item.approvedAt);
-      ctx.store.audit('absence.exemption.recover',actor,{user:item.user_id,period:period.id,request:item.id});
-    }
     const corrected=[];
     const remove=(warning,request,source)=>{
       const reason=`Automatische ${source==='gangpot'?'gangpotwarn':source==='planning'?'planningwarn':'check-in-warn'} ingetrokken: de bijbehorende afwezigheid was al vóór deze warn goedgekeurd.`;
@@ -56,6 +49,7 @@ export function repairApprovedAbsenceWarnings(ctx,guild,now=Date.now()){
       JOIN gangpot_periods p ON p.id=d.period_id WHERE w.removed_at IS NULL AND w.actor_id=?
       AND NOT EXISTS(SELECT 1 FROM absence_warn_corrections x WHERE x.warn_id=w.id)`).all(actor);
     for(const warning of debts){
+      if(warning.ends_at>exemptionRemovalTime(ctx))continue;
       const exemption=db.prepare('SELECT * FROM gangpot_exemptions WHERE user_id=? AND period_id=? AND revoked_at IS NULL').get(warning.user_id,warning.period_id);
       if(!exemption||exemption.created_at>warning.created_at)continue;
       const request=approved.find(item=>item.id===exemption.request_id&&item.approvedAt<=warning.created_at);

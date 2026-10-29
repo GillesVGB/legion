@@ -1,8 +1,14 @@
 # Bakarov — Discord-bot voor Future RP
 
+## Geen gangpotvrijstellingen — 2.5.27
+
+Iedereen met de betaalrol moet betalen, ook Lead, nieuwe leden en goedgekeurd afwezige leden. De instapweek en handmatige vrijstellingen zijn afgeschaft. Bestaande vrijstellingsregistraties worden bij starten ingetrokken en blijven als historie bewaard. De vrijstellingscommando's en dashboardknoppen zijn verwijderd; oude API-acties worden geweigerd.
+
+Afmelden voor activiteiten en check-ins blijft mogelijk, maar verandert de gangpotbetaling niet. Het informatiepaneel, betaaloverzicht en `/gangpot openstaand` volgen dezelfde regels. De wijziging maakt geen nieuwe warns voor deadlines die vóór de eerste start van deze versie verstreken zijn en heractiveert geen oude ingetrokken warns.
+
 ## Ticketmelding na antwoord van Lead — 2.5.26
 
-Met **`/gangpot openstaand`** ziet de leiding privé wie nog moet betalen en welke meldingen op goedkeuring wachten, inclusief het resterende bedrag per lid en het totaal. `termijn` is optioneel en gebruikt dezelfde zaterdagdatum als de andere gangpotcommando's. Lead, goedgekeurde vrijstellingen, instapweken en vertrokken leden worden uitgesloten. Lange lijsten worden volledig over meerdere privépagina's getoond.
+Met **`/gangpot openstaand`** ziet de leiding privé wie nog moet betalen en welke meldingen op goedkeuring wachten, inclusief het resterende bedrag per lid en het totaal. `termijn` is optioneel en gebruikt dezelfde zaterdagdatum als de andere gangpotcommando's. Alle huidige leden met de betaalrol tellen mee. Lange lijsten worden volledig over meerdere privépagina's getoond.
 
 Wanneer een wachtrijticket na een bericht van Lead weer antwoorden toestaat, plaatst de bot ook een bericht in dat ticket en tagt uitsluitend de sollicitant: **De leiding heeft gereageerd. Je kunt in dit ticket weer antwoorden. Je sollicitatie blijft in de wachtrij staan.** De melding wordt per wachtrijronde opgeslagen. Herstarts en volgende Leadberichten plaatsen haar niet opnieuw; mislukte verzending wordt herhaald. Bestaande vrijgegeven wachtrijtickets krijgen hun ontbrekende melding bij de normale synchronisatie.
 

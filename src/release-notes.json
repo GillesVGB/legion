@@ -1,4 +1,11 @@
 {
+  "2.5.27": [
+    "💰 **Gangpotvrijstellingen volledig afgeschaft**\nIedereen met de betaalrol moet dezelfde weekbijdrage betalen, ook Lead en nieuwe leden. Een goedgekeurde afmelding of langere afwezigheid geeft geen gangpotvrijstelling meer. Zonder betaalrol ontstaat geen verplichte bijdrage.",
+    "🧹 **Bestaande vrijstellingen ingetrokken**\nDe bot trekt bij starten bestaande vrijstellingsregistraties in, met behoud van historie. Afmeldingen en herstarts maken geen nieuwe gangpotvrijstellingen aan. De instapweek geeft geen uitstel meer.",
+    "🖥️ **Commando’s en dashboard aangepast**\nDe knoppen en commando’s om weekvrijstellingen te geven of in te trekken zijn verwijderd. Verouderde dashboardacties worden geweigerd. Gangpotinformatie, betaalstatus, totaaloverzicht en /gangpot openstaand volgen de nieuwe regels.",
+    "📅 **Afmelden blijft mogelijk**\nAfmeldingen voor activiteiten en check-ins blijven bestaan en kunnen door Lead worden beoordeeld. De gangpotbetaling blijft daarbij verplicht. De bot vermeldt dit in het paneel en in nieuwe afwezigheidsberichten.",
+    "🛡️ **Geen terugwerkende nieuwe straffen**\nDe wijziging maakt geen nieuwe gangpotwarns voor deadlines die al voorbij waren toen deze versie voor het eerst startte. Eerder ingetrokken warns worden hierdoor niet hersteld. Bij een volgende deadline blijven ontbrekende of niet volledig goedgekeurde betalingen wel maximaal één automatische gangpotwarn per lid en termijn geven."
+  ],
   "2.5.26": [
     "💰 **Nieuw: /gangpot openstaand**\nDe leiding kan privé zien wie zijn verplichte weekbijdrage nog niet volledig heeft betaald. Het overzicht onderscheidt leden zonder open betaalmelding en meldingen die nog op Lead-goedkeuring wachten. Per lid staat het resterende bedrag; bovenaan staan de termijn, deadline en het totaal. Met termijn kies je eventueel een andere week. Lead, vrijgestelde leden, instapweken en vertrokken leden worden uitgesloten. Lange lijsten krijgen vervolgpagina's zodat iedereen zichtbaar blijft.",
     "📨 **Melding zodra de sollicitant weer mag antwoorden**\nWanneer Lead in een wachtrijticket reageert en de sollicitant weer kan typen, plaatst de bot ook een bericht in datzelfde ticket: De leiding heeft gereageerd. Je kunt in dit ticket weer antwoorden. Je sollicitatie blijft in de wachtrij staan. De bot tagt uitsluitend de sollicitant.",

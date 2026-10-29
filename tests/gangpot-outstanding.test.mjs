@@ -19,19 +19,19 @@ function fixture(t){
 }
 const text=messages=>messages.map(item=>item.embeds[0].toJSON().description).join('\n');
 
-test('openstaand onderscheidt schuld en wachtende meldingen en sluit Lead, vrijstelling, instapweek en vertrokken leden uit',t=>{
+test('openstaand telt ook Lead, oude vrijstellingen en nieuwe leden mee; vertrokken leden en leden zonder betaalrol niet',t=>{
   const f=fixture(t),unpaid=f.add(1),partial=f.add(2),pending=f.add(3),paid=f.add(4),exempt=f.add(5),newMember=f.add(6),left=f.add(7,undefined,0),lead=f.add(8,[f.ctx.config.gangpot.memberRoleId,GANGPOT_LEAD_ROLE_ID]),withdrawn=f.add(9),withoutRole=f.add(10,[]);
   f.pay(partial,5000);f.pay(paid,25000);f.claim(pending);
   f.db.prepare('INSERT INTO gangpot_exemptions(id,user_id,period_id,actor_id,reason,created_at) VALUES(?,?,?,?,?,?)').run('exemption',exempt,f.period.id,'lead','Vrijgesteld',NOW);
   f.db.prepare('INSERT INTO gangpot_memberships(user_id,started_at,required_from,source) VALUES(?,?,?,?)').run(newMember,NOW,f.period.ends_at,'role');
   const oldClaim=f.claim(withdrawn);f.db.prepare('UPDATE gangpot_claims SET withdrawn_at=? WHERE id=?').run(NOW,oldClaim.id);
   const balance=gangpotBalance(f.ctx),warnings=f.db.prepare('SELECT COUNT(*) AS n FROM warnings').get().n,messages=gangpotOutstandingMessages(f.ctx,f.period,NOW),output=text(messages);
-  assert.match(output,/Openstaand:\*\* 4 leden/);assert.match(output,/Nog betalen \/ geen open betaalmelding \(3\)/);assert.match(output,/Wacht op Lead-goedkeuring \(1\)/);
-  for(const id of [unpaid,partial,pending,withdrawn])assert.ok(output.includes(`<@${id}>`));
-  for(const id of [paid,exempt,newMember,left,lead,withoutRole])assert.ok(!output.includes(`<@${id}>`));
+  assert.match(output,/Openstaand:\*\* 7 leden/);assert.match(output,/Nog betalen \/ geen open betaalmelding \(6\)/);assert.match(output,/Wacht op Lead-goedkeuring \(1\)/);
+  for(const id of [unpaid,partial,pending,withdrawn,exempt,newMember,lead])assert.ok(output.includes(`<@${id}>`));
+  for(const id of [paid,left,withoutRole])assert.ok(!output.includes(`<@${id}>`));
   assert.ok(output.includes(`<@${partial}> — nog €20.000`));assert.ok(output.includes(`<@${pending}> — nog €25.000 · gemeld €25.000`));
   assert.equal(gangpotBalance(f.ctx),balance);assert.deepEqual(messages[0].allowedMentions.parse,[]);
-  assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM warnings').get().n,warnings);assert.ok(output.includes('€95.000'));
+  assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM warnings').get().n,warnings);assert.ok(output.includes('€170.000'));
 });
 
 test('lange lijsten blijven volledig zichtbaar binnen Discordlimieten en een lege lijst is duidelijk',t=>{

@@ -7,13 +7,14 @@ import {quiet,staffLogChannel} from './service.mjs';
 import {serializeCommunity,updateCommunityPost} from './community-posts.mjs';
 import {planningTime} from './activities.mjs';
 import {missionDay} from './mission-definitions.mjs';
-import {gangpotWindow,gangpotPeriodId,requireGangPot,gangpotEligible,GANGPOT_LEAD_ROLE_ID,reconcileGangpotDebt} from './gangpot.mjs';
+import {gangpotWindow,requireGangPot,gangpotEligible,GANGPOT_LEAD_ROLE_ID} from './gangpot.mjs';
 import {operationSettings} from './feature-settings.mjs';
 import {queueFeatureNotice,deliverFeatureNotices} from './notices.mjs';
+import {removeGangpotExemptions} from './gangpot-policy.mjs';
 const uid=()=>randomBytes(6).toString('hex');
 const statusLabels={pending:'Wacht op Lead',approved:'Goedgekeurd',rejected:'Afgewezen',cancelled:'Ingetrokken'};
 const shift=(date,days)=>missionDay(Date.parse(date+'T12:00:00Z')+days*86400000);
-export const exemptionFor=(ctx,user,week)=>ctx.store.db.prepare('SELECT * FROM gangpot_exemptions WHERE user_id=? AND period_id=? AND revoked_at IS NULL').get(user,week);
+export const exemptionFor=()=>null;
 export const absenceById=(ctx,id)=>ctx.store.db.prepare('SELECT * FROM absence_requests WHERE id=?').get(id);
 export function approvedAway(ctx,activity,user){
   const date=missionDay(activity.starts_at);
@@ -24,34 +25,9 @@ export function activityAbsences(ctx,activity){
   const result=new Map();for(const item of rows){const response=ctx.store.db.prepare('SELECT response FROM activity_rsvps WHERE activity_id=? AND user_id=?').get(activity.id,item.user_id)?.response;if(response&&response!=='no')continue;if(!result.has(item.user_id))result.set(item.user_id,item);}
   return [...result.values()];
 }
-function grantInside(ctx,user,week,actor,reason,request,now){
-  if(exemptionFor(ctx,user,week))return;
-  ctx.store.db.prepare('INSERT INTO gangpot_exemptions(id,user_id,period_id,actor_id,reason,request_id,created_at) VALUES(?,?,?,?,?,?,?)').run(uid(),user,week,actor,reason,request,now);
-  reconcileGangpotDebt(ctx,week,user,actor,now);
-  ctx.store.audit('absence.exemption',actor,{user,week,request});
-}
 export function syncAbsenceExemptions(ctx,actor,now=Date.now(),inside=false){
   if(!ctx.config.gangpot)return;
-  const run=()=>{
-    const valid=new Map();
-    for(const item of ctx.store.db.prepare("SELECT * FROM absence_requests WHERE status='approved' AND kind='range' ORDER BY reviewed_at,created_at").all()){
-      const weeks=JSON.parse(item.weeks);
-      for(const week of weeks)valid.set(`${item.user_id}:${week}`,{item,week});
-    }
-    for(const entry of ctx.store.db.prepare('SELECT * FROM gangpot_exemptions WHERE request_id IS NOT NULL AND revoked_at IS NULL').all()){
-      const source=valid.get(`${entry.user_id}:${entry.period_id}`);
-      if(source){if(source.item.id!==entry.request_id)ctx.store.db.prepare('UPDATE gangpot_exemptions SET request_id=? WHERE id=?').run(source.item.id,entry.id);continue;}
-      ctx.store.db.prepare('UPDATE gangpot_exemptions SET revoked_at=?,revoked_by=?,revoke_reason=? WHERE id=?').run(now,actor,'Afwezigheidsperiode ingetrokken.',entry.id);
-      reconcileGangpotDebt(ctx,entry.period_id,entry.user_id,actor,now);
-    }
-    for(const {item,week} of valid.values()){
-      // A deliberate Lead revocation stays revoked across refreshes and restarts.
-      const revoked=ctx.store.db.prepare('SELECT revoked_by FROM gangpot_exemptions WHERE user_id=? AND period_id=? AND revoked_at IS NOT NULL ORDER BY revoked_at DESC LIMIT 1').get(item.user_id,week);
-      if(!exemptionFor(ctx,item.user_id,week)&&revoked&&revoked.revoked_by!==ctx.config.clientId)continue;
-      grantInside(ctx,item.user_id,week,item.reviewer_id||actor,item.reason,item.id,now);
-      reconcileGangpotDebt(ctx,week,item.user_id,actor,now);
-    }
-  };
+  const run=()=>ctx.store.db.prepare("UPDATE gangpot_exemptions SET revoked_at=?,revoked_by=?,revoke_reason='Gangpotvrijstellingen zijn afgeschaft.' WHERE revoked_at IS NULL").run(now,actor||ctx.config.clientId);
   return inside?run():ctx.store.transaction(run);
 }
 function autoApprove(ctx,guild,item,now){
@@ -66,7 +42,7 @@ function autoApprove(ctx,guild,item,now){
 }
 export async function requireLead(ctx,guild,member){
   requireGangPot(ctx);assertUser(guild.id===ctx.config.guildId,'Kies de Bakarov-hoofdserver.');const fresh=await guild.members.fetch({user:member.id,force:true});
-  assertUser(!fresh.user.bot&&fresh.roles.cache.has(GANGPOT_LEAD_ROLE_ID),'Alleen Lead kan afmeldingen en vrijstellingen beoordelen.');return fresh;
+  assertUser(!fresh.user.bot&&fresh.roles.cache.has(GANGPOT_LEAD_ROLE_ID),'Alleen Lead kan afmeldingen beoordelen.');return fresh;
 }
 export async function createAbsence(ctx,guild,user,input,now=Date.now()){
   requireGangPot(ctx);const member=await guild.members.fetch({user,force:true});assertUser(input.activityId?!member.user.bot:gangpotEligible(ctx,member),'Alleen Bakarov-leden kunnen afwezigheid aanvragen.');
@@ -100,21 +76,14 @@ export async function decideAbsence(ctx,guild,member,id,decision,now=Date.now())
     if(item.activity_id)ctx.store.db.prepare('UPDATE activities SET dirty=1,next_attempt=0 WHERE id=?').run(item.activity_id);
     else ctx.store.db.prepare('UPDATE activities SET dirty=1,next_attempt=0 WHERE starts_at>=? AND starts_at<=?').run(planningTime(item.start_date,'00:00',now),planningTime(shift(item.end_date,1),'00:00',now));
     ctx.store.audit(`absence.${decision}`,lead.id,{id,user:item.user_id,weeks:JSON.parse(item.weeks),activity:item.activity_id});
-    queueFeatureNotice(ctx,{key:`absence:${id}:decision`,kind:'absence',user:item.user_id,payload:{embeds:[embed(ctx.config,decision==='approve'?'Bakarov — Afmelding goedgekeurd':'Bakarov — Afmelding afgewezen',`Je aanvraag is ${decision==='approve'?'goedgekeurd':'afgewezen'}.${item.kind==='range'?`\nPeriode: ${item.start_date} t/m ${item.end_date}\nGangpotweken: ${JSON.parse(item.weeks).join(', ')}`:`\nPlanning: ${item.activity_id}`}\n${item.kind==='planning'?'Deze beslissing geldt uitsluitend voor de activiteit; de gangpotplicht verandert niet.':decision==='approve'?'Je afwezigheid en gangpotvrijstelling zijn geregistreerd.':'Zonder goedgekeurde vrijstelling blijft de gangpotbijdrage verplicht.'}`).setColor(decision==='approve'?0x22C55E:0xEF4444)],allowedMentions:quiet},now});
+    queueFeatureNotice(ctx,{key:`absence:${id}:decision`,kind:'absence',user:item.user_id,payload:{embeds:[embed(ctx.config,decision==='approve'?'Bakarov — Afmelding goedgekeurd':'Bakarov — Afmelding afgewezen',`Je aanvraag is ${decision==='approve'?'goedgekeurd':'afgewezen'}.${item.kind==='range'?`\nPeriode: ${item.start_date} t/m ${item.end_date}`:`\nPlanning: ${item.activity_id}`}\n${item.kind==='planning'?'Deze beslissing geldt uitsluitend voor de activiteit; de gangpotplicht verandert niet.':decision==='approve'?'Je afwezigheid is geregistreerd. De gangpotbijdrage blijft verplicht.':'De gangpotbijdrage blijft verplicht.'}`).setColor(decision==='approve'?0x22C55E:0xEF4444)],allowedMentions:quiet},now});
     return absenceById(ctx,id);
   }));
 }
-export async function setExemption(ctx,guild,member,user,week,reason,revoke=false,now=Date.now()){
-  const lead=await requireLead(ctx,guild,member),target=await guild.members.fetch({user,force:true});assertUser(gangpotEligible(ctx,target),'Kies een lid met de Bakarov-ledenrol.');
-  const period=gangpotPeriodId(week);assertUser(typeof reason==='string'&&reason.trim()&&reason.length<=500,'Geef een reden van maximaal 500 tekens.');
-  return ctx.store.transaction(()=>{
-    if(revoke){const existing=exemptionFor(ctx,user,period);assertUser(existing,'Er is geen actieve vrijstelling voor deze week.');ctx.store.db.prepare('UPDATE gangpot_exemptions SET revoked_at=?,revoked_by=?,revoke_reason=? WHERE id=?').run(now,lead.id,reason.trim(),existing.id);reconcileGangpotDebt(ctx,period,user,lead.id,now);ctx.store.audit('absence.exemption.revoke',lead.id,{user,week:period});}
-    else grantInside(ctx,user,period,lead.id,reason.trim(),null,now);
-  });
-}
+export async function setExemption(){assertUser(false,'Gangpotvrijstellingen zijn afgeschaft. Iedereen met de betaalrol moet bijdragen.');}
 export function absenceMessage(ctx,item){
   const planning=item.kind==='planning',pending=item.status==='pending',automatic=item.status==='approved'&&item.reviewer_id===ctx.config.clientId;
-  return{embeds:[embed(ctx.config,planning?'Bakarov — Afmelding planning':'Bakarov — Afwezigheidsaanvraag',`**Lid:** <@${item.user_id}>\n${planning?`**Planning:** ${item.activity_id}`:`**Periode:** ${item.start_date} t/m ${item.end_date}\n**Gangpotvrijstelling voor:** ${JSON.parse(item.weeks).join(', ')}`}\n**Reden:** ${safeText(item.reason)}\n**Status:** ${statusLabels[item.status]||item.status}${item.reviewer_id?`\n**Beoordeeld door:** <@${item.reviewer_id}>`:''}\n\n${planning?'Een rode reactie alleen is niet voldoende. Geef een reden op; duidelijke redenen kan de bot goedkeuren. Dit geldt alleen voor deze activiteit.':'Goedkeuren geeft vrijstelling voor de genoemde weken; een aanvraag alleen geeft geen vrijstelling.'}`).setColor(item.status==='approved'?0x22C55E:item.status==='pending'?0xF59E0B:0xEF4444).setFooter({text:`Bakarov • Afmelding ${item.id}`})],components:pending?[row(button(`absence:approve:${item.id}`,'Goedkeuren',ButtonStyle.Success).setDisabled(missingAbsenceReason(item.reason)),button(`absence:reject:${item.id}`,'Afwijzen',ButtonStyle.Danger))]:automatic?[row(button(`absence:reject:${item.id}`,'Goedkeuring intrekken',ButtonStyle.Danger))]:[],allowedMentions:quiet};
+  return{embeds:[embed(ctx.config,planning?'Bakarov — Afmelding planning':'Bakarov — Afwezigheidsaanvraag',`**Lid:** <@${item.user_id}>\n${planning?`**Planning:** ${item.activity_id}`:`**Periode:** ${item.start_date} t/m ${item.end_date}`}\n**Reden:** ${safeText(item.reason)}\n**Status:** ${statusLabels[item.status]||item.status}${item.reviewer_id?`\n**Beoordeeld door:** <@${item.reviewer_id}>`:''}\n\n${planning?'Een rode reactie alleen is niet voldoende. Geef een reden op; duidelijke redenen kan de bot goedkeuren. Dit geldt alleen voor deze activiteit.':'Deze aanvraag geldt voor afwezigheid bij activiteiten en check-ins. De gangpotbijdrage blijft verplicht.'}`).setColor(item.status==='approved'?0x22C55E:item.status==='pending'?0xF59E0B:0xEF4444).setFooter({text:`Bakarov • Afmelding ${item.id}`})],components:pending?[row(button(`absence:approve:${item.id}`,'Goedkeuren',ButtonStyle.Success).setDisabled(missingAbsenceReason(item.reason)),button(`absence:reject:${item.id}`,'Afwijzen',ButtonStyle.Danger))]:automatic?[row(button(`absence:reject:${item.id}`,'Goedkeuring intrekken',ButtonStyle.Danger))]:[],allowedMentions:quiet};
 }
 export async function syncAbsences(ctx,guild,now=Date.now()){
   if(!ctx.config.gangpot)return;
@@ -140,9 +109,9 @@ export async function handleAbsenceCommand(ctx,interaction){
   requireGangPot(ctx);await interaction.deferReply({flags:MessageFlags.Ephemeral});const action=interaction.commandName==='afmelden'?'planning':interaction.options.getSubcommand();
   if(['aanvragen','planning'].includes(action)){
     const item=await createAbsence(ctx,interaction.guild,interaction.user.id,{activityId:action==='planning'?interaction.options.getString('planning',true):null,start:interaction.options.getString('van'),end:interaction.options.getString('tot'),reason:interaction.options.getString('reden',true)});await syncAbsences(ctx,interaction.guild);
-    return interaction.editReply({content:item.status==='approved'?'Je afmelding is goedgekeurd.':`Aanvraag \`${item.id}\` opgeslagen. Lead moet je afmelding goedkeuren${item.kind==='range'?`; aangevraagde gangpotweken: ${JSON.parse(item.weeks).join(', ')}`:''}.`,allowedMentions:quiet});
+    return interaction.editReply({content:item.status==='approved'?'Je afmelding is goedgekeurd.':`Aanvraag \`${item.id}\` opgeslagen. Lead moet je afmelding goedkeuren.`,allowedMentions:quiet});
   }
-  if(action==='status'){const requests=ctx.store.db.prepare('SELECT * FROM absence_requests WHERE user_id=? ORDER BY created_at DESC LIMIT 10').all(interaction.user.id);const exemptions=ctx.store.db.prepare('SELECT period_id FROM gangpot_exemptions WHERE user_id=? AND revoked_at IS NULL ORDER BY period_id DESC LIMIT 12').all(interaction.user.id);return interaction.editReply({content:`## Jouw afmeldingen\n${requests.map(item=>`• ${item.id} · ${item.status} · ${item.activity_id||`${item.start_date} t/m ${item.end_date}`}`).join('\n')||'Nog geen aanvragen.'}\n\n**Vrijgestelde gangpotweken:** ${exemptions.map(item=>item.period_id).join(', ')||'Geen.'}`,allowedMentions:quiet});}
+  if(action==='status'){const requests=ctx.store.db.prepare('SELECT * FROM absence_requests WHERE user_id=? ORDER BY created_at DESC LIMIT 10').all(interaction.user.id);return interaction.editReply({content:`## Jouw afmeldingen\n${requests.map(item=>`• ${item.id} · ${item.status} · ${item.activity_id||`${item.start_date} t/m ${item.end_date}`}`).join('\n')||'Nog geen aanvragen.'}`,allowedMentions:quiet});}
   await setExemption(ctx,interaction.guild,interaction.member,interaction.options.getUser('gebruiker',true).id,interaction.options.getString('termijn',true),interaction.options.getString('reden',true),action==='vrijstelling-intrekken');
   return interaction.editReply({content:action==='vrijstelling-intrekken'?'Vrijstelling ingetrokken.':'Vrijstelling voor deze week opgeslagen.',allowedMentions:quiet});
 }

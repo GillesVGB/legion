@@ -2,9 +2,7 @@ import {planningTime} from './activities.mjs';
 import {missionDay} from './mission-definitions.mjs';
 const eligible=(ctx,member)=>Boolean(member&&!member.user.bot&&member.roles.cache.has(ctx.config.gangpot.memberRoleId));
 export function gangpotIntroduction(ctx,user,period){
-  if(!period)return null;
-  const membership=ctx.store.db.prepare('SELECT * FROM gangpot_memberships WHERE user_id=?').get(user);
-  return membership&&period.starts_at<membership.required_from?membership:null;
+  return null;
 }
 const dayShift=(date,days)=>missionDay(Date.parse(date+'T12:00:00Z')+days*86400000);
 function firstRequired(ctx,started,windowAt){

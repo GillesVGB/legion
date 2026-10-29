@@ -8,6 +8,7 @@ import { applicationSteps, validateApplicationStep } from './application.mjs';
 import { fishCatch,fishWeek } from './fishing.mjs';
 import {operationSettings} from './feature-settings.mjs';
 import {cleanAudit} from './audit-sanitize.mjs';
+import {removeGangpotExemptions} from './gangpot-policy.mjs';
 import { missions, missionDay } from './mission-definitions.mjs';
 
 const newId = () => randomBytes(6).toString('hex');
@@ -290,6 +291,7 @@ export class Store {
       CREATE INDEX IF NOT EXISTS check_deadline_due ON activity_check_sessions(status,deadline_at,next_attempt);
       PRAGMA user_version = 21;
     `);
+    removeGangpotExemptions(this);
   }
 
   close() { this.db.close(); }

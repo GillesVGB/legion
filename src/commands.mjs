@@ -23,17 +23,11 @@ export function commands(maxBet, ticketsEnabled = true) {
     cmd('afmelden','Vraag Lead-goedkeuring voor afwezigheid op een planning')
       .addStringOption(o=>o.setName('planning').setDescription('Planning-ID onderaan het bericht').setRequired(true).setMinLength(12).setMaxLength(12))
       .addStringOption(reasonOption),
-    cmd('afwezig','Afwezigheid aanvragen en gangpotvrijstellingen beheren')
+    cmd('afwezig','Afwezigheid aanvragen en bekijken')
       .addSubcommand(s=>s.setName('aanvragen').setDescription('Vraag goedgekeurde afwezigheid voor een periode aan')
         .addStringOption(o=>o.setName('van').setDescription('Begindatum DD-MM-JJJJ').setRequired(true).setMaxLength(10))
         .addStringOption(o=>o.setName('tot').setDescription('Einddatum DD-MM-JJJJ').setRequired(true).setMaxLength(10)).addStringOption(reasonOption))
-      .addSubcommand(s=>s.setName('status').setDescription('Bekijk je eigen aanvragen en vrijgestelde weken'))
-      .addSubcommand(s=>s.setName('vrijstellen').setDescription('Geef een gebruiker vrijstelling voor één gangpotweek (Lead)')
-        .addUserOption(o=>o.setName('gebruiker').setDescription('Bakarov-lid').setRequired(true))
-        .addStringOption(o=>o.setName('termijn').setDescription('Zaterdag van de week: DD-MM-JJJJ').setRequired(true).setMaxLength(10)).addStringOption(reasonOption))
-      .addSubcommand(s=>s.setName('vrijstelling-intrekken').setDescription('Trek een specifieke weekvrijstelling in (Lead)')
-        .addUserOption(o=>o.setName('gebruiker').setDescription('Bakarov-lid').setRequired(true))
-        .addStringOption(o=>o.setName('termijn').setDescription('Zaterdag van de week: DD-MM-JJJJ').setRequired(true).setMaxLength(10)).addStringOption(reasonOption)),
+      .addSubcommand(s=>s.setName('status').setDescription('Bekijk je eigen afwezigheidsaanvragen')),
     cmd('uitnodiging', 'Bekijk je persoonlijke uitnodiging na een aangenomen sollicitatie'),
     cmd('inrichten', 'Maak privecategorieen en een logkanaal voor deze guild')
       .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
