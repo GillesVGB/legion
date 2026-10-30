@@ -1,4 +1,22 @@
+import { createHash } from 'node:crypto';
+
 export const MAX_XP = 1_000_000_000_000;
+
+function queueLevelUp(ctx, user, previousXp, xp, settings, channel, now) {
+  const previousLevel = levelProgress(previousXp).level,
+    level = levelProgress(xp).level;
+  if (!settings?.levelUpMessages || level <= previousLevel) return;
+  const id = createHash('sha256')
+    .update(`${ctx.config.guildId}:${user}:${level}`)
+    .digest('hex')
+    .slice(0, 20);
+  ctx.store.db
+    .prepare(
+      `INSERT OR IGNORE INTO level_up_notices
+    (id,user_id,level,previous_level,xp,channel_id,created_at) VALUES(?,?,?,?,?,?,?)`,
+    )
+    .run(id, user, level, previousLevel, xp, channel || null, now);
+}
 
 export function levelProgress(xp = 0) {
   const total = Math.max(0, Math.min(MAX_XP, Math.floor(Number(xp) || 0)));
@@ -30,7 +48,7 @@ export function levelProfile(ctx, user) {
   );
 }
 
-export function recordMessageXp(ctx, user, hash, settings, now) {
+export function recordMessageXp(ctx, user, hash, settings, now, channel) {
   return ctx.store.transaction(() => {
     const previous = levelProfile(ctx, user);
     if (
@@ -50,12 +68,13 @@ export function recordMessageXp(ctx, user, hash, settings, now) {
       message_count=message_count+1,last_message_at=excluded.last_message_at,last_message_hash=excluded.last_message_hash`,
       )
       .run(user, gain, gain, now, hash);
+    queueLevelUp(ctx, user, previous.total_xp, previous.total_xp + gain, settings, channel, now);
     return levelProfile(ctx, user);
   });
 }
 
 // Voice ticks call this inside one transaction for the whole guild.
-export function recordVoiceTime(ctx, user, seconds, rate) {
+export function recordVoiceTime(ctx, user, seconds, rate, settings, channel, now = Date.now()) {
   const profile = levelProfile(ctx, user);
   const units = profile.voice_remainder + seconds * rate;
   const gain = Math.min(Math.floor(units / 60), MAX_XP - profile.total_xp);
@@ -67,6 +86,7 @@ export function recordVoiceTime(ctx, user, seconds, rate) {
     voice_seconds=voice_seconds+excluded.voice_seconds,voice_remainder=excluded.voice_remainder`,
     )
     .run(user, gain, gain, seconds, units % 60);
+  queueLevelUp(ctx, user, profile.total_xp, profile.total_xp + gain, settings, channel, now);
 }
 
 export function levelRanking(ctx, guild, limit = 10) {

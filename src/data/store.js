@@ -71,6 +71,15 @@ export class Store {
         last_message_hash TEXT NOT NULL DEFAULT ''
       );
       CREATE INDEX IF NOT EXISTS member_levels_ranking ON member_levels(total_xp DESC,user_id);
+      CREATE TABLE IF NOT EXISTS level_up_notices (
+        id TEXT PRIMARY KEY, user_id TEXT NOT NULL, level INTEGER NOT NULL,
+        previous_level INTEGER NOT NULL, xp INTEGER NOT NULL, channel_id TEXT,
+        delivery_channel_id TEXT, created_at INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending', message_id TEXT, sending_at INTEGER,
+        next_attempt INTEGER NOT NULL DEFAULT 0, attempts INTEGER NOT NULL DEFAULT 0,
+        last_error TEXT, UNIQUE(user_id,level)
+      );
+      CREATE INDEX IF NOT EXISTS level_up_notices_pending ON level_up_notices(status,next_attempt);
       CREATE TABLE IF NOT EXISTS application_drafts (
         id TEXT PRIMARY KEY, owner_id TEXT NOT NULL UNIQUE, step INTEGER NOT NULL DEFAULT 0,
         revision INTEGER NOT NULL DEFAULT 0, answers TEXT NOT NULL,

@@ -46,20 +46,30 @@ export function syncVoiceXp(ctx, guild, now = performance.now()) {
   ]);
   const previous = ctx.levelingVoice;
   const active = eligibleVoiceMembers(guild, settings);
+  const channels = new Map(
+    [...active].map((user) => [user, guild.voiceStates.cache.get(user)?.channelId]),
+  );
   if (!previous || previous.signature !== signature || now < previous.at) {
-    ctx.levelingVoice = { at: now, active, signature };
+    ctx.levelingVoice = { at: now, active, channels, signature };
     return;
   }
   const elapsed = Math.max(0, Math.min(60, Math.floor((now - previous.at) / 1000)));
   if (elapsed && previous.active.size)
     ctx.store.transaction(() => {
       for (const user of previous.active)
-        recordVoiceTime(ctx, user, elapsed, settings.voiceXpPerMinute);
+        recordVoiceTime(
+          ctx,
+          user,
+          elapsed,
+          settings.voiceXpPerMinute,
+          settings,
+          previous.channels?.get(user),
+        );
     });
   const unchanged =
     active.size === previous.active.size && [...active].every((user) => previous.active.has(user));
   const at = unchanged && now - previous.at <= 60_000 ? previous.at + elapsed * 1000 : now;
-  ctx.levelingVoice = { at, active, signature };
+  ctx.levelingVoice = { at, active, channels, signature };
 }
 
 export function clearVoiceXpTracking(contexts) {

@@ -1,12 +1,12 @@
 # Levelsysteem
 
-De code staat in `src/modules/leveling/`: `index.js` handelt berichten en commando's af, `voice.js` meet aanwezigheid en `profiles.js` bewaart en leest XP. De tabel `member_levels` staat in de bestaande SQLite-database van iedere guild.
+De code staat in `src/modules/leveling/`: `index.js` handelt berichten en commando's af, `voice.js` meet aanwezigheid, `profiles.js` bewaart en leest XP, `cards.js` tekent PNG-kaarten en `notifications.js` verstuurt levelmeldingen. De tabellen `member_levels` en `level_up_notices` staan in de bestaande SQLite-database van iedere guild.
 
 ## Voortgang
 
 Bericht-XP en spraak-XP tellen samen voor één level. De minimale totale XP voor level L is `100 * L * L`. Een nieuw profiel begint op level 0. Level 1 vereist 100 XP, level 2 vereist 400 XP en level 3 vereist 900 XP.
 
-- `/level` toont je eigen profiel; `/level lid:@naam` toont een ander huidig lid.
+- `/level` toont je eigen profiel met een PNG-rankkaart; `/level lid:@naam` toont een ander huidig lid. De kaart bevat avatar, naam, level, positie, totale XP, de voortgang binnen dit level en resterende XP. Bericht- en spraakdetails staan ook als leesbare embedtekst bij de afbeelding.
 - `/levels` toont de top tien huidige leden. Bots en vertrokken leden worden overgeslagen.
 - **Dashboard → Levels** toont de top 25, inclusief de verdeling tussen bericht- en spraak-XP.
 
@@ -34,5 +34,16 @@ Onder **Modules instellen → Levels & XP** staan, afzonderlijk per guild:
 - XP per bericht, cooldown en minimale tekstlengte.
 - XP per spraakminuut, minimum actieve deelnemers en mutecontrole.
 - Maximaal twintig genegeerde kanaal- of categorie-ID's, gescheiden door komma's. Een genegeerde categorie sluit ook haar kanalen uit.
+- Afbeeldingen bij een level omhoog aan/uit en een optioneel meldingskanaal-ID. Leeg gebruikt het kanaal van de verdiende XP; voor spraak is dit de tekstchat van het betrokken spraakkanaal, ook als het lid dat kanaal net verliet.
 
-Uitschakelen bewaart de voortgang. Het systeem kent geen historische XP toe voor berichten of spraak van vóór de update. Bestaande databases en back-ups blijven op dezelfde plaats; alleen een nieuwe tabel wordt toegevoegd.
+Uitschakelen bewaart de voortgang. Het systeem kent geen historische XP toe voor berichten of spraak van vóór de update. Bestaande databases en back-ups blijven op dezelfde plaats.
+
+## Kaarten en verzending
+
+Bij een levelovergang wordt binnen dezelfde XP-transactie een melding opgeslagen met de bereikte XP-stand. Er is maximaal één melding per lid en bereikt level. Bestaande levels leveren geen meldingen achteraf op. Bij een sprong over meerdere levels verschijnt één kaart voor het hoogste bereikte level. Nieuwe berichtmeldingen worden direct verwerkt; spraakmeldingen binnen de normale meetronde van vijftien seconden. Iedere ronde verwerkt maximaal drie meldingen per server; resterende meldingen komen de volgende ronde aan bod.
+
+Een verbindings- of rechtenfout bewaart de melding voor een volgende poging, met een wachttijd van vijftien seconden oplopend tot tien minuten. Herstarts behouden de wachtrij. Na een mogelijk onderbroken verzending zoekt de bot in maximaal duizend recente berichten naar zijn eigen unieke melding, naast Discord-noncecontrole. Een teruggevonden melding wordt niet opnieuw gestuurd. Als die historie niet meer beschikbaar is, kan de bot een eerdere verzending niet met zekerheid herkennen. Bij uitschakelen worden wachtende meldingen overgeslagen, zodat opnieuw inschakelen geen inhaalronde veroorzaakt.
+
+Een eigen kanaal moet in dezelfde server staan. Nodige rechten: Kanaal bekijken, Berichten versturen, Links insluiten, Bestanden bijvoegen en Berichtgeschiedenis lezen; voor een thread ook Berichten in threads versturen. Onbereikbare kanalen of ontbrekende rechten worden in de hostingconsole vermeld. Een vertrokken lid ontvangt geen melding.
+
+De PNG-renderer gebruikt `@resvg/resvg-js` met meegeleverde Barlow-lettertypen onder de SIL Open Font License. Voer bij installatie `npm install` of `npm ci` uit op het doelsysteem, met optionele platformpakketten ingeschakeld. Afbeeldingen worden in het geheugen gemaakt en niet op schijf bewaard. Er rendert hoogstens één kaart tegelijk met maximaal vier actieve/wachtende opdrachten samen. Avatar-PNG's worden uitsluitend van Discord-CDN-hostnamen opgehaald, met maximaal drie seconden, 300 kB en 256 × 256 pixels. Bij een fout verschijnen initialen.

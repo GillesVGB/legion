@@ -1,6 +1,6 @@
 {
   "name": "bakarov-future-rp-bot",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "private": true,
   "description": "Nederlandstalige Discord-bot voor Bakarov in Future RP",
   "type": "module",
@@ -16,6 +16,7 @@
     "backup": "node --env-file-if-exists=.env scripts/backup.js"
   },
   "dependencies": {
+    "@resvg/resvg-js": "2.6.2",
     "discord.js": "14.25.1"
   }
 }

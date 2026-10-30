@@ -96,6 +96,10 @@ import { createRuntimeClientOptions, startRuntimeCacheMaintenance } from './runt
 import { maintainStorage } from '../data/maintenance.js';
 import { awardMessageXp, handleLevelCommand } from '../modules/leveling/index.js';
 import { syncVoiceXp, clearVoiceXpTracking } from '../modules/leveling/voice.js';
+import {
+  syncLevelNotifications,
+  waitForLevelNotifications,
+} from '../modules/leveling/notifications.js';
 import { syncBotBranding } from '../ui/branding.js';
 import { handleMonthlyReport } from '../modules/reports/monthly.js';
 import { syncWeeklyReports, handleWeeklyReport } from '../modules/reports/weekly.js';
@@ -1050,8 +1054,9 @@ client.on(Events.MessageCreate, (message) => {
     }
   if (ctx && !shuttingDown)
     handleSecurityMessage(ctx, message)
-      .then((allowed) => {
-        if (allowed !== false && ctx.ready && !shuttingDown) awardMessageXp(ctx, message);
+      .then(async (allowed) => {
+        if (allowed !== false && ctx.ready && !shuttingDown && awardMessageXp(ctx, message))
+          await syncLevelNotifications(ctx, message.guild);
       })
       .catch((error) => securityFailure(ctx, 'Berichtencontrole of bericht-XP', error));
   if (ctx && !shuttingDown && !message.author?.bot) {
@@ -1209,6 +1214,7 @@ async function performMaintenance() {
         ['check-ins', () => syncActivityChecks(ctx, guild)],
         ['planning', () => syncActivities(ctx, guild)],
         ['promoties', () => syncPromotions(ctx, guild)],
+        ['levelmeldingen', () => syncLevelNotifications(ctx, guild)],
       );
       if (ctx.config.roster?.roleIds?.length)
         jobs.push(['proefperioden', () => syncProbationReviews(ctx, guild)]);
@@ -1301,6 +1307,9 @@ const levelingTimer = setInterval(() => {
     }
     try {
       syncVoiceXp(ctx, guild);
+      syncLevelNotifications(ctx, guild).catch((error) =>
+        console.error(`Levelmeldingen wachten op herhaling (${error.code || error.name}).`),
+      );
     } catch (error) {
       console.error(`Spraak-XP opslaan mislukt (${error.code || error.name}).`);
     }
@@ -1327,6 +1336,7 @@ async function shutdown() {
   for (const task of recruitmentDebounce.values()) clearTimeout(task);
   for (const task of rosterDebounce.values()) clearTimeout(task);
   await maintenanceRun?.catch(() => {});
+  await waitForLevelNotifications(contexts);
   await stopViewer?.();
   dashboard.close();
   await client.destroy();

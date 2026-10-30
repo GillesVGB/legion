@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
-import { ChannelType } from 'discord.js';
+import { AttachmentBuilder, ChannelType } from 'discord.js';
+import { renderLevelCard } from './cards.js';
 import { operationSettings } from '../../config/features.js';
 import { assertUser } from '../../common/errors.js';
 import { embed } from '../../ui/messages.js';
@@ -56,7 +57,7 @@ export function awardMessageXp(ctx, message, now = Date.now()) {
   const words = normalized.replace(/https?:\/\/\S+|www\.\S+/gu, '').trim();
   if (words.length < settings.minMessageLength || !/[\p{L}\p{N}]/u.test(words)) return null;
   const hash = createHash('sha256').update(normalized).digest('hex');
-  return recordMessageXp(ctx, message.author.id, hash, settings, now);
+  return recordMessageXp(ctx, message.author.id, hash, settings, now, message.channelId);
 }
 
 export const voiceDuration = (seconds) =>
@@ -90,20 +91,35 @@ export async function handleLevelCommand(ctx, interaction) {
   const profile = levelProfile(ctx, user.id),
     progress = levelProgress(profile.total_xp),
     rank = levelRank(ctx, interaction.guild, user.id);
-  const filled = Math.floor((progress.current / progress.required) * 10);
+  const image = await renderLevelCard(member, { xp: profile.total_xp, rank });
+  const filename = `level-${user.id}.png`;
   return interaction.editReply({
     embeds: [
       embed(
         ctx.config,
         `Bakarov — Level ${progress.level}`,
-        `**Lid:** <@${user.id}>\n**XP:** ${progress.xp.toLocaleString('nl-BE')}\n**Positie:** ${rank ? `#${rank}` : 'Nog niet gerangschikt'}\n\n` +
-          `${'▰'.repeat(filled)}${'▱'.repeat(10 - filled)}\n**Volgend level:** ${progress.current}/${progress.required} XP · nog ${progress.remaining} XP\n\n` +
-          `**Berichten:** ${profile.message_xp.toLocaleString('nl-BE')} XP uit ${profile.message_count} geldige berichten\n**Spraak:** ${profile.voice_xp.toLocaleString('nl-BE')} XP · ${voiceDuration(profile.voice_seconds)} actief\n\n` +
+        `<@${user.id}> · ${rank ? `Positie **#${rank}**` : 'Nog niet gerangschikt'}\n` +
+          `**${progress.xp.toLocaleString('nl-BE')} XP** in totaal · nog **${progress.remaining.toLocaleString('nl-BE')} XP** tot level ${progress.level + 1}` +
           (settings.enabled
-            ? 'XP is per server gescheiden. Levels veranderen je gangrang en coins niet.'
-            : 'XP verdienen staat momenteel uit; je voortgang blijft bewaard.'),
-      ),
+            ? ''
+            : '\nXP verdienen staat momenteel uit; je voortgang blijft bewaard.'),
+      )
+        .setThumbnail(null)
+        .setImage(`attachment://${filename}`)
+        .addFields(
+          {
+            name: 'Berichten',
+            value: `${profile.message_xp.toLocaleString('nl-BE')} XP · ${profile.message_count} berichten`,
+            inline: true,
+          },
+          {
+            name: 'Spraak',
+            value: `${profile.voice_xp.toLocaleString('nl-BE')} XP · ${voiceDuration(profile.voice_seconds)} actief`,
+            inline: true,
+          },
+        ),
     ],
+    files: [new AttachmentBuilder(image, { name: filename })],
     allowedMentions: { parse: [] },
   });
 }

@@ -1482,6 +1482,8 @@ const operationLabels = {
   security: 'Beveiliging & automatisch modereren',
 };
 const settingLabels = {
+  levelUpMessages: 'Afbeelding versturen bij een level omhoog',
+  levelUpChannelId: 'Levelmeldingen kanaal-ID (leeg = kanaal waar je XP verdient)',
   messageEnabled: 'XP voor berichten',
   messageXp: 'XP per geldig bericht',
   messageCooldownSeconds: 'Berichtcooldown (seconden)',
@@ -1600,7 +1602,7 @@ function modulesPage() {
                   ? 'date'
                   : 'text',
           );
-          return ['weeklyChannelId', 'ignoredChannelIds'].includes(key)
+          return ['weeklyChannelId', 'ignoredChannelIds', 'levelUpChannelId'].includes(key)
             ? input.replace(' required', '')
             : input;
         })

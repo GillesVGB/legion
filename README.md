@@ -1,5 +1,11 @@
 # Bakarov — Discord-bot voor Future RP
 
+## Rankkaarten en levelmeldingen — 2.6.1
+
+`/level [lid]` toont een zwart-gouden afbeelding met avatar, naam, level, rang en XP-voortgang. Bij een nieuw level via berichten of spraaktijd verstuurt de bot automatisch een groene levelkaart. Het meldingskanaal en de aan/uit-schakelaar staan bij **Modules instellen → Levels & XP**. Zonder eigen kanaal komt de melding in het kanaal waar XP werd verdiend, voor spraak in de tekstchat van het spraakkanaal.
+
+Voer na deze update **`npm install`** uit en herstart de bot. De PNG-renderer heeft een vooraf gebouwde versie voor Windows en Linux; kopieer geen Windows-`node_modules` naar de hosting en laat optionele npm-platformpakketten aan. De bot heeft in het meldingskanaal **Bestanden bijvoegen** en **Links insluiten** nodig, naast bekijken, versturen en geschiedenis lezen.
+
 ## Levels voor berichten en spraaktijd — 2.6.0
 
 Met `/level [lid]` bekijk je level, XP, voortgang en actieve spraaktijd. `/levels` toont de publieke ranglijst. Standaard verdien je 15 XP per geldig bericht met een cooldown van 60 seconden, plus 5 XP per minuut in een gewoon spraakkanaal met minstens twee actieve mensen. Bots, privétickets, logkanalen, herhaalde tekst, AFK en gedempte/dove deelnemers tellen niet mee. Er wordt geen audio opgenomen of daadwerkelijke spraak gedetecteerd.

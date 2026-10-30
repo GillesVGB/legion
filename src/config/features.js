@@ -37,6 +37,8 @@ export const featureDefaults = {
     voiceMinMembers: 2,
     voiceRequireUnmuted: true,
     ignoredChannelIds: '',
+    levelUpMessages: true,
+    levelUpChannelId: '',
   },
   activityCheck: {
     remindersEnabled: true,
@@ -191,10 +193,10 @@ export function validateOperations(value) {
             new Date(input + 'T12:00:00Z').toISOString().slice(0, 10) === input,
           'Gebruik een geldige startdatum: JJJJ-MM-DD.',
         );
-      else if (key === 'weeklyChannelId')
+      else if (['weeklyChannelId', 'levelUpChannelId'].includes(key))
         assertUser(
           typeof input === 'string' && (!input || /^\d{17,20}$/.test(input)),
-          'Gebruik een geldig kanaal-ID of laat leeg voor mededelingen.',
+          'Gebruik een geldig kanaal-ID of laat leeg voor het standaardkanaal.',
         );
       else if (key.endsWith('Time'))
         assertUser(
