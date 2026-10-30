@@ -89,7 +89,7 @@ test('berichten geven eenmaal XP per cooldown; herhaling, korte tekst en alleen 
   assert.equal(levelProfile(f.ctx, OTHER).message_count, 3);
 });
 
-test('bots, webhooks, privétickets, logkanalen, uitgesloten categorieën en uitgeschakelde modules geven geen XP', (t) => {
+test('bots, webhooks, uitgesloten categorieën en uitgeschakelde modules geven geen XP', (t) => {
   const f = fixture(t);
   for (const extra of [
     { author: { id: OTHER, bot: true } },
@@ -97,8 +97,6 @@ test('bots, webhooks, privétickets, logkanalen, uitgesloten categorieën en uit
     { system: true },
     { partial: true },
     { guild: { id: 'anders' } },
-    { channel: { type: ChannelType.PrivateThread } },
-    { channelId: f.ctx.config.botLogChannelId },
   ])
     assert.equal(awardMessageXp(f.ctx, f.message(undefined, extra)), null);
   f.settings({ ignoredChannelIds: f.channel.id });
@@ -123,8 +121,8 @@ test('bots, webhooks, privétickets, logkanalen, uitgesloten categorieën en uit
         channelId: entry.channel_id,
         channel: guild.channels.cache.get(entry.channel_id),
       }),
-    ),
-    null,
+    ).total_xp,
+    15,
   );
   assert.equal(levelProfile(f.ctx, OTHER).total_xp, 0);
 });
@@ -253,10 +251,54 @@ test('levelcommando’s zijn publiek in beide guilds en de ranglijst bevat allee
     },
   });
   assert.equal(deferred, undefined);
-  assert.match(reply.embeds[0].toJSON().description, /105/);
+  assert.equal(reply.embeds, undefined);
+  assert.equal(reply.content, undefined);
+  assert.match(reply.files[0].description, /105 XP/);
   assert.deepEqual(reply.allowedMentions.parse, []);
   f.guild.members.cache.delete(OTHER);
   assert.equal(levelRanking(f.ctx, f.guild).length, 0);
+});
+
+test('ledenberichten geven XP in changelog, logs, transcripts en alle tekst- en threadsoorten', (t) => {
+  const f = fixture(t);
+  const channels = [
+    [f.ctx.config.updateChannelId, ChannelType.GuildAnnouncement],
+    [f.ctx.config.botLogChannelId, ChannelType.GuildText],
+    [f.ctx.config.logChannelId, ChannelType.GuildText],
+    [f.ctx.config.warnLogChannelId, ChannelType.GuildText],
+    ['100000000000009021', ChannelType.PublicThread],
+    ['100000000000009022', ChannelType.PrivateThread],
+    ['100000000000009023', ChannelType.AnnouncementThread],
+    ['100000000000009024', ChannelType.GuildVoice],
+  ];
+  channels.forEach(([id, type], i) => {
+    const channel = { id, type };
+    const profile = awardMessageXp(
+      f.ctx,
+      f.message(`Geldig bericht in kanaal ${i}`, { channelId: id, channel }),
+      1000 + i * 60_000,
+    );
+    assert.equal(profile.total_xp, (i + 1) * 15, `Kanaal ${id}`);
+  });
+  const community = f.guilds.get(f.source.config.guildId);
+  for (const [i, id] of [
+    f.source.config.applicationTranscriptChannelId,
+    f.source.config.ticketTranscriptChannelId,
+  ].entries()) {
+    assert.equal(
+      awardMessageXp(
+        f.source,
+        f.message(`Transcriptkanaal testbericht ${i}`, {
+          guild: community,
+          guildId: community.id,
+          channelId: id,
+          channel: community.channels.cache.get(id),
+        }),
+        1000 + i * 60_000,
+      ).total_xp,
+      (i + 1) * 15,
+    );
+  }
 });
 
 test('dashboard toont levels en module-instellingen veilig; XP-instellingen worden per guild bewaard', (t) => {

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { AttachmentBuilder, ChannelType } from 'discord.js';
+import { AttachmentBuilder } from 'discord.js';
 import { renderLevelCard } from './cards.js';
 import { operationSettings } from '../../config/features.js';
 import { assertUser } from '../../common/errors.js';
@@ -25,8 +25,7 @@ export function awardMessageXp(ctx, message, now = Date.now()) {
     message.author.bot ||
     message.webhookId ||
     message.system ||
-    message.partial ||
-    message.channel?.type === ChannelType.PrivateThread
+    message.partial
   )
     return null;
   const excluded = ignoredLevelChannels(settings);
@@ -35,20 +34,7 @@ export function awardMessageXp(ctx, message, now = Date.now()) {
     message.channel?.parentId,
     message.guild.channels?.cache.get(message.channel?.parentId)?.parentId,
   ];
-  const privateChannels = [
-    ctx.config.logChannelId,
-    ctx.config.botLogChannelId,
-    ctx.config.warnLogChannelId,
-    ctx.config.updateChannelId,
-    ctx.config.applicationTranscriptChannelId,
-    ctx.config.ticketTranscriptChannelId,
-  ];
-  if (
-    channelIds.some((id) => id && (excluded.has(id) || privateChannels.includes(id))) ||
-    ctx.store.caseByChannel(message.channelId) ||
-    (message.channel?.parentId && ctx.store.caseByChannel(message.channel.parentId))
-  )
-    return null;
+  if (channelIds.some((id) => id && excluded.has(id))) return null;
   const normalized = String(message.content || '')
     .normalize('NFKC')
     .trim()
@@ -59,9 +45,6 @@ export function awardMessageXp(ctx, message, now = Date.now()) {
   const hash = createHash('sha256').update(normalized).digest('hex');
   return recordMessageXp(ctx, message.author.id, hash, settings, now, message.channelId);
 }
-
-export const voiceDuration = (seconds) =>
-  `${Math.floor(seconds / 3600)}u ${Math.floor((seconds % 3600) / 60)}m`;
 
 export async function handleLevelCommand(ctx, interaction) {
   await interaction.deferReply();
@@ -94,32 +77,11 @@ export async function handleLevelCommand(ctx, interaction) {
   const image = await renderLevelCard(member, { xp: profile.total_xp, rank });
   const filename = `level-${user.id}.png`;
   return interaction.editReply({
-    embeds: [
-      embed(
-        ctx.config,
-        `Bakarov — Level ${progress.level}`,
-        `<@${user.id}> · ${rank ? `Positie **#${rank}**` : 'Nog niet gerangschikt'}\n` +
-          `**${progress.xp.toLocaleString('nl-BE')} XP** in totaal · nog **${progress.remaining.toLocaleString('nl-BE')} XP** tot level ${progress.level + 1}` +
-          (settings.enabled
-            ? ''
-            : '\nXP verdienen staat momenteel uit; je voortgang blijft bewaard.'),
-      )
-        .setThumbnail(null)
-        .setImage(`attachment://${filename}`)
-        .addFields(
-          {
-            name: 'Berichten',
-            value: `${profile.message_xp.toLocaleString('nl-BE')} XP · ${profile.message_count} berichten`,
-            inline: true,
-          },
-          {
-            name: 'Spraak',
-            value: `${profile.voice_xp.toLocaleString('nl-BE')} XP · ${voiceDuration(profile.voice_seconds)} actief`,
-            inline: true,
-          },
-        ),
+    files: [
+      new AttachmentBuilder(image, { name: filename }).setDescription(
+        `${member.displayName}: level ${progress.level}, ${progress.xp} XP. Nog ${progress.remaining} XP tot level ${progress.level + 1}.`,
+      ),
     ],
-    files: [new AttachmentBuilder(image, { name: filename })],
     allowedMentions: { parse: [] },
   });
 }

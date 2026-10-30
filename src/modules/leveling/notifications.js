@@ -1,6 +1,5 @@
 import { AttachmentBuilder, ChannelType, PermissionFlagsBits as P } from 'discord.js';
 import { operationSettings } from '../../config/features.js';
-import { embed } from '../../ui/messages.js';
 import { renderLevelCard } from './cards.js';
 
 const running = new WeakMap();
@@ -29,7 +28,8 @@ async function findSentMessage(channel, botId, notice) {
     const found = history.find(
       (message) =>
         message.author.id === botId &&
-        message.embeds?.some((card) => (card.footer || card.data?.footer)?.text === marker),
+        (message.attachments?.some((file) => file.name === `level-up-${notice.id}.png`) ||
+          message.embeds?.some((card) => (card.footer || card.data?.footer)?.text === marker)),
     );
     if (found) return found;
     if (history.size < 100) break;
@@ -54,7 +54,6 @@ async function deliver(ctx, guild, notice, now) {
     throw fail('LEVEL_CHANNEL_INVALID');
   const required = [
     P.ViewChannel,
-    P.EmbedLinks,
     P.AttachFiles,
     P.ReadMessageHistory,
     channel.isThread?.() ? P.SendMessagesInThreads : P.SendMessages,
@@ -81,20 +80,12 @@ async function deliver(ctx, guild, notice, now) {
   const filename = `level-up-${notice.id}.png`;
   ctx.store.db.prepare('UPDATE level_up_notices SET sending_at=? WHERE id=?').run(now, notice.id);
   const message = await channel.send({
-    content: `<@${notice.user_id}>`,
-    embeds: [
-      embed(
-        ctx.config,
-        'Bakarov — Level omhoog!',
-        `Je hebt **level ${notice.level}** bereikt. Goed bezig!`,
-      )
-        .setColor(0x28ba7b)
-        .setThumbnail(null)
-        .setImage(`attachment://${filename}`)
-        .setFooter({ text: `Bakarov • Levelmelding ${notice.id}` }),
+    files: [
+      new AttachmentBuilder(image, { name: filename }).setDescription(
+        `${member.displayName} heeft level ${notice.level} bereikt!`,
+      ),
     ],
-    files: [new AttachmentBuilder(image, { name: filename })],
-    allowedMentions: { parse: [], users: [notice.user_id] },
+    allowedMentions: { parse: [] },
     nonce: `lv:${notice.id}`,
     enforceNonce: true,
   });

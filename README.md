@@ -1,5 +1,9 @@
 # Bakarov — Discord-bot voor Future RP
 
+## Alleen PNG en XP in alle kanalen — 2.6.2
+
+`/level` en levelmeldingen sturen uitsluitend de PNG-rankkaart. Gewone ledenberichten kunnen in alle kanalen XP verdienen, ook changelog, logs, tickets en threads. Alleen eigen uitsluitingen in het dashboard blijven gelden. De cooldown van standaard zestig seconden, minimale berichtlengte en spamcontrole blijven actief. Een eerder gestuurde afbeelding is een momentopname; opnieuw `/level` toont de nieuwste stand.
+
 ## Rankkaarten en levelmeldingen — 2.6.1
 
 `/level [lid]` toont een zwart-gouden afbeelding met avatar, naam, level, rang en XP-voortgang. Bij een nieuw level via berichten of spraaktijd verstuurt de bot automatisch een groene levelkaart. Het meldingskanaal en de aan/uit-schakelaar staan bij **Modules instellen → Levels & XP**. Zonder eigen kanaal komt de melding in het kanaal waar XP werd verdiend, voor spraak in de tekstchat van het spraakkanaal.

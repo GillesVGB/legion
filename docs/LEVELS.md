@@ -6,7 +6,7 @@ De code staat in `src/modules/leveling/`: `index.js` handelt berichten en comman
 
 Bericht-XP en spraak-XP tellen samen voor één level. De minimale totale XP voor level L is `100 * L * L`. Een nieuw profiel begint op level 0. Level 1 vereist 100 XP, level 2 vereist 400 XP en level 3 vereist 900 XP.
 
-- `/level` toont je eigen profiel met een PNG-rankkaart; `/level lid:@naam` toont een ander huidig lid. De kaart bevat avatar, naam, level, positie, totale XP, de voortgang binnen dit level en resterende XP. Bericht- en spraakdetails staan ook als leesbare embedtekst bij de afbeelding.
+- `/level` stuurt uitsluitend je PNG-rankkaart; `/level lid:@naam` toont een ander huidig lid. De kaart bevat avatar, naam, level, positie, totale XP, de voortgang binnen dit level en resterende XP. Er is geen extra embed, berichttekst of tag. Een beschrijving bij de bijlage maakt de stand beschikbaar voor schermlezers. Eerder gestuurde kaarten zijn momentopnamen; opnieuw `/level` toont de actuele stand.
 - `/levels` toont de top tien huidige leden. Bots en vertrokken leden worden overgeslagen.
 - **Dashboard → Levels** toont de top 25, inclusief de verdeling tussen bericht- en spraak-XP.
 
@@ -16,7 +16,7 @@ De commando's zijn voor iedereen zichtbaar en werken in beide servers. Iedere se
 
 Standaard: 15 XP per geldig bericht, minimaal vijf tekens met letters of cijfers, maximaal één beloning per 60 seconden. Hetzelfde genormaliseerde bericht binnen tien minuten geeft geen nieuwe XP. De cooldown blijft na een herstart gelden.
 
-Bots, webhooks, systeemmeldingen, alleen links/emoji's, geregistreerde tickets en hun threads, privéthreads en ingestelde log-/transcriptkanalen tellen niet mee. De beveiligingscontrole loopt vóór de XP-toekenning; afgekeurde berichten worden niet beloond. De XP-administratie bewaart een hash voor herhalingscontrole, geen kopie van de berichttekst.
+Gewone ledenberichten tellen in alle kanaalsoorten mee, ook changelog, logs, transcripts, geregistreerde tickets, de tekstchat van spraakkanalen en publieke of privéthreads. De bot moet toegang tot het kanaal hebben. Alleen zelf in het dashboard ingestelde kanaal- of categorie-uitsluitingen gelden nog. Bots, webhooks, systeemmeldingen en alleen links/emoji's tellen niet mee. De beveiligingscontrole loopt vóór de XP-toekenning; afgekeurde berichten worden niet beloond. De XP-administratie bewaart een hash voor herhalingscontrole, geen kopie van de berichttekst.
 
 ## Spraak
 
@@ -42,8 +42,8 @@ Uitschakelen bewaart de voortgang. Het systeem kent geen historische XP toe voor
 
 Bij een levelovergang wordt binnen dezelfde XP-transactie een melding opgeslagen met de bereikte XP-stand. Er is maximaal één melding per lid en bereikt level. Bestaande levels leveren geen meldingen achteraf op. Bij een sprong over meerdere levels verschijnt één kaart voor het hoogste bereikte level. Nieuwe berichtmeldingen worden direct verwerkt; spraakmeldingen binnen de normale meetronde van vijftien seconden. Iedere ronde verwerkt maximaal drie meldingen per server; resterende meldingen komen de volgende ronde aan bod.
 
-Een verbindings- of rechtenfout bewaart de melding voor een volgende poging, met een wachttijd van vijftien seconden oplopend tot tien minuten. Herstarts behouden de wachtrij. Na een mogelijk onderbroken verzending zoekt de bot in maximaal duizend recente berichten naar zijn eigen unieke melding, naast Discord-noncecontrole. Een teruggevonden melding wordt niet opnieuw gestuurd. Als die historie niet meer beschikbaar is, kan de bot een eerdere verzending niet met zekerheid herkennen. Bij uitschakelen worden wachtende meldingen overgeslagen, zodat opnieuw inschakelen geen inhaalronde veroorzaakt.
+Een verbindings- of rechtenfout bewaart de melding voor een volgende poging, met een wachttijd van vijftien seconden oplopend tot tien minuten. Herstarts behouden de wachtrij. Na een mogelijk onderbroken verzending zoekt de bot in maximaal duizend recente berichten naar de unieke PNG-bestandsnaam of de marker van een oudere embed, naast Discord-noncecontrole. Een teruggevonden melding wordt niet opnieuw gestuurd. Als die historie niet meer beschikbaar is, kan de bot een eerdere verzending niet met zekerheid herkennen. Bij uitschakelen worden wachtende meldingen overgeslagen, zodat opnieuw inschakelen geen inhaalronde veroorzaakt.
 
-Een eigen kanaal moet in dezelfde server staan. Nodige rechten: Kanaal bekijken, Berichten versturen, Links insluiten, Bestanden bijvoegen en Berichtgeschiedenis lezen; voor een thread ook Berichten in threads versturen. Onbereikbare kanalen of ontbrekende rechten worden in de hostingconsole vermeld. Een vertrokken lid ontvangt geen melding.
+Een eigen kanaal moet in dezelfde server staan. Nodige rechten: Kanaal bekijken, Berichten versturen, Bestanden bijvoegen en Berichtgeschiedenis lezen; voor een thread ook Berichten in threads versturen. Levelmeldingen bevatten alleen de PNG, zonder embed of tag; Links insluiten is hiervoor niet nodig. Onbereikbare kanalen of ontbrekende rechten worden in de hostingconsole vermeld. Een vertrokken lid ontvangt geen melding.
 
 De PNG-renderer gebruikt `@resvg/resvg-js` met meegeleverde Barlow-lettertypen onder de SIL Open Font License. Voer bij installatie `npm install` of `npm ci` uit op het doelsysteem, met optionele platformpakketten ingeschakeld. Afbeeldingen worden in het geheugen gemaakt en niet op schijf bewaard. Er rendert hoogstens één kaart tegelijk met maximaal vier actieve/wachtende opdrachten samen. Avatar-PNG's worden uitsluitend van Discord-CDN-hostnamen opgehaald, met maximaal drie seconden, 300 kB en 256 × 256 pixels. Bij een fout verschijnen initialen.

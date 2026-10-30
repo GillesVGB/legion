@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { Collection, ChannelType, PermissionsBitField } from 'discord.js';
+import { Collection, ChannelType, PermissionsBitField, PermissionFlagsBits as P } from 'discord.js';
 import { dashboardFixture, ACTOR, OTHER } from './dashboard-fixture.js';
 import { operationSettings, validateOperations } from '../src/config/features.js';
 import { awardMessageXp, handleLevelCommand } from '../src/modules/leveling/index.js';
@@ -16,6 +16,14 @@ function fixture(t) {
     guild = f.guilds.get(ctx.config.guildId);
   const channel = guild.channels.cache.get(ctx.config.planningChannelId),
     member = guild.members.cache.get(OTHER);
+  const send = channel.send;
+  channel.send = async (payload) => {
+    const message = await send(payload);
+    message.attachments = new Collection(
+      (payload.files || []).map((file, i) => [String(i), { name: file.name }]),
+    );
+    return message;
+  };
   const settings = (changes) =>
     (ctx.config.operations = {
       ...ctx.config.operations,
@@ -94,7 +102,7 @@ test('avatar gebruikt uitsluitend begrensde Discord-PNGs; ongeldige bron geeft e
   );
 });
 
-test('/level levert zijn afbeelding als bijlage binnen de publieke embed', async (t) => {
+test('/level levert uitsluitend een publieke PNG met beschrijving voor schermlezers', async (t) => {
   const f = fixture(t);
   f.cross();
   let reply,
@@ -112,12 +120,14 @@ test('/level levert zijn afbeelding als bijlage binnen de publieke embed', async
     },
   });
   assert.equal(deferred, undefined);
-  assert.equal(reply.embeds[0].toJSON().image.url, `attachment://${reply.files[0].name}`);
+  assert.equal(reply.embeds, undefined);
+  assert.equal(reply.content, undefined);
+  assert.equal(reply.files.length, 1);
   assert.ok(reply.files[0].attachment.subarray(0, 8).equals(signature));
-  assert.match(reply.embeds[0].toJSON().description, /105/);
+  assert.match(reply.files[0].description, /105 XP/);
 });
 
-test('bericht-levelovergang bewaart exact één melding en verstuurt een groene kaart met alleen de juiste tag', async (t) => {
+test('bericht-levelovergang bewaart exact één melding en verstuurt alleen een PNG zonder embed of tag', async (t) => {
   const f = fixture(t),
     notice = f.cross();
   assert.equal(notice.level, 1);
@@ -129,11 +139,10 @@ test('bericht-levelovergang bewaart exact één melding en verstuurt een groene 
   ]);
   assert.equal(f.channel.posted.size, 1);
   assert.equal(f.notice().status, 'sent');
-  const message = f.channel.posted.last(),
-    card = message.embeds[0].toJSON();
-  assert.equal(card.color, 0x28ba7b);
-  assert.match(card.image.url, /^attachment:\/\/level-up-/);
-  assert.equal(message.content, `<@${OTHER}>`);
+  const message = f.channel.posted.last();
+  assert.equal(message.embeds.length, 0);
+  assert.equal(message.attachments.first().name, `level-up-${notice.id}.png`);
+  assert.equal(message.content, '');
   assert.equal(f.notice().message_id, message.id);
   await syncLevelNotifications(f.ctx, f.guild);
   awardMessageXp(f.ctx, f.message(8), 600_000);
@@ -208,12 +217,12 @@ test('mislukte verzending blijft klaarstaan, herstelt later en dupliceert een re
 test('ontbrekende bijlagerechten verliezen geen melding; herstel van rechten verstuurt alsnog', async (t) => {
   const f = fixture(t);
   f.cross();
-  const permissions = f.channel.permissionsFor;
   f.channel.permissionsFor = () => new PermissionsBitField(0n);
   await syncLevelNotifications(f.ctx, f.guild, 1_000_000);
   assert.equal(f.notice().last_error, 'LEVEL_CHANNEL_PERMISSIONS');
   assert.equal(f.channel.posted.size, 0);
-  f.channel.permissionsFor = permissions;
+  f.channel.permissionsFor = () =>
+    new PermissionsBitField([P.ViewChannel, P.SendMessages, P.ReadMessageHistory, P.AttachFiles]);
   await syncLevelNotifications(f.ctx, f.guild, 1_020_000);
   assert.equal(f.notice().status, 'sent');
   assert.equal(f.channel.posted.size, 1);
