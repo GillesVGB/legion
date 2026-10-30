@@ -1,5 +1,26 @@
 # Bakarov — Discord-bot voor Future RP
 
+## Code-indeling — 2.5.29
+
+De broncode staat per onderdeel in duidelijke mappen:
+
+```text
+src/app/          Opstarten, Discord-events en achtergrondtaken
+src/commands/     Slashcommando's en registratie
+src/config/       Configuratie en module-instellingen
+src/data/         Databasecode, back-ups en opslagonderhoud
+src/modules/      Gangpot, tickets, sollicitaties, games en overige functies
+src/dashboard/    Dashboardserver, login en webbestanden
+src/logging/      Berichtlogs en auditlog
+src/ui/           Discordweergave, branding en afbeeldingen
+src/common/       Gedeelde hulpmiddelen
+src/releases/     Changelog en updateberichten
+```
+
+Alle eigen scripts gebruiken `.js`-bestanden. Zie [Projectstructuur](docs/PROJECTSTRUCTUUR.md) voor de uitleg per map en de werkwijze bij een wijziging. De code gebruikt een vaste, leesbare opmaak.
+
+De echte `data/`-map met databases, back-ups en transcripts blijft in de hoofdmap staan. Starten gebeurt nog steeds met `node index.js` of `npm start`. Omgevingsvariabelen, server-ID's en opgeslagen botgegevens worden door de herindeling niet veranderd.
+
 ## Goedgekeurde afmeldingen blijven vrijgesteld — 2.5.28
 
 Een door Lead goedgekeurde **langere afwezigheidsperiode** geeft gangpotvrijstelling voor de bijbehorende weken. Dit volgt rechtstreeks uit de goedgekeurde aanvraag, zodat ook bestaande afmeldingen weer meetellen na 2.5.27. Die leden krijgen voor de betreffende weken geen gangpotwarn of betaalherinnering en staan niet bij openstaande verplichte bijdragen.
@@ -132,7 +153,7 @@ Bij starten en tijdens de normale verwerking controleert de bot eerder gegeven *
 
 Een Nederlandstalige bot met gangwarns, gangpotbetalingen, sollicitatietickets, privétickets, een automatische ledenlijst, informatie en games. De hosting draait op Bot-Hosting.net. Zie `HOSTING.md` voor installatie en updates. Het downloadpakket bevat geen bot-token of database.
 
-![Bakarov](src/branding-assets/logo.webp)
+![Bakarov](src/ui/assets/logo.webp)
 
 Versie **2.0.0** geeft de bot, het dashboard, de panelen en nieuwe transcripts de naam **Bakarov** en een zwart-gouden huisstijl met het aangeleverde logo. De bot werkt zijn Discord-naam en profielfoto bij de eerste start bij; bij een geweigerde profielwijziging volgt een melding in de console en een nieuwe poging bij de volgende start. Oude botbijnamen worden waar mogelijk aangepast.
 
@@ -244,7 +265,7 @@ Nieuwe commands worden bij het starten automatisch geregistreerd: 32 in de hoofd
 
 **Dashboardinstellingen.** Bij **Modules instellen** kun je het gangpotbedrag, de zaterdagdeadline, herinneringstijden, Lead-overzicht, planningsduur, voorbereiding, afmeldingsgoedkeuring, maximale afwezigheid, vischallenges, sollicitatiecapaciteit, minimumleeftijd, invitegeldigheid, loginstellingen en embedkleur aanpassen. De bestaande pagina’s blijven informatie, regels en gewone game-instellingen beheren. Bedrag en deadline gelden standaard vanaf de volgende gangpotweek; wijzigen van de lopende week vraagt een expliciete bevestiging. Alleen administrators mogen bestemmingskanalen aanpassen; het leidinglog moet privé blijven. Instellingen blijven in `data/` bewaard bij restarts.
 
-**Botlogs en changelog.** Hoofdserverbotlogs komen in `1555685637129109586`: commands, knoppen, keuzelijsten, dashboardacties en belangrijke leden-, rollen-, kanalen- en berichtgebeurtenissen. Vanaf versie 1.8.1 tonen verwijderde en bewerkte berichten de beschikbare berichttekst, auteur, kanaal en bijlagen. Bij bewerkingen staan de oude en nieuwe tekst apart. Alle botlogs, inclusief berichtinhoud, gaan naar het ingestelde botlogkanaal: in de hoofdserver `1555685637129109586`. Tokens, wachtwoorden, uitnodigingscodes en toegangssleutels blijven afgeschermd. Van berichten die niet in de botcache stonden kan de oude inhoud ontbreken. De volledige loghistorie blijft lokaal bewaard en is in het dashboard pagineerbaar. Nieuwe versies worden automatisch één keer aangekondigd in `1558496003726774432`, met wijzigingen uit `src/release-notes.json`. Voeg bij elke code-release een nieuw versienummer en de bijbehorende changelog toe; `npm run check` controleert dit. Een gewone herstart maakt geen dubbel updatebericht.
+**Botlogs en changelog.** Hoofdserverbotlogs komen in `1555685637129109586`: commands, knoppen, keuzelijsten, dashboardacties en belangrijke leden-, rollen-, kanalen- en berichtgebeurtenissen. Vanaf versie 1.8.1 tonen verwijderde en bewerkte berichten de beschikbare berichttekst, auteur, kanaal en bijlagen. Bij bewerkingen staan de oude en nieuwe tekst apart. Alle botlogs, inclusief berichtinhoud, gaan naar het ingestelde botlogkanaal: in de hoofdserver `1555685637129109586`. Tokens, wachtwoorden, uitnodigingscodes en toegangssleutels blijven afgeschermd. Van berichten die niet in de botcache stonden kan de oude inhoud ontbreken. De volledige loghistorie blijft lokaal bewaard en is in het dashboard pagineerbaar. Nieuwe versies worden automatisch één keer aangekondigd in `1558496003726774432`, met wijzigingen uit `src/releases/notes.json`. Voeg bij elke code-release een nieuw versienummer en de bijbehorende changelog toe; `npm run check` controleert dit. Een gewone herstart maakt geen dubbel updatebericht.
 
 **Gangpot.** Alleen in de hoofdserver `1555685630640652338`. Menselijke leden met rol `1555685630640652347` betalen **€25.000 in-game per week**. Lead `1555685630707769382` is vrijgesteld van de verplichte bijdrage, herinneringen en automatische gangpotwarns, maar kan vrijwillig bijdragen. Bij de eerste update worden gekoppelde automatische gangpotwarns van huidige Leads ingetrokken; handmatige warns blijven staan. De termijn loopt zondag–zaterdag en de deadline is iedere zaterdag om 23:59 Belgische tijd. Wie vanaf dinsdag toetreedt is alleen voor de lopende week vrijgesteld; toetreders op maandag betalen vanaf die week mee. Vanaf de week erna geldt altijd de normale bijdrage. Betaal in-game en doe zelf `/gangpot betaling` (optioneel bedrag, termijn en notitie). Een melding wordt in `1558238040932225034` geplaatst met **✅ Goedkeuren / ❌ Afkeuren**. Alleen de exacte Lead-rol mag beslissen. In `1555685634515927050` staat uitsluitend uitleg. Het totaal en de lijst met wie deze week betaald heeft staan in `1558420548000813126`. Het saldo telt uitsluitend goedgekeurde betalingen en extra donaties, min uitgaven; dit heeft geen invloed op fun-coins.
 

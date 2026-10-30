@@ -1,0 +1,268 @@
+{
+  "2.5.29": [
+    "📁 **Broncode per onderdeel ingedeeld**\nDe scripts zijn verdeeld over app, commands, config, data, modules, dashboard, logging, ui, common en releases. Onder modules hebben gangpot, tickets, sollicitaties, afmeldingen, planning, check-ins, games, ledenbeheer, moderatie, rapporten en transcripts elk hun eigen map.",
+    "✍️ **JavaScript met consistente, leesbare opmaak**\nAlle eigen scripts gebruiken .js-bestanden. De JavaScriptcode is opgemaakt met duidelijke inspringing, witruimte en vaste stijlregels. Compacte regels zijn leesbaarder gemaakt. De projectdocumentatie legt uit waar wijzigingen thuishoren en hoe je die controleert.",
+    "🔗 **Imports en webbestanden bijgewerkt**\nAlle verwijzingen naar verplaatste modules, afbeeldingen, dashboardbestanden en de transcriptviewer zijn aangepast. Commando- en controlescripts gebruiken dezelfde nieuwe indeling.",
+    "💾 **Bestaande hosting en gegevens behouden**\nDe bot blijft starten via index.js. De echte data-map, databasebestandsnamen, omgevingsvariabelen en serverinstellingen blijven gelijk. Dit is een herindeling van de code; de gangpotregels, tickets en overige functies krijgen hierdoor geen nieuwe gedragsregels. De opmaak voegt geen runtimepakket toe aan de hosting."
+  ],
+  "2.5.28": [
+    "🌴 **Goedgekeurde langere afmeldingen geven wél gangpotvrijstelling**\nEen langere afwezigheidsperiode die door Lead is goedgekeurd geeft weer vrijstelling voor de gangpotweken die bij die aanvraag horen. Bestaande goedgekeurde afmeldingen tellen automatisch weer mee, ook als de losse vrijstellingsregistratie door 2.5.27 was ingetrokken.",
+    "📅 **Planning en onbeoordeelde aanvragen blijven gescheiden**\nEen losse planningsafmelding geeft alleen toestemming om die activiteit te missen. Een aanvraag die nog op goedkeuring wacht of is afgewezen geeft geen gangpotvrijstelling. Losse weekvrijstellingen, de instapweek en automatische vrijstelling voor Lead blijven afgeschaft.",
+    "💰 **Overzichten en automatische controles aangepast**\nGoedgekeurd afgemelde leden hebben voor de betrokken weken geen openstaande verplichte bijdrage en krijgen daarvoor geen gangpotwarn of betaalherinnering. De bot toont de vrijstelling in de betaalstatus en het gangpotoverzicht. Een betaling in die week is vrijwillig. Afmeldpaneel, dashboard en berichten leggen de uitzondering uit."
+  ],
+  "2.5.27": [
+    "💰 **Gangpotvrijstellingen volledig afgeschaft**\nIedereen met de betaalrol moet dezelfde weekbijdrage betalen, ook Lead en nieuwe leden. Een goedgekeurde afmelding of langere afwezigheid geeft geen gangpotvrijstelling meer. Zonder betaalrol ontstaat geen verplichte bijdrage.",
+    "🧹 **Bestaande vrijstellingen ingetrokken**\nDe bot trekt bij starten bestaande vrijstellingsregistraties in, met behoud van historie. Afmeldingen en herstarts maken geen nieuwe gangpotvrijstellingen aan. De instapweek geeft geen uitstel meer.",
+    "🖥️ **Commando’s en dashboard aangepast**\nDe knoppen en commando’s om weekvrijstellingen te geven of in te trekken zijn verwijderd. Verouderde dashboardacties worden geweigerd. Gangpotinformatie, betaalstatus, totaaloverzicht en /gangpot openstaand volgen de nieuwe regels.",
+    "📅 **Afmelden blijft mogelijk**\nAfmeldingen voor activiteiten en check-ins blijven bestaan en kunnen door Lead worden beoordeeld. De gangpotbetaling blijft daarbij verplicht. De bot vermeldt dit in het paneel en in nieuwe afwezigheidsberichten.",
+    "🛡️ **Geen terugwerkende nieuwe straffen**\nDe wijziging maakt geen nieuwe gangpotwarns voor deadlines die al voorbij waren toen deze versie voor het eerst startte. Eerder ingetrokken warns worden hierdoor niet hersteld. Bij een volgende deadline blijven ontbrekende of niet volledig goedgekeurde betalingen wel maximaal één automatische gangpotwarn per lid en termijn geven."
+  ],
+  "2.5.26": [
+    "💰 **Nieuw: /gangpot openstaand**\nDe leiding kan privé zien wie zijn verplichte weekbijdrage nog niet volledig heeft betaald. Het overzicht onderscheidt leden zonder open betaalmelding en meldingen die nog op Lead-goedkeuring wachten. Per lid staat het resterende bedrag; bovenaan staan de termijn, deadline en het totaal. Met termijn kies je eventueel een andere week. Lead, vrijgestelde leden, instapweken en vertrokken leden worden uitgesloten. Lange lijsten krijgen vervolgpagina's zodat iedereen zichtbaar blijft.",
+    "📨 **Melding zodra de sollicitant weer mag antwoorden**\nWanneer Lead in een wachtrijticket reageert en de sollicitant weer kan typen, plaatst de bot ook een bericht in datzelfde ticket: De leiding heeft gereageerd. Je kunt in dit ticket weer antwoorden. Je sollicitatie blijft in de wachtrij staan. De bot tagt uitsluitend de sollicitant.",
+    "🔄 **Eenmalig en herstelbaar**\nDe melding wordt per plaatsing in de wachtrij opgeslagen, zodat volgende Leadberichten, synchronisaties en herstarts geen nieuwe melding veroorzaken. Een mislukte verzending wordt opnieuw geprobeerd. Een reeds verstuurd bericht kan na een opslagfout worden teruggevonden. Opnieuw in de wachtrij plaatsen begint een nieuwe ronde.",
+    "📋 **Ook voor bestaande vrijgegeven wachtrijtickets**\nBij de normale synchronisatie ontvangen bestaande wachtrijtickets waarin antwoorden al zijn vrijgegeven alsnog hun ontbrekende melding. Tickets zonder reactie van Lead en gesloten of afgehandelde sollicitaties worden hierdoor niet geopend."
+  ],
+  "2.5.25": [
+    "💬 **Antwoorden na een bericht van Lead**\nZodra de leiding een gewoon bericht of een bijlage stuurt in een open sollicitatieticket in de wachtrij, krijgt de sollicitant automatisch toestemming om daar weer te typen. Hiervoor hoeft Lead geen knop te gebruiken.",
+    "📋 **De sollicitatie blijft in de wachtrij**\nDe kanaalnaam, categorie en wachtrijpositie blijven behouden. Andere leden krijgen geen toegang. Botmeldingen en berichten van de sollicitant of gewone leden openen het ticket niet. De bestaande knop Ticket heropenen blijft bedoeld om de sollicitatie volledig uit de wachtrij te halen.",
+    "🔄 **Toestemming blijft behouden bij herstarts**\nDe bot slaat de toestemming op bij het dossier, zodat achtergrondcontroles en herstarts het typen niet opnieuw blokkeren. Een tijdelijk mislukte rechtenwijziging wordt door de wachtrijsynchronisatie opnieuw geprobeerd. Opnieuw in de wachtrij plaatsen blokkeert antwoorden weer totdat Lead opnieuw reageert. Afgehandelde of gesloten sollicitaties worden niet geopend.",
+    "📝 **Uitleg en logregistratie bijgewerkt**\nHet bericht in nieuwe wachtrijtickets legt uit wanneer reageren mogelijk wordt. Het eerste bericht van Lead dat antwoorden toestaat wordt eenmaal bij het dossier gelogd. Deze functie werkt ook in bestaande geregistreerde wachtrijtickets zodra Lead daar een nieuw bericht stuurt."
+  ],
+  "2.5.24": [
+    "🧠 **Minder geheugen voor Discordberichten**\nDe bot bewaart maximaal 25 volledige berichten per kanaal. Elke minuut worden de oudste berichten verwijderd als de gezamenlijke cache groter is dan 500 berichten. Berichten ouder dan 15 minuten worden eveneens uit het werkgeheugen gehaald. Gebruikers en reactiegebruikers krijgen een eigen cachelimiet. Leden, rollen en kanalen blijven beschikbaar voor de ledenlijst, aanwezigheid en gangpotcontrole.",
+    "📝 **Berichtlogs blijven bruikbaar bij een kleinere cache**\nEen begrensde, geredigeerde schijfcache bewaart maximaal 1.000 recente ledenberichten per server, maximaal 24 uur. Daardoor kan een verwijderd of aangepast bericht ook worden gelogd wanneer de volledige Discordcache het bericht niet meer bevat. Uitgeschakelde berichtlogs bewaren geen nieuwe berichtinhoud.",
+    "💾 **Kleinere en begrensde back-ups**\nNieuwe back-ups worden in kleine gzipblokken gecomprimeerd. Bestaande eigen back-ups kunnen eveneens worden gecomprimeerd. Standaard worden twee kopieën en een totaalbudget van 96 MB gebruikt; bestaande eigen instellingen blijven gelden. De nieuwste volledige back-up wordt altijd behouden, ook als die zelf groter dan het budget is. Aantal en opslagbudget zijn instelbaar via Modules instellen.",
+    "🧹 **Automatisch opslagonderhoud**\nBij opstarten worden uitsluitend bekende, opnieuw opbouwbare npm- en installatiecaches opgeruimd. Elk uur worden dubbele verzendkopieën van afgeleverde logs vrijgegeven. Oude afgeleverde bericht- en actielogs worden lokaal standaard 90 dagen bewaard; deze termijn is instelbaar. Nog wachtende logs en bewijs voor afmeldingen en lidmaatschap blijven behouden. Gangwarns, gangpotregistraties en transcripts worden niet door dit onderhoud verwijderd.",
+    "⚙️ **Zuinigere database en hostinginstellingen**\nSQLite gebruikt een begrensde paginacache en kleinere WAL-checkpoints. Vrije databasepagina's kunnen worden teruggewonnen wanneer voldoende schijfruimte beschikbaar is. Op kleine Linux-hosting krijgt Node standaard extra ruimte buiten zijn JavaScriptheap; expliciet ingestelde geheugenopties blijven leidend. De hostingquota zelf veranderen niet.",
+    "🔒 **Privégegevens blijven op de hosting**\nDeze code-update bevat geen databases, betalingen, gangwarns, toegangssleutels of herstelbestanden. Het terugzetten van privégegevens gebeurt afzonderlijk met een gecontroleerd herstelbestand."
+  ],
+  "2.5.23": [
+    "🔗 **Alle leden mogen overal links plaatsen in de hoofdserver**\nIn hoofdserver `1555685630640652338` mogen alle leden voortaan links naar alle websites delen in alle tekstkanalen. Dit geldt voor onder andere Discord-uitnodigingen, YouTube, Medal en andere websites. Een Lead- of uitzonderingsrol is hiervoor niet nodig.",
+    "✅ **Geen verwijdering of linkban in de hoofdserver**\nHet linkfilter verwijdert deze berichten niet en registreert ze niet als verboden linkbericht. Meerdere links in één bericht, links in verschillende kanalen en ingesloten linkvoorbeelden zijn ook toegestaan.",
+    "🛡️ **De overige beveiliging blijft werken**\nSpam, schelden, meer dan drie tags en @everyone/@here blijven voor gewone leden gecontroleerd. De beveiliging van beheeracties en de bestaande vrijstelling voor Lead en de uitzonderingsrol blijven gelden.",
+    "📍 **Community houdt haar eigen regels**\nDeze verruiming geldt voor de hoofdserver. In de community blijven alle links toegestaan in geregistreerde tickets en sollicitaties; daarbuiten mogen YouTube en Medal alleen in het ingestelde mediakanaal. Andere links volgen daar het bestaande filter.",
+    "📋 **Dashboard en logs verduidelijkt**\nHet dashboard vermeldt nu expliciet dat alle leden overal in de hoofdserver alle links mogen plaatsen. Toegestane links worden geregistreerd in het botlogkanaal van de betreffende server."
+  ],
+  "2.5.22": [
+    "🎫 **Alle links toegestaan in tickets**\nIn geregistreerde gewone tickets en sollicitatietickets mogen voortaan links naar alle websites worden gedeeld. Dit geldt ook voor meerdere links in één bericht, combinaties van verschillende websites en ingesloten linkvoorbeelden.",
+    "✅ **Geen linkban door delen binnen een ticket**\nLinks in een geregistreerd ticket worden niet verwijderd door het linkfilter en tellen niet mee voor een linkban. De uitzondering blijft gelden zolang het geregistreerde ticketkanaal bestaat. Een kanaal alleen ticket noemen geeft geen vrijstelling.",
+    "🛡️ **Overige controles blijven actief**\nVoor gewone leden blijven spam-, tag- en scheldcontroles ook in tickets gelden. Buiten tickets blijven de bestaande linkregels gelden: YouTube en Medal mogen overal in de hoofdserver en alleen in media in de community.",
+    "📋 **Dashboard en logs bijgewerkt**\nHet dashboard vermeldt nu dat alle links in tickets zijn toegestaan. Toegestane ticketlinks worden in het logkanaal van de betreffende server geregistreerd. Lead en de bestaande uitzonderingsrollen blijven vrijgesteld van automatische beveiligingsstraffen."
+  ],
+  "2.5.21": [
+    "👑 **Lead is vrijgesteld van automatische beveiligingsstraffen**\nIn beide Discords geeft de ingestelde Lead-rol voortaan dezelfde beveiligingsvrijstelling als de bestaande +-rol. Lead kan links plaatsen en beheeracties uitvoeren zonder daarvoor automatisch te worden geband of getime-out. De gewone Discordrechten en rolvolgorde bepalen welke acties daadwerkelijk mogelijk zijn.",
+    "🏷️ **De vrijstelling gebruikt de Lead-rol van de juiste server**\nIn de hoofdserver geldt rol `1555685630707769382`; in de community is dat `1555726440933363761`. De bestaande uitzonderingsrollen blijven ook vrijgesteld. Botstatus en het dashboard tonen alle vrijgestelde rollen. Een Administrator-recht zonder een vrijgestelde rol geeft geen extra beveiligingsvrijstelling.",
+    "🎫 **Discord-links mogen in tickets**\nDiscord-uitnodigingen en Discord-berichtlinks zijn toegestaan in geregistreerde gewone tickets en sollicitatietickets. De bot controleert daarvoor de ticketregistratie; een kanaal alleen ticket noemen geeft geen uitzondering. Toegestane Discord-links en hun ingesloten voorbeelden tellen niet mee voor de linkban.",
+    "🛡️ **Controle op de echte Discord-website**\nDe uitzondering geldt voor discord.gg, discord.com, discordapp.com en discordapp.net, inclusief echte subdomeinen en Discord-bijlagen. Misleidende domeinen, links met inloggegevens en afwijkende protocollen of poorten vallen onder het gewone linkfilter. Andere websites worden door de ticketuitzondering niet toegestaan.",
+    "🔗 **Linkregels voor gewone leden**\nYouTube en Medal mogen overal in de hoofdserver. In de community mogen ze alleen in het ingestelde mediakanaal. Andere niet-toegestane links worden verwijderd. Standaard volgt een ban bij twee verboden links in één bericht of een tweede verboden linkbericht binnen tien minuten, ook wanneer de berichten in verschillende kanalen van dezelfde server staan.",
+    "📋 **Duidelijkere meldingen en logs**\nDe waarschuwing na een verwijderd bericht benoemt nu expliciet een niet-toegestane link. Toegestane Discord-links in tickets worden in het logkanaal van de eigen server geregistreerd. Spam-, tag- en scheldcontroles blijven voor gewone leden ook in tickets gelden."
+  ],
+  "2.5.20": [
+    "🎬 **YouTube en Medal mogen overal in de hoofdserver**\nLeden mogen YouTube-, youtu.be- en Medal-links plaatsen in alle tekstkanalen van hoofdserver `1555685630640652338`. Hiervoor is geen uitzonderingsrol nodig. Ook meerdere geldige medialinks in één bericht en hun ingesloten voorbeelden zijn toegestaan.",
+    "📍 **Community: alleen in media**\nIn communityserver `1555726440933363753` zijn deze links alleen toegestaan in mediakanaal `1555726441944064011`, of het andere mediakanaal dat een administrator via het dashboard instelt. Buiten dat kanaal blijft het gewone linkfilter gelden.",
+    "🛡️ **Andere links en misleidende adressen blijven gefilterd**\nDe bot controleert de echte website achter elke link. Een YouTube-naam als onderdeel van een ander domein geeft geen uitzondering. Bevat een bericht ook een verboden link, dan gelden voor die link de bestaande verwijder- en banregels. Geldige YouTube- en Medal-links tellen niet mee als verboden linkbericht.",
+    "💬 **Spam, schelden en tagspam blijven gecontroleerd**\nDe toestemming geldt voor de link. De overige berichtcontroles blijven actief, zowel in de hoofdserver als in community-media. Beveiligingsmeldingen worden gelogd in het logkanaal van de betreffende server.",
+    "📝 **Ontbrekende changelog 2.5.18 alsnog plaatsen**\nDe bot controleert bij de volgende opstart en onderhoudsronde ook de changelog van 2.5.18. Ontbreekt die aankondiging, dan wordt hij alsnog in het ingestelde updatekanaal geplaatst. Een bestaand updatebericht wordt hergebruikt, zodat herstarts geen dubbele aankondigingen maken."
+  ],
+  "2.5.19": [
+    "🎬 **YouTube en Medal toegestaan in community-media**\nLeden mogen YouTube- en Medal-links plaatsen in mediakanaal `1555726441944064011` van communityserver `1555726440933363753`. Meerdere toegestane medialinks in één bericht zijn ook toegestaan en tellen niet mee als verboden linkbericht.",
+    "🔗 **De uitzondering geldt alleen op die plek**\nBuiten het ingestelde mediakanaal geldt het gewone linkfilter. Ook in media blijven links naar andere websites en Discord-uitnodigingen onder dat filter vallen. De bestaande uitzonderingsrol van elke server behoudt haar vrijstelling.",
+    "🛡️ **Controle van de echte website**\nDe bot controleert het domein van elke link en gebruikt daarvoor youtube.com, youtu.be en medal.tv, inclusief hun echte subdomeinen. Misleidende adressen zoals youtube.com.anderewebsite.nl worden geblokkeerd. Links met inloggegevens, afwijkende poorten of een ander protocol worden niet toegelaten via de media-uitzondering.",
+    "🔎 **Berichten en linkvoorbeelden worden gecontroleerd**\nBevat een bericht naast een toegestane video ook een verboden link, dan wordt het bericht verwijderd en telt de verboden link mee voor de bestaande beveiligingsregels. De bot controleert ook de link van het ingesloten voorbeeld. YouTube-doorverwijsadressen krijgen geen uitzondering.",
+    "💬 **Spam- en tagcontroles blijven werken**\nEen toegestane medialink geeft geen vrijstelling voor spam, schelden of te veel tags. Deze controles blijven in het mediakanaal actief.",
+    "⚙️ **Mediakanaal aanpassen in het dashboard**\nEen communityadministrator kan onder Modules instellen → Bestemmingskanalen bij Media: YouTube & Medal een ander tekstkanaal uit dezelfde community kiezen. De keuze geldt direct en blijft bij herstarts bewaard. Toegestane medialinks worden in het eigen communitylog geregistreerd."
+  ],
+  "2.5.18": [
+    "🔗 **Uitnodigingen maken mag in de community**\nLeden mogen in de communityserver (`1555726440933363753`) een Discord-uitnodiging aanmaken zonder automatische beveiligingsban. Hiervoor is geen uitzonderingsrol nodig. De gewone Discordrechten bepalen wie de functie kan gebruiken.",
+    "⚙️ **Per server instelbaar in het dashboard**\nOnder Modules instellen → Beveiliging & automatisch modereren staat Uitnodigingen maken toestaan. Deze instelling staat standaard aan in de community en uit in de hoofdserver. Aanpassingen gelden direct en blijven bewaard na een herstart.",
+    "📋 **Toegestane uitnodigingsacties worden gelogd**\nDe bot registreert dat een lid een uitnodiging mocht aanmaken in het eigen logkanaal van de community (`1556781560320102432`). De uitnodigingscode en uitnodigingslink worden niet in deze beveiligingsmelding opgeslagen.",
+    "🛡️ **De uitzondering geldt voor aanmaken**\nHet verwijderen van uitnodigingen en andere beschermde beheeracties vallen nog onder de bestaande beveiligingsregels. Het plaatsen van een uitnodigingslink in een bericht wordt beoordeeld door het linkfilter."
+  ],
+  "2.5.17": [
+    "🛡️ **Beveiliging staat aan in beide Discords**\nDe hoofdserver en de community hebben elk hun eigen beveiligingsinstellingen. In de hoofdserver is de +-rol `1555685630770413643` vrijgesteld; in de community geldt rol `1555726440983437504`.",
+    "🚨 **Raidcontrole staat standaard aan**\nNieuwe leden worden automatisch gecontroleerd. Zonder aanval toont de status nu Aan — controleert nieuwe leden. De melding Geen raid gedetecteerd beschrijft alleen de tijdelijke beschermmodus; de controle blijft actief.",
+    "⚙️ **Beveiliging aan- en uitzetten via het dashboard**\nSelecteer de gewenste server en ga naar Modules instellen → Beveiliging & automatisch modereren. Je kunt de hele beveiliging en de raidcontrole afzonderlijk aan- of uitzetten. Instellingen gelden direct voor de geselecteerde server en blijven na een herstart bewaard.",
+    "⏱️ **Raidgedrag en duur instellen**\nHet aantal nieuwe leden, het tijdvenster, de duur van de beschermmodus en de time-out zijn instelbaar. Standaard activeren 8 nieuwe leden binnen 10 seconden een beschermmodus van 10 minuten. Daaropvolgende toetreders krijgen dan 10 minuten time-out.",
+    "🔗 **De bestaande berichtregels blijven gelden**\nHerkende links worden verwijderd. Een tweede linkbericht binnen 10 minuten, of meerdere links in één bericht, leidt standaard tot een ban. Meer dan 3 verschillende tags of een daadwerkelijke @everyone- of @here-vermelding leidt ook tot verwijdering en een ban.",
+    "⏳ **Spam en schelden: oplopende time-outs**\nStandaard geldt bij 6 berichten in 10 seconden of 3 gelijke berichten een spam-time-out. Herhaling per overtredingstype verhoogt de duur: 10 minuten → 30 minuten → 60 minuten → 24 uur. De herhalingsperiode en drempels zijn aanpasbaar. Ook hogere ingestelde spamdrempels worden nu volledig gevolgd.",
+    "📋 **Beveiligingslogs naar de juiste server**\nMeldingen van de hoofdserver gaan naar botlogkanaal `1555685637129109586`. De community gebruikt haar eigen logkanaal `1556781560320102432`. Beveiligingsincidenten, verwijderde berichten, straffen en verstuurde of mislukte DM-meldingen worden in de eigen server geregistreerd.",
+    "⚠️ **Problemen zijn terug te vinden**\nOntbrekende rechten, een ontbrekende uitzonderingsrol, mislukte verwijderingen en mislukte bans of time-outs worden gelogd. Een geblokkeerde DM stopt de beveiligingsactie niet. Logberichten die tijdelijk niet bezorgd kunnen worden blijven bewaard voor een nieuwe poging.",
+    "🔄 **Uitschakelen stopt de raidmodus**\nAls je raidcontrole of het hele beveiligingssysteem uitschakelt, worden de actieve beschermmodus en recente toetredingsreeks gewist. Na opnieuw inschakelen begint de raidcontrole met nieuwe toetredingen.",
+    "🔧 **Benodigde rechten en grenzen**\nDe bot heeft View Audit Log, Manage Messages, Moderate Members en Ban Members nodig, plus een botrol boven de te straffen rollen. Botstatus toont wanneer de controle door ontbrekende rechten niet kan werken. Discord meldt uitgevoerde serveracties; mislukte pogingen zijn niet zichtbaar en wijzigingen worden niet automatisch teruggedraaid."
+  ],
+  "2.5.16": [
+    "🛡️ **Nieuw: automatische beveiliging in de hoofdserver**\nDe beveiliging geldt in de hoofdserver van Bakarov (`1555685630640652338`). De bot controleert daar berichten, nieuwe leden en uitgevoerde serveracties. Hieronder staan de standaardregels; de drempels zijn via het dashboard aanpasbaar.",
+    "🔑 **Wie is vrijgesteld?**\nLeden met de +-rol `1555685630770413643` zijn vrijgesteld. Beheerrechten alleen geven geen vrijstelling. Berichten en acties van bots worden overgeslagen; webhookberichten worden ook overgeslagen.",
+    "🔗 **Links: verwijderen en bij herhaling een ban**\nEen herkend linkbericht wordt verwijderd. Een tweede linkbericht binnen 10 minuten leidt tot een ban. Twee of meer links in één bericht geven direct een ban. Ook bereikbare eerdere linkberichten uit die periode worden verwijderd.",
+    "🏷️ **Tagspam: maximaal 3 tags**\nPer bericht zijn maximaal 3 verschillende leden en/of rollen toegestaan. Meer dan 3 tags, of een daadwerkelijke @everyone- of @here-vermelding, leidt tot verwijdering van het bericht en een ban.",
+    "🤬 **Schelden: bericht weg en time-out**\nDe bot herkent een vaste lijst Nederlandse en Engelse scheldwoorden. Bij herkenning wordt het bericht verwijderd en krijgt het lid standaard 10 minuten time-out.",
+    "💬 **Spam: veel of dezelfde berichten**\nBij 6 berichten binnen 10 seconden, of 3 gelijke berichten binnen die periode, verwijdert de bot de betrokken berichten en geeft hij standaard 10 minuten time-out.",
+    "⏳ **Herhaalde overtredingen tellen mee**\nBij herhaald schelden of spammen loopt de time-out per overtredingstype op: 10 minuten → 30 minuten → 60 minuten → 24 uur. Standaard tellen overtredingen 30 dagen mee. Deze registraties blijven na een herstart bewaard.",
+    "🏗️ **Beveiliging van kanalen en rollen**\nEen lid zonder beveiligingsrol krijgt een ban na het aanmaken, wijzigen of verwijderen van kanalen of rollen, of het wijzigen van kanaalrechten. De bot reageert zodra Discord de uitgevoerde actie meldt.",
+    "🚫 **Bescherming tegen onbevoegde beheeracties**\nOok kicken, bannen, unbannen, time-outs wijzigen, leden opschonen, berichten in bulk verwijderen, uitnodigingen aanmaken/verwijderen, webhooks beheren en serverinstellingen wijzigen vallen onder de banregel.",
+    "🚨 **Raidbeveiliging bij veel nieuwe leden**\n8 nieuwe leden binnen 10 seconden activeren 10 minuten raidmodus. Leden die daarna toetreden krijgen standaard 10 minuten time-out. Bij een bot-herstart vervalt de actieve raidmodus en begint de toetredingscontrole opnieuw.",
+    "📋 **Duidelijke logs en meldingen**\nIncidenten, straffen en mislukte beveiligingsacties worden gelogd. De bot probeert het betrokken lid via DM uitleg te geven. Bij Botstatus zie je of beveiliging actief is, hoeveel incidenten er zijn en of raidmodus aanstaat.",
+    "⚙️ **Instellen via het dashboard**\nGa naar Modules instellen → Beveiliging & automatisch modereren. Pas daar linkdrempels, taglimiet, spamdrempels, time-outs, herhalingsperiode en raidcontrole aan. De ingestelde uitzonderingsrol wordt daar ook getoond.",
+    "🔧 **Benodigde rechten en grenzen**\nDe bot heeft View Audit Log, Manage Messages, Moderate Members en Ban Members nodig, plus een botrol boven de te straffen rollen. Ontbreekt bij opstarten een vereist recht of de beveiligingsrol, dan blijft beveiliging inactief. Mislukte pogingen zijn niet zichtbaar in Discords auditlog; uitgevoerde wijzigingen worden niet automatisch teruggedraaid.",
+    "📝 **Changelog blijft actueel**\nAangepaste uitleg voor dezelfde botversie wordt voortaan in het bestaande updatebericht verwerkt. Een gewone herstart plaatst geen dubbele changelog."
+  ],
+  "2.5.15": [
+    "De automatische gegevensback-up geeft nu de bestandsnaam en SQLite-fout door aan de console. Dat maakt een mislukte back-up op de hosting gericht te herstellen.",
+    "De back-up heeft een alternatieve SQLite-opdracht voor omgevingen die parameters in VACUUM INTO niet ondersteunen."
+  ],
+  "2.5.14": [
+    "Het wachtrijbord wordt nu bij de botstart klaargezet, ook als er nog geen sollicitanten in de wachtrij staan.",
+    "Het opgegeven wachtrijkanaal wordt gebruikt en onder de privé-categorie Sollicitatie Wachtrij geplaatst."
+  ],
+  "2.5.13": [
+    "De sollicitatiewachtrij heeft nu een eigen privé kanaal #wachtrij met één bijgewerkte kaart per kandidaat en knoppen om te accepteren, af te wijzen of het ticket opnieuw te openen.",
+    "Wachtrijtickets krijgen nu de naam wachtrij-gebruikersnaam. Bij het opnieuw openen wordt het ticket teruggezet naar de gewone sollicitatiecategorie en kan de sollicitant weer reageren. Bestaande wachtrijdossiers worden na een herstart automatisch gesynchroniseerd."
+  ],
+  "2.5.12": [
+    "Bij plaatsing in de sollicitatiewachtrij schrijft de bot nu ook een bericht in het ticket. De sollicitant kan het kanaal lezen maar niet meer reageren; Lead kan het dossier blijven behandelen."
+  ],
+  "2.5.11": [
+    "Lead kan sollicitaties ook in de wachtrij plaatsen als de community nog niet vol is. De DM vermeldt voortaan de actuele ledenstatus."
+  ],
+  "2.5.10": [
+    "De Wachtrij-knop bevestigt nu privé direct de uitkomst. Fouten, zoals een nog niet volle ledenlijst of ontbrekende kanaalrechten, worden meteen duidelijk aan Lead getoond."
+  ],
+  "2.5.9": [
+    "Lead kan een sollicitant met één knop in de categorie Sollicitatie Wachtrij plaatsen. Het kanaal krijgt de naam gebruikersnaam-wachtrij en blijft privé voor de sollicitant en de leiding.",
+    "De bot stuurt de sollicitant automatisch een DM dat de community vol zit en de aanvraag in de wachtrij staat. Mislukte DM's worden automatisch opnieuw geprobeerd.",
+    "Bestaande open sollicitaties krijgen na de botupdate ook de nieuwe Wachtrij-knop; alleen een Lead-klik verplaatst het dossier."
+  ],
+  "2.5.8": [
+    "Rangwijzigingen van alle ingestelde gangrangen worden automatisch met datum en uitvoerder bijgehouden. /ranggeschiedenis toont de laatste wijzigingen; promoties vermelden de Lead-stemmen die hebben goedgekeurd.",
+    "Na een aangenomen sollicitatie start een proefperiode van 14 dagen. Daarna ontvangt Lead een beoordelingsbericht met keuzes voor geslaagd, verlengen met 14 dagen of verdere opvolging."
+  ],
+  "2.5.7": [
+    "De wekelijkse gangpottermijn eindigt vanaf nu op zaterdag om 23:59 Belgische tijd. De standaard herinneringen zijn vrijdag en zaterdag; Lead ontvangt het betaaloverzicht op zaterdag.",
+    "Leden die vanaf dinsdag toetreden zijn alleen voor de lopende week vrijgesteld. Wie uiterlijk maandag toetreedt, betaalt die week mee; vanaf de volgende week geldt voor iedereen de normale bijdrage.",
+    "Open bestaande vrijdagtermijnen worden bij de update naar de zaterdagdeadline omgezet. Betaalregistraties, meldingen en bestaande betaalhistorie blijven behouden."
+  ],
+  "2.5.6": [
+    "Lead hoeft geen wekelijkse gangpotbijdrage te betalen. Vrijwillige bijdragen blijven mogelijk; betaalherinneringen en automatische gangpotwarns gelden niet voor Lead.",
+    "Bij de eerste synchronisatie trekt de bot alleen actieve automatische gangpotwarns van huidige Leads in die aan de gangpotadministratie gekoppeld zijn. Handmatige en andere warns blijven behouden.",
+    "De gangpotinformatie, statusweergave, ledenlijst van betaalplichtigen en weektotalen tonen de Lead-uitzondering duidelijk."
+  ],
+  "2.5.5": [
+    "Gangpotweek loopt vanaf zaterdag 24 oktober t/m vrijdag 23:59 Belgische tijd. De open termijn van 24 oktober wordt bij de eerste hostingstart direct afgesloten; de nieuwe termijn begint daarna en sluit vrijdag 30 oktober.",
+    "De twee gangpotwarns van Fronzy op 24 oktober worden alleen ingetrokken als de hostingdatabase precies twee actieve gangpotwarns van dat account vindt. De correcties worden groen gelogd en per DM bevestigd; bij een afwijkend aantal verandert de bot niets.",
+    "De bot maakt in de hoofdserver de rollen Waarschuwing 1 en Waarschuwing 2 aan en houdt ze automatisch gelijk aan het actieve aantal warns. Eén warn geeft rol 1; twee of meer geven rol 2; na intrekken wordt de rol verlaagd of weggehaald.",
+    "Gangpotherinneringen zijn standaard donderdag en vrijdag. De herinneringstijden en vrijdagdeadline blijven instelbaar via het dashboard."
+  ],
+  "2.5.4": [
+    "De automatische ledenlijst staat nu ook in communitykanaal 1556308405524898005. De rangindeling komt uit de hoofdserver; beide vaste berichten worden bij rang-, naam- en ledenwijzigingen bijgewerkt en herstellen na herstarts zonder duplicaten."
+  ],
+  "2.5.3": [
+    "Automatische activiteitencheck staat nu standaard om de twee weken gepland, met een instelbaar interval van 1 tot 12 weken in het dashboard.",
+    "De bestaande check in mededelingen wordt bij de eerste hostingstart overgenomen. Bestaande ✅-reacties tellen meteen mee in de teller; alleen de oorspronkelijke 19 leden tellen mee.",
+    "Een nieuwe ✅ op een herstelde check werkt hetzelfde bericht direct bij met het nieuwe aantal bevestigingen en de bevestigde leden.",
+    "Nieuwe automatische checks tonen de reden Tweewekelijkse activiteitencheck. De instelling blijft bewaard na herstarts."
+  ],
+  "2.5.2": [
+    "De wekelijkse activiteitencheck voor vrijdag 23 oktober om 07:30 staat in mededelingen. De bot kan ditzelfde gepubliceerde bericht veilig overnemen met behoud van de oorspronkelijke 19 opgenomen leden en bestaande vinkjes.",
+    "Herstel controleert eigen botberichten, de privé herstelregistratie, het kanaal, de deadline en ledenrechten. De bot overschrijft geen bestaande check en maakt geen dubbele weekcheck."
+  ],
+  "2.5.1": [
+    "De wekelijkse activiteitencheck gebruikt voortaan mededelingen: kanaal 1555685632704249932. Een bestaande weekcheck in planning wordt veilig opnieuw geplaatst met behoud van deadline en opgeslagen bevestigingen.",
+    "De gangpot-embed toont Totaal witgeld, Totaal zwartgeld en Items groot en afzonderlijk. Itemaantallen staan prominent boven het betaaloverzicht."
+  ],
+  "2.5.0": [
+    "Wekelijkse activiteitencheck: vanaf vrijdag 23 oktober 2026 is de deadline iedere vrijdag om 07:30 Belgische tijd. De check staat vooraf open, tagt Bakarov en leden bevestigen met ✅. Reden: Wekelijkse activiteitencheck.",
+    "De bot bewaart iedere weekcheck, hergebruikt een handmatige check met dezelfde deadline en maakt geen dubbele of achteraf gemiste weekchecks aan. Instellingen staan onder Modules instellen → Activiteitencheck & herinneringen.",
+    "Nieuw: items en in-game zwartgeld toevoegen, opnemen en corrigeren in de gangpot via Discord en dashboard. Gewoon geld, zwartgeld en itemvoorraden hebben aparte overzichten en een bewaarde historie.",
+    "Gangpotbedragen worden voortaan in euro weergegeven. Items en zwartgeld tellen niet als verplichte weekbijdrage en veranderen geen fun-coins."
+  ],
+  "2.4.0": [
+    "Planningsafmeldingen vereisen een reden. Duidelijke redenen zoals school, training, hobby, gym of een kapotte pc kan de bot automatisch goedkeuren; twijfelgevallen blijven bij Lead. Instelbaar in het dashboard.",
+    "Planningsafmeldingen en afwezigheidsperiodes blijven gescheiden. Alleen een goedgekeurde afwezigheidsperiode geeft gangpotvrijstelling. Ontbrekende vrijstellingen en bijbehorende automatische betaalwarns worden hersteld, met log en DM.",
+    "Het dashboard toont beide soorten afmeldingen apart. Lead kan een automatische planningsgoedkeuring alsnog intrekken.",
+    "Nieuwe en bestaande transcripts in de viewer krijgen de zwart-gouden Bakarov-huisstijl en het logo. Oorspronkelijke berichten blijven behouden."
+  ],
+  "2.3.1": [
+    "De Bakarov-rename is versie 2.0.0. Alle latere Bakarov-versies zijn vanaf dat punt opnieuw genummerd.",
+    "Recent aangenomen sollicitanten worden ook aan hun opgeslagen aanname gekoppeld. Een onterechte automatische gangpotwarn uit hun instapweek wordt ingetrokken, met een groene melding in het gangwarnkanaal en een DM.",
+    "Alleen de gekoppelde gangpotwarn wordt gecorrigeerd; handmatige warns, andere overtredingen en betaalplichten uit volgende volledige termijnen blijven behouden."
+  ],
+  "2.3.0": [
+    "Nieuwe gangleden zijn vrijgesteld in hun instapweek. De verplichte gangpotbijdrage begint bij de volgende volledige zaterdag–zaterdagtermijn; in de instapweek volgen geen automatische gangpotwarns of betaalherinneringen.",
+    "De betaalstatus en het dashboard tonen de instapvrijstelling. De start van de betaalplicht blijft bewaard bij herstarts en wordt niet opnieuw vrijgesteld wanneer een ledenrol wordt weggehaald en teruggezet.",
+    "Bestaande automatische gangpotwarns voor een aantoonbare instapweek worden ingetrokken met log en DM. Andere warns en eerdere betaalverplichtingen blijven behouden."
+  ],
+  "2.2.1": [
+    "De loginpagina heeft een vernieuwd zwart-gouden Bakarov-thema: een omlijst logo, gouden Discord-knop en subtiele achtergrond. De pagina blijft compact en werkt op mobiel."
+  ],
+  "2.2.0": [
+    "Nieuw: rechtstreeks aanmelden met je eigen Discord-account via een eenvoudige loginpagina met Discord-icoon.",
+    "Alleen leden met de ingestelde Legion Lead-rol krijgen toegang. Administrator zonder deze rol geeft geen toegang; verloren rollen blokkeren ook bestaande sessies.",
+    "De Discord-login gebruikt beveiligde, eenmalige browsergebonden aanmeldingen. Eenmalige OAuth2-configuratie op de hosting is nodig; /dashboard blijft als terugval beschikbaar."
+  ],
+  "2.1.1": [
+    "Het automatische overzicht wordt voortaan iedere zondag om 09:00 Belgische tijd verstuurd, over de afgelopen zondag t/m zaterdag. De zaterdagse gangpotdeadline telt volledig mee.",
+    "Nieuw: /weekoverzicht en Weekoverzicht in het dashboard. Verzendtijd en privékanaal zijn instelbaar; bestaande rapportage-instellingen worden meegenomen. Maandcijfers blijven op aanvraag beschikbaar.",
+    "Het dashboardmenu kan scrollen, zodat alle pagina's bereikbaar blijven bij veel menu-items."
+  ],
+  "2.1.0": [
+    "Nieuw: Bezwaar maken bij gangwarns. Leden geven zonder formulier uitleg via /bezwaar; Lead beoordeelt het privé in Discord of het dashboard. Goedkeuren trekt de warn in en de beslissing gaat per DM.",
+    "Nieuw: automatisch maandoverzicht voor de leiding met activiteiten, planningreacties, check-ins, promoties en gangpotbijdragen. Standaard op de eerste dag om 09:00 Belgische tijd.",
+    "Bekijk een maand met /maandoverzicht of via de nieuwe dashboardpagina. Verzending, tijd en een privé bestemmingskanaal zijn instelbaar.",
+    "Bestaande automatische warns worden gecontroleerd op eerder goedgekeurde afwezigheid. Onterechte warns worden ingetrokken, ontbrekende gangpotvrijstellingen hersteld en de correctie wordt gelogd en per DM bevestigd. Handmatige warns blijven behouden."
+  ],
+  "2.0.0": [
+    "Legion heet vanaf nu Bakarov: vernieuwde botteksten, commands, panelen en dashboard.",
+    "Het Bakarov-logo en de zwart-gouden huisstijl zijn toegevoegd aan dashboard, embeds en nieuwe transcripts.",
+    "De botnaam en profielfoto worden bij opstarten bijgewerkt. Bestaande gegevens en oude panelen blijven bruikbaar."
+  ],
+  "1.8.2": [
+    "Alle botlogs, inclusief verwijderde en bewerkte berichten, gaan in de hoofdserver naar botlogkanaal 1555685637129109586.",
+    "Wachtende logs volgen ook het ingestelde botlogkanaal."
+  ],
+  "1.8.1": [
+    "Botlogs zijn opnieuw opgemaakt met Nederlandse titels en duidelijke velden voor auteur, kanaal, acties en tijdstippen.",
+    "Verwijderde berichten tonen de beschikbare tekst en bijlagen. Bij wijzigingen tonen de logs de oude en nieuwe tekst.",
+    "Lange logs worden volledig verdeeld over meerdere berichten en hervatten na storingen zonder dezelfde delen dubbel te versturen.",
+    "Berichtinhoud gaat uitsluitend naar een gecontroleerd privé leidingkanaal. Tokens, wachtwoorden en toegangssleutels blijven afgeschermd."
+  ],
+  "1.8.0": [
+    "Automatische privé-back-ups vóór een nieuwe botversie de gegevens bijwerkt; consistente SQLite-kopieën en instelbaar aantal bewaarde back-ups.",
+    "Eenmalige check-in-herinnering aan leden zonder vinkje of goedgekeurde afwezigheid. Aan en uit en het tijdstip zijn instelbaar via het dashboard.",
+    "Nieuw: /lidinfo lid, met recente check-ins, afmeldingen en gangwarns. Hetzelfde overzicht staat bij Leden in het dashboard.",
+    "Vaste Discord-berichten worden alleen bijgewerkt als de inhoud verandert. Onnodige edits en dubbele gebruikerscontroles verminderd.",
+    "Achtergrondtaken herstellen afzonderlijk na fouten; een storing in één module houdt andere modules en de andere server niet meer tegen.",
+    "Meldingen worden achter elkaar verwerkt om dubbele DMs bij gelijktijdige acties te voorkomen. De ledenlijst wordt pas na volledig ophalen vervangen.",
+    "Syntaxcontrole van alle botscripts en snellere databasezoekopdrachten voor ledenhistorie en wachtende meldingen."
+  ],
+  "1.7.3": [
+    "De lijst met leden die nog niet bevestigd hebben is uit het activiteitencheckbericht verwijderd.",
+    "Bij een nieuwe activiteitencheck tagt de bot de Bakarov-ledenrol. Bij verversen of herstarten wordt deze niet opnieuw gepingd."
+  ],
+  "1.7.2": [
+    "Activiteitencheck is nu een aparte check-in voor actieve leden, los van de activiteitenplanning.",
+    "Start met /activiteitencheck datum tijd en eventueel kanaal. Leden reageren vóór de deadline met ✅ onder het bericht.",
+    "Na de deadline controleert de bot automatisch en geeft één gangwarn aan leden zonder bevestiging of goedgekeurde langere afwezigheid.",
+    "Check-ins, reacties en afhandeling blijven bewaard bij herstarts. Nieuwe leden na de start, bots en vertrokken leden worden niet gewaarschuwd.",
+    "Check-ins starten, opvolgen en annuleren kan ook via het dashboard."
+  ],
+  "1.7.1": [
+    "Nieuw: /activiteitencheck planning voor de leiding in de hoofdserver, vanaf de geplande datum en starttijd.",
+    "Bakarov-leden zonder een van de vier emoji-reacties en zonder goedgekeurde afmelding krijgen één gangwarn per activiteit.",
+    "De check haalt reacties en leden opnieuw op, slaat nieuwe leden die na de start zijn gejoind over en geeft nooit dubbele warns bij opnieuw controleren of herstarten.",
+    "Gangwarns verschijnen in het gangwarnkanaal en worden per DM verstuurd; mislukte meldingen worden automatisch opnieuw geprobeerd."
+  ],
+  "1.7.0": [
+    "Afwezigheid aanvragen en afmelden voor een planning; Lead keurt de aanvraag goed of wijst deze af.",
+    "Een afmeldpaneel met twee knoppen: afmelden voor een planning en langere afwezigheid melden, allebei volledig via de embed.",
+    "Goedgekeurde afwezigheid is zichtbaar op planningen. Een rode reactie alleen is nog geen goedgekeurde afmelding.",
+    "Gangpotvrijstellingen per week, met intrekken en behoud van historie.",
+    "Gangpotherinneringen op vrijdag en zaterdag, plus een overzicht voor Lead vóór de deadline.",
+    "Gangpotbedrag, deadline, herinneringstijden, planning en vischallenges instellen via het dashboard.",
+    "Vangstenboek met zeldzame vangsten en wekelijkse challenges voor fictieve coins.",
+    "Botstatus voor de leiding, met verbinding en acties die nog op verwerking wachten.",
+    "Logs van commands, knoppen, dashboardacties en belangrijke server- en botgebeurtenissen.",
+    "Automatische changelog bij elke nieuwe botversie, zonder dubbele updateberichten bij een herstart.",
+    "Sollicitaties en tickets openen uitsluitend in de communityserver."
+  ]
+}

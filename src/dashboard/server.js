@@ -1,0 +1,1204 @@
+import { warnAppealRow } from '../modules/moderation/appeal-ui.js';
+import { decideWarnAppeal, syncWarnAppeals } from '../modules/moderation/appeals.js';
+import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { PermissionFlagsBits as P, Routes } from 'discord.js';
+import { UserError, assertUser } from '../common/errors.js';
+import {
+  saveDashboardSettings,
+  validateDashboardSettings,
+  applyDashboardSettings,
+} from './settings.js';
+import { commands } from '../commands/definitions.js';
+import {
+  decideCase,
+  startInterview,
+  publishPanel,
+  writeWarnLog,
+  warnLogChannel,
+} from '../modules/tickets/service.js';
+import { safeText } from '../ui/messages.js';
+import { recordGangpotAsset, voidGangpotAsset } from '../modules/gangpot/assets.js';
+import { fetchTranscriptMessages } from '../modules/transcripts/export.js';
+import { transcriptViewURL } from '../modules/transcripts/viewer.js';
+import { resendAcceptance } from '../modules/applications/admissions.js';
+import { refreshMembers } from '../common/members.js';
+import { refreshRecruitment } from '../modules/applications/recruitment.js';
+import { publishRoster } from '../modules/members/roster.js';
+import { applicationQueue } from '../modules/applications/status.js';
+import { cancelActivity } from '../modules/planning/index.js';
+import {
+  decidePromotion,
+  promotionVotes,
+  promotionVoteReply,
+  PROMOTION_LEAD_ROLE_ID,
+} from '../modules/members/promotions.js';
+import { missions, missionDay } from '../modules/games/mission-definitions.js';
+import {
+  gangpotSummary,
+  syncGangpot,
+  recordGangpotEntry,
+  voidGangpotEntry,
+  reviewGangpotPayment,
+  GANGPOT_LEAD_ROLE_ID,
+  gangpotMoney,
+  requireGangPot,
+} from '../modules/gangpot/index.js';
+import { operationSettings } from '../config/features.js';
+import {
+  decideAbsence,
+  setExemption,
+  createAbsence,
+  syncAbsences,
+  activityAbsences,
+  requireLead,
+} from '../modules/absence/index.js';
+import { auditedAction, cleanAudit } from '../logging/audit.js';
+import { botHealth } from '../commands/bot-status.js';
+import { createActivity, planningTime } from '../modules/planning/index.js';
+import { communityChannel } from '../common/discord-posts.js';
+import { catches } from '../modules/games/fishing.js';
+import { createActivityCheck, cancelActivityCheck } from '../modules/check-ins/index.js';
+import { memberOverview } from '../modules/members/overview.js';
+import { backupSummary, createDataBackup } from '../data/backups.js';
+import { releaseVersion } from '../releases/announcements.js';
+import { dashboardAuditItem } from '../logging/format.js';
+import { logo } from '../ui/branding.js';
+import { syncWarningRoles } from '../modules/moderation/warning-roles.js';
+import { monthlyReport, monthlyReportIndex } from '../modules/reports/monthly.js';
+import { weeklyReport, weeklyReportIndex } from '../modules/reports/weekly.js';
+import { DiscordLogin, DiscordLoginError } from './auth.js';
+import { initializeSecurity, securityTrustedRoleIds } from '../modules/moderation/security.js';
+
+const secret = () => randomBytes(32).toString('base64url');
+const digest = (value) => createHash('sha256').update(value).digest('hex');
+const same = (a, b) =>
+  typeof a === 'string' &&
+  typeof b === 'string' &&
+  Buffer.byteLength(a) === Buffer.byteLength(b) &&
+  timingSafeEqual(Buffer.from(a), Buffer.from(b));
+const assets = new Map(
+  [
+    ['/dashboard', ['index.html', 'text/html; charset=utf-8']],
+    ['/dashboard/app.js', ['app.js', 'text/javascript; charset=utf-8']],
+    ['/dashboard/style.css', ['style.css', 'text/css; charset=utf-8']],
+  ].map(([path, [file, type]]) => [
+    path,
+    { body: readFileSync(new URL(`./public/${file}`, import.meta.url)), type },
+  ]),
+);
+assets.set('/dashboard/logo.webp', { body: logo, type: 'image/webp' });
+const security = {
+  'Cache-Control': 'private, no-store',
+  'Referrer-Policy': 'no-referrer',
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'X-Robots-Tag': 'noindex, nofollow, noarchive',
+  'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+  'Content-Security-Policy':
+    "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://cdn.discordapp.com https://media.discordapp.net; connect-src 'self'; frame-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+};
+class HTTPError extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+const failure = (test, status, message) => {
+  if (!test) throw new HTTPError(status, message);
+};
+async function bodyJSON(request) {
+  failure(
+    request.headers['content-type']?.startsWith('application/json'),
+    415,
+    'Stuur geldige JSON.',
+  );
+  let text = '';
+  for await (const part of request) {
+    text += part.toString('utf8');
+    failure(Buffer.byteLength(text) <= 32768, 413, 'Het verzoek is te groot.');
+  }
+  let value;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    throw new HTTPError(400, 'Ongeldige JSON.');
+  }
+  failure(value && typeof value === 'object' && !Array.isArray(value), 400, 'Ongeldig verzoek.');
+  return value;
+}
+
+export class Dashboard {
+  constructor({ client, contexts, locks, origin, allowLocalPreview = false, oauthFetch = fetch }) {
+    this.client = client;
+    this.contexts = contexts;
+    this.locks = locks;
+    this.origin = origin || (() => contexts.values().next().value?.config.transcriptSiteURL);
+    this.allowLocalPreview = allowLocalPreview;
+    this.logins = new Map();
+    this.sessions = new Map();
+    this.discordLogin = new DiscordLogin({
+      config: () => contexts.values().next().value?.config,
+      origin: () => this.currentOrigin(),
+      preview: allowLocalPreview,
+      fetchImpl: oauthFetch,
+    });
+  }
+  currentOrigin() {
+    const value = this.connection ? this.connection.origin : this.origin();
+    assertUser(
+      value,
+      this.connection?.error ||
+        'Het dashboard maakt verbinding. Gebruik /dashboard opnieuw zodra de console "dashboard bereikbaar" toont.',
+    );
+    const url = new URL(value);
+    assertUser(
+      url.protocol === 'https:' ||
+        (this.allowLocalPreview &&
+          url.protocol === 'http:' &&
+          ['localhost', '127.0.0.1'].includes(url.hostname)),
+      'Het dashboard moet HTTPS gebruiken.',
+    );
+    return url.origin;
+  }
+  setConnection(origin, error = '') {
+    this.connection = { origin, error };
+  }
+  prune(now = Date.now()) {
+    for (const [key, entry] of this.logins) if (entry.expires <= now) this.logins.delete(key);
+    for (const [key, entry] of this.sessions) if (entry.expires <= now) this.sessions.delete(key);
+  }
+  issueLogin(userId, guildId) {
+    assertUser(
+      /^\d{17,20}$/.test(userId) && this.contexts.has(guildId),
+      'Ongeldige dashboardtoegang.',
+    );
+    const origin = this.currentOrigin();
+    this.prune();
+    const code = secret();
+    for (const [key, item] of this.logins) if (item.userId === userId) this.logins.delete(key);
+    this.logins.set(digest(code), { userId, guildId, expires: Date.now() + 120000 });
+    return `${origin}/dashboard#login=${code}`;
+  }
+  cookieName() {
+    return this.allowLocalPreview ? 'legion-preview-session' : '__Host-legion-session';
+  }
+  cookie(value, maxAge) {
+    return `${this.cookieName()}=${value}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${maxAge}${this.allowLocalPreview ? '' : '; Secure'}`;
+  }
+  session(request) {
+    this.prune();
+    const value = request.headers.cookie
+      ?.split(';')
+      .map((part) => part.trim())
+      .find((part) => part.startsWith(this.cookieName() + '='))
+      ?.slice(this.cookieName().length + 1);
+    const session = value ? this.sessions.get(digest(value)) : null;
+    failure(session, 401, 'Log in met Discord om het dashboard te openen.');
+    return session;
+  }
+  async authorized(session, guildId) {
+    const ctx = this.contexts.get(guildId),
+      guild = this.client.guilds.cache.get(guildId);
+    failure(ctx && guild, 404, 'Deze guild hoort niet bij Bakarov.');
+    failure(ctx.ready && this.client.isReady(), 503, 'De bot start nog op.');
+    let member;
+    try {
+      member = await guild.members.fetch({ user: session.userId, force: true });
+    } catch (error) {
+      throw new HTTPError(
+        error.code === 10007 ? 403 : 503,
+        error.code === 10007
+          ? 'Je zit niet meer in deze guild.'
+          : 'Discordtoegang kan nu niet worden gecontroleerd.',
+      );
+    }
+    failure(
+      !member.user.bot && ctx.config.staffRoleIds.some((id) => member.roles.cache.has(id)),
+      403,
+      'Je hebt de Legion Lead-rol van deze server nodig voor dashboardtoegang.',
+    );
+    return { ctx, guild, member };
+  }
+  async sessionInfo(session) {
+    const guilds = [];
+    let user;
+    for (const id of this.contexts.keys()) {
+      try {
+        const { ctx, guild, member } = await this.authorized(session, id);
+        user ||= {
+          id: member.id,
+          name: member.displayName,
+          avatar: member.displayAvatarURL?.({ size: 64 }) || null,
+        };
+        guilds.push({
+          id,
+          name: guild.name,
+          icon: guild.iconURL?.({ size: 64 }) || null,
+          ticketsEnabled: ctx.config.ticketsEnabled,
+          admin: member.permissions.has(P.Administrator),
+        });
+      } catch (error) {
+        if (![403, 404].includes(error.status)) throw error;
+      }
+    }
+    failure(guilds.length, 403, 'Je hebt geen leidingtoegang meer.');
+    return {
+      user,
+      guilds,
+      selectedGuild: guilds.some((g) => g.id === session.guildId) ? session.guildId : guilds[0].id,
+      csrf: session.csrf,
+      expires: session.expires,
+    };
+  }
+  async createSession(userId, guildId) {
+    const session = { userId, guildId, csrf: secret(), expires: Date.now() + 1800000 };
+    const info = await this.sessionInfo(session),
+      token = secret();
+    for (const [key, item] of this.sessions) if (item.userId === userId) this.sessions.delete(key);
+    this.sessions.set(digest(token), session);
+    return { info, cookie: this.cookie(token, 1800) };
+  }
+  summary(ctx, guild, viewer) {
+    const { config, store } = ctx;
+    const name = (id) => guild.members.cache.get(id)?.displayName || id;
+    const avatar = (id) => guild.members.cache.get(id)?.displayAvatarURL?.({ size: 64 }) || null;
+    const queue = applicationQueue(store);
+    const cases = store.db
+      .prepare(
+        "SELECT c.*,a.status AS dm_status,a.last_error AS dm_error FROM cases c LEFT JOIN acceptance_notifications a ON a.case_id=c.id WHERE c.status!='creating' ORDER BY c.created_at DESC LIMIT 200",
+      )
+      .all()
+      .map(({ payload, ...item }) => ({
+        ...item,
+        queue: queue.get(item.id) || null,
+        owner_name: name(item.owner_id),
+        owner_avatar: avatar(item.owner_id),
+      }));
+    const transcripts = store.db
+      .prepare(
+        "SELECT c.id,c.kind,c.status,c.owner_id,c.closed_at,t.state,v.view_id,v.secret_key FROM cases c LEFT JOIN transcripts t ON t.case_id=c.id LEFT JOIN transcript_views v ON v.case_id=c.id WHERE c.status IN ('accepted','rejected','closed') ORDER BY c.closed_at DESC LIMIT 200",
+      )
+      .all()
+      .map(({ view_id, secret_key, ...item }) => ({
+        ...item,
+        owner_name: name(item.owner_id),
+        url:
+          view_id && config.transcriptSiteURL
+            ? this.allowLocalPreview
+              ? `${this.currentOrigin()}/t/${view_id}#k=${secret_key}`
+              : transcriptViewURL(config, { view_id, secret_key })
+            : null,
+      }));
+    const warnings = store.db
+      .prepare('SELECT * FROM warnings ORDER BY created_at DESC LIMIT 200')
+      .all()
+      .map((item) => ({ ...item, user_name: name(item.user_id), actor_name: name(item.actor_id) }));
+    const wallets = new Map(
+      store.db
+        .prepare('SELECT user_id,balance FROM wallets')
+        .all()
+        .map((item) => [item.user_id, item.balance]),
+    );
+    const ranked = config.roster?.roleIds || [];
+    const members = [...guild.members.cache.values()]
+      .filter((member) => !member.user.bot)
+      .map((member) => {
+        const roleId = ranked.find((id) => member.roles.cache.has(id));
+        return {
+          id: member.id,
+          name: member.displayName,
+          avatar: member.displayAvatarURL?.({ size: 64 }) || null,
+          rank: roleId ? guild.roles.cache.get(roleId)?.name : null,
+          rankOrder: roleId ? ranked.indexOf(roleId) : 999,
+          legion: Boolean(config.memberRoleId && member.roles.cache.has(config.memberRoleId)),
+          coins: wallets.get(member.id) ?? null,
+        };
+      })
+      .sort((a, b) => a.rankOrder - b.rankOrder || a.name.localeCompare(b.name, 'nl'));
+    const invitations = store.db
+      .prepare(
+        'SELECT case_id,owner_id,target_guild_id,status,expires_at,last_error FROM acceptance_notifications ORDER BY rowid DESC LIMIT 100',
+      )
+      .all()
+      .map((item) => ({ ...item, owner_name: name(item.owner_id) }));
+    const activity = store.db
+      .prepare("SELECT * FROM audit WHERE event NOT LIKE '%.started' ORDER BY id DESC LIMIT 80")
+      .all()
+      .map((item) => dashboardAuditItem(ctx, guild, item));
+    const totals = store.db
+      .prepare(
+        "SELECT COALESCE(SUM(kind='ticket' AND status='open'),0) AS tickets,COALESCE(SUM(kind='application' AND status='open'),0) AS applications,COALESCE(SUM(status='accepted'),0) AS accepted FROM cases",
+      )
+      .get();
+    const securityTrustedRoleNames = securityTrustedRoleIds(config).map(
+      (id) => guild.roles.cache.get(id)?.name || id,
+    );
+    return {
+      guild: {
+        id: guild.id,
+        name: guild.name,
+        ticketsEnabled: config.ticketsEnabled,
+        warningsEnabled: Boolean(config.warnLogChannelId),
+        securityEnabled: Boolean(config.security?.enabled),
+        securityTrustedRoleNames,
+        securityTrustedRoleName: securityTrustedRoleNames.length
+          ? securityTrustedRoleNames.join(' en ')
+          : null,
+        memberRoleId: config.memberRoleId,
+        staffRoleNames: config.staffRoleIds.map((id) => guild.roles.cache.get(id)?.name || id),
+      },
+      overview: {
+        members: members.length,
+        legionMembers: members.filter((member) => member.legion).length,
+        openTickets: totals.tickets,
+        openApplications: totals.applications,
+        accepted: totals.accepted,
+        savedTranscripts: store.db.prepare('SELECT COUNT(*) AS total FROM transcript_views').get()
+          .total,
+        activeWarns: store.db
+          .prepare('SELECT COUNT(*) AS total FROM warnings WHERE removed_at IS NULL')
+          .get().total,
+        pendingExports: store.db
+          .prepare(
+            "SELECT COUNT(*) AS total FROM transcripts WHERE state NOT IN ('done','unavailable')",
+          )
+          .get().total,
+        pendingDMs: store.db
+          .prepare(
+            "SELECT COUNT(*) AS total FROM acceptance_notifications WHERE status IN ('pending','dm_blocked')",
+          )
+          .get().total,
+        uptime: Math.round(process.uptime()),
+        latency: Math.max(0, this.client.ws?.ping || 0),
+        memoryMB: Math.round(process.memoryUsage().rss / 1048576),
+        quota: ctx.recruitment || null,
+      },
+      cases,
+      transcripts,
+      warnings,
+      members,
+      invitations,
+      activity,
+      leaderboard: [...wallets]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 20)
+        .map(([id, balance]) => ({ id, name: name(id), balance })),
+      settings: {
+        warnThreshold: config.warnThreshold,
+        startingCoins: config.startingCoins,
+        dailyCoins: config.dailyCoins,
+        maxBet: config.maxBet,
+        gamesMembersOnly: config.gamesMembersOnly,
+        content: config.content,
+      },
+      panels: store.db
+        .prepare("SELECT key,value FROM settings WHERE key LIKE 'panel:%'")
+        .all()
+        .map((item) => {
+          const [, type, channelId] = item.key.split(':');
+          return {
+            type,
+            channelId,
+            messageId: item.value,
+            url: `https://discord.com/channels/${guild.id}/${channelId}/${item.value}`,
+          };
+        }),
+      channels: [...guild.channels.cache.values()]
+        .filter((channel) => channel.type === 0)
+        .map((channel) => ({ id: channel.id, name: channel.name })),
+      commands: commands(config.maxBet, config.ticketsEnabled).map((command) => ({
+        name: command.name,
+        description: command.description,
+      })),
+      admission: config.admission
+        ? {
+            targetGuildId: config.admission.targetGuildId,
+            maxAge: config.admission.inviteMaxAgeSeconds,
+            restricted: true,
+            maxUses: 1,
+          }
+        : null,
+      roster: config.roster || null,
+      gangpot: gangpotSummary(ctx, guild),
+      health: botHealth(ctx, this.client),
+      operations: operationSettings(ctx),
+      backups: config.gangpot ? backupSummary(config.dataDir) : [],
+      monthlyReports: config.gangpot ? monthlyReportIndex(ctx) : null,
+      weeklyReports: config.gangpot ? weeklyReportIndex(ctx) : null,
+      warnAppeals: config.gangpot
+        ? store.db
+            .prepare(
+              "SELECT a.*,w.reason AS warnReason,w.removed_at AS warnRemovedAt FROM warn_appeals a JOIN warnings w ON w.id=a.warn_id WHERE a.status!='draft' ORDER BY a.submitted_at DESC LIMIT 100",
+            )
+            .all()
+            .map((item) => ({
+              ...item,
+              userName: name(item.user_id),
+              reviewerName: name(item.reviewer_id),
+            }))
+        : null,
+      channelSettings: {
+        logChannelId: config.logChannelId,
+        botLogChannelId: config.botLogChannelId || config.logChannelId,
+        updateChannelId: config.updateChannelId || '',
+        absencePanelChannelId: config.absencePanelChannelId || '',
+        planningChannelId: config.planningChannelId,
+        warnLogChannelId: config.warnLogChannelId,
+        panelChannelId: config.panelChannelId,
+        ...(config.guildId === '1555726440933363753'
+          ? { mediaChannelId: config.mediaChannelId || '' }
+          : {}),
+        ...(config.gangpot
+          ? {
+              weeklyReportChannelId:
+                config.weeklyReportChannelId ||
+                config.monthlyReportChannelId ||
+                config.logChannelId,
+              gangpotInfo: config.gangpot.infoChannelId,
+              gangpotPayments: config.gangpot.paymentsChannelId,
+              gangpotTotal: config.gangpot.totalChannelId,
+            }
+          : {}),
+      },
+      embedColor: '#' + config.color.toString(16).padStart(6, '0'),
+      canConfigureChannels: viewer?.permissions.has(P.Administrator) ?? false,
+      absences: store.db
+        .prepare('SELECT * FROM absence_requests ORDER BY created_at DESC LIMIT 100')
+        .all()
+        .map((item) => ({
+          ...item,
+          weeks: JSON.parse(item.weeks),
+          userName: name(item.user_id),
+          reviewerName: name(item.reviewer_id),
+          autoApproved:
+            item.kind === 'planning' &&
+            item.status === 'approved' &&
+            item.reviewer_id === guild.members.me.id,
+        })),
+      exemptions: store.db
+        .prepare('SELECT * FROM gangpot_exemptions ORDER BY period_id DESC LIMIT 100')
+        .all()
+        .map((item) => ({ ...item, userName: name(item.user_id) })),
+      fishCollections: store.db
+        .prepare('SELECT * FROM fish_collection ORDER BY last_at DESC LIMIT 200')
+        .all()
+        .map((item) => ({
+          ...item,
+          catch_name:
+            catches.find((catchItem) => catchItem.id === item.catch_id)?.title || item.catch_id,
+          userName: name(item.user_id),
+        })),
+      canReviewGangpot: viewer?.roles.cache.has(GANGPOT_LEAD_ROLE_ID) ?? false,
+      planningChannelId: config.planningChannelId,
+      activityChecks: store.db
+        .prepare('SELECT * FROM activity_check_sessions ORDER BY created_at DESC LIMIT 50')
+        .all()
+        .map((item) => ({
+          ...item,
+          url: item.message_id
+            ? `https://discord.com/channels/${guild.id}/${item.channel_id}/${item.message_id}`
+            : null,
+          members: store.db
+            .prepare('SELECT * FROM activity_check_members WHERE check_id=? ORDER BY user_id')
+            .all(item.id)
+            .map((person) => ({ ...person, name: name(person.user_id) })),
+        })),
+      plannings: store.db
+        .prepare('SELECT * FROM activities ORDER BY starts_at DESC LIMIT 100')
+        .all()
+        .map((item) => ({
+          ...item,
+          absences: activityAbsences(ctx, item).map((person) => ({
+            ...person,
+            name: name(person.user_id),
+          })),
+          url: item.message_id
+            ? `https://discord.com/channels/${guild.id}/${item.channel_id}/${item.message_id}`
+            : null,
+          participants: store.db
+            .prepare(
+              'SELECT user_id,response FROM activity_rsvps WHERE activity_id=? ORDER BY updated_at',
+            )
+            .all(item.id)
+            .map((person) => ({ ...person, name: name(person.user_id) })),
+        })),
+      canVotePromotions: viewer?.roles.cache.has(PROMOTION_LEAD_ROLE_ID) ?? false,
+      promotions: store.db
+        .prepare('SELECT * FROM promotions ORDER BY created_at DESC LIMIT 100')
+        .all()
+        .map((item) => ({
+          ...item,
+          voting: promotionVotes(ctx, item.id),
+          member_name: name(item.member_id),
+          role_name: guild.roles.cache.get(item.role_id)?.name || item.role_id,
+          url: item.message_id
+            ? `https://discord.com/channels/${guild.id}/${item.channel_id}/${item.message_id}`
+            : null,
+        })),
+      missions: {
+        day: missionDay(),
+        definitions: missions,
+        claimedToday: store.db
+          .prepare('SELECT COUNT(*) AS total FROM mission_claims WHERE day=?')
+          .get(missionDay()).total,
+      },
+    };
+  }
+  async interaction(ctx, guild, member, caseId) {
+    const dossier = ctx.store.caseById(caseId);
+    assertUser(dossier && dossier.status === 'open', 'Dit dossier is niet meer open.');
+    const channel = await guild.channels.fetch(dossier.channel_id);
+    assertUser(
+      channel?.guildId === guild.id && channel.topic?.includes(`dossier:${caseId} |`),
+      'Dit kanaal hoort niet bij het dossier.',
+    );
+    let result = '';
+    return {
+      guild,
+      guildId: guild.id,
+      member,
+      memberPermissions: member.permissions,
+      user: member.user,
+      client: this.client,
+      channel,
+      channelId: channel.id,
+      editReply: async (value) => {
+        result = value.content || '';
+      },
+      reply: async (value) => {
+        result = value.content || '';
+      },
+      result: () => result,
+    };
+  }
+  async action(ctx, guild, member, value) {
+    return auditedAction(ctx, member.id, String(value.action || '').slice(0, 80), () =>
+      this.performAction(ctx, guild, member, value),
+    );
+  }
+  async performAction(ctx, guild, member, value) {
+    const { store, config } = ctx;
+    const actor = member.id;
+    if (value.action === 'backup.create') {
+      requireGangPot(ctx);
+      assertUser(
+        member.permissions.has(P.Administrator),
+        'Alleen een administrator mag een back-up starten.',
+      );
+      const result = createDataBackup(config.dataDir, releaseVersion);
+      store.audit('backup.create', actor, { id: result.id || null, files: result.files || 0 });
+      return {
+        message: result.saved
+          ? 'Privé-back-up opgeslagen in data/backups.'
+          : 'Er zijn nog geen botgegevens om te bewaren.',
+      };
+    }
+    if (['appeal.approve', 'appeal.reject'].includes(value.action)) {
+      assertUser(value.confirm === true, 'Bevestig de beslissing over het bezwaar.');
+      const result = await decideWarnAppeal(
+        ctx,
+        guild,
+        member,
+        value.id,
+        value.action.split('.')[1],
+      );
+      await syncWarnAppeals(ctx, guild);
+      return {
+        message:
+          result.status === 'approved'
+            ? 'Bezwaar goedgekeurd. De gangwarn is ingetrokken.'
+            : result.status === 'rejected'
+              ? 'Bezwaar afgewezen.'
+              : 'Dit bezwaar is al afgehandeld.',
+      };
+    }
+    if (value.action === 'activitycheck.create') {
+      const result = await createActivityCheck(ctx, guild, member, {
+        date: value.date,
+        time: value.time,
+        channelId: value.channelId || config.planningChannelId,
+        reason: value.reason || '',
+      });
+      return {
+        message: result.posted
+          ? 'Activiteitencheck geplaatst. De controle na de deadline gebeurt automatisch.'
+          : 'Check opgeslagen; het plaatsen wordt opnieuw geprobeerd.',
+      };
+    }
+    if (value.action === 'activitycheck.cancel') {
+      assertUser(value.confirm === true, 'Bevestig het annuleren van de activiteitencheck.');
+      await cancelActivityCheck(ctx, guild, member, value.id);
+      return { message: 'Activiteitencheck geannuleerd.' };
+    }
+    if (['absence.approve', 'absence.reject'].includes(value.action)) {
+      assertUser(value.confirm === true, 'Bevestig de afmelding.');
+      await decideAbsence(ctx, guild, member, value.id, value.action.split('.')[1]);
+      await syncAbsences(ctx, guild);
+      await syncGangpot(ctx, this.client, Date.now(), this.contexts);
+      return { message: 'Afmelding beoordeeld.' };
+    }
+    if (['absence.exempt', 'absence.revoke'].includes(value.action)) {
+      await setExemption(
+        ctx,
+        guild,
+        member,
+        value.userId,
+        value.week,
+        value.reason,
+        value.action === 'absence.revoke',
+      );
+      await syncGangpot(ctx, this.client, Date.now(), this.contexts);
+      return { message: 'Vrijstelling bijgewerkt.' };
+    }
+    if (value.action === 'planning.create') {
+      const interaction = {
+        guild,
+        user: member.user,
+        member,
+        memberPermissions: member.permissions,
+      };
+      const result = await createActivity(ctx, interaction, {
+        date: value.date,
+        time: value.time,
+        location: value.location,
+        title: value.title,
+        description: value.description,
+        duration: value.duration,
+      });
+      return {
+        message: result.posted
+          ? 'Planning geplaatst.'
+          : 'Planning opgeslagen; de bot probeert opnieuw.',
+      };
+    }
+    if (value.action === 'absence.request') {
+      const item = await createAbsence(ctx, guild, member.id, {
+        start: value.start,
+        end: value.end,
+        reason: value.reason,
+        activityId: value.activityId,
+      });
+      await syncAbsences(ctx, guild);
+      return { message: `Aanvraag ${item.id} opgeslagen.` };
+    }
+    if (value.action === 'gangpot.refresh') {
+      await syncGangpot(ctx, this.client, Date.now(), this.contexts);
+      return { message: 'Gangpot bijgewerkt.' };
+    }
+    if (['gangpot.asset', 'gangpot.asset-void'].includes(value.action)) {
+      await requireLead(ctx, guild, member);
+      requireGangPot(ctx);
+      assertUser(value.confirm === true, 'Bevestig de voorraadregistratie.');
+      const entry =
+        value.action === 'gangpot.asset-void'
+          ? voidGangpotAsset(ctx, value.id, actor, value.reason)
+          : recordGangpotAsset(ctx, {
+              kind: value.kind,
+              name: value.name,
+              quantity: value.quantity,
+              direction: value.direction,
+              actor,
+              requestId: value.requestId,
+              note: value.note,
+            });
+      await syncGangpot(ctx, this.client, Date.now(), this.contexts);
+      return { message: `Voorraadregistratie ${entry.id} verwerkt. Weekbijdragen blijven apart.` };
+    }
+    if (
+      [
+        'gangpot.approve',
+        'gangpot.reject',
+        'gangpot.donation',
+        'gangpot.expense',
+        'gangpot.void',
+      ].includes(value.action)
+    ) {
+      requireGangPot(ctx);
+      assertUser(
+        value.confirm === true,
+        'Bevestig eerst dat deze in-game transactie werkelijk is ontvangen of uitgevoerd.',
+      );
+      const submittedAt = Date.now();
+      await syncGangpot(ctx, this.client, submittedAt, this.contexts);
+      let result;
+      if (['gangpot.asset', 'gangpot.asset-void'].includes(value.action)) {
+        requireGangPot(ctx);
+        assertUser(value.confirm === true, 'Bevestig de voorraadregistratie.');
+        const entry =
+          value.action === 'gangpot.asset-void'
+            ? voidGangpotAsset(ctx, value.id, actor, value.reason)
+            : recordGangpotAsset(ctx, {
+                kind: value.kind,
+                name: value.name,
+                quantity: value.quantity,
+                direction: value.direction,
+                actor,
+                requestId: value.requestId,
+                note: value.note,
+              });
+        await syncGangpot(ctx, this.client, Date.now(), this.contexts);
+        return {
+          message: `Voorraadregistratie ${entry.id} verwerkt. Weekbijdragen blijven apart.`,
+        };
+      }
+      if (['gangpot.approve', 'gangpot.reject'].includes(value.action))
+        result = await reviewGangpotPayment(
+          ctx,
+          guild,
+          member,
+          value.id,
+          value.action.split('.')[1],
+        );
+      else if (value.action === 'gangpot.void')
+        result = voidGangpotEntry(ctx, value.id, actor, value.reason);
+      else {
+        assertUser(
+          typeof value.requestId === 'string' && value.requestId.length >= 8,
+          'Ongeldige registratie.',
+        );
+        result = recordGangpotEntry(ctx, {
+          kind: value.action.split('.')[1],
+          amount: value.amount,
+          actor,
+          requestId: value.requestId,
+          note: value.note || '',
+          paidAt: submittedAt,
+        });
+      }
+      await syncGangpot(ctx, this.client, Date.now(), this.contexts);
+      return {
+        message: `Gangpotregistratie ${result.id} verwerkt. Saldo: ${gangpotMoney(gangpotSummary(ctx, guild).balance)}.`,
+      };
+    }
+    if (value.action === 'planning.cancel') {
+      assertUser(
+        /^[a-f0-9]{12}$/.test(value.id) && value.confirm === true,
+        'Bevestig eerst welke planning je wilt annuleren.',
+      );
+      await cancelActivity(ctx, guild, value.id, actor);
+      return {
+        message: 'Planning geannuleerd. Nieuwe aanwezigheidsreacties worden niet meer verwerkt.',
+      };
+    }
+    if (['promotion.approve', 'promotion.reject'].includes(value.action)) {
+      assertUser(
+        /^[a-f0-9]{12}$/.test(value.id) && value.confirm === true,
+        'Bevestig eerst welk promotievoorstel je wilt beoordelen.',
+      );
+      const result = await decidePromotion(
+        ctx,
+        guild,
+        member,
+        value.id,
+        value.action.endsWith('approve') ? 'approve' : 'reject',
+      );
+      return { message: promotionVoteReply(result) };
+    }
+    const reason = () => {
+      assertUser(
+        typeof value.reason === 'string' && value.reason.trim() && value.reason.length <= 500,
+        'Geef een reden van maximaal 500 tekens.',
+      );
+      return value.reason.trim();
+    };
+    const userId = () => {
+      assertUser(/^\d{17,20}$/.test(value.userId), 'Kies een geldig Discord-lid.');
+      return value.userId;
+    };
+    if (value.action === 'warn.add') {
+      await warnLogChannel(guild, config);
+      const user = userId(),
+        why = reason();
+      assertUser(user !== actor, 'Je kunt jezelf geen gangwarn geven.');
+      const target = await guild.members.fetch({ user, force: true });
+      assertUser(
+        !target.user.bot &&
+          (member.permissions.has(P.Administrator) ||
+            (!target.permissions.has(P.Administrator) &&
+              member.roles.highest.comparePositionTo(target.roles.highest) > 0)),
+        'Je kunt geen bot, administrator of lid met een gelijke/hogere rang waarschuwen.',
+      );
+      const result = store.addWarn(user, actor, why);
+      await syncWarningRoles(ctx, guild).catch((error) =>
+        console.error(
+          `Dashboard: waarschuwingsrol bijwerken mislukt (${error.code ?? error.message}).`,
+        ),
+      );
+      const logged = await writeWarnLog(
+        ctx,
+        guild,
+        'Bakarov | Gangwarn gegeven',
+        `Lid: <@${user}>\nDoor: <@${actor}>\nID: \`${result.id}\`\nReden: ${safeText(why)}\nActieve warns: **${result.count}**${result.count >= config.warnThreshold ? '\n⚠️ De ingestelde warn-drempel is bereikt.' : ''}`,
+        [warnAppealRow(config.guildId, result.id)],
+      );
+      await target.user
+        .send({
+          content: `Je hebt een gangwarn ontvangen in **${safeText(guild.name)}**.\nReden: ${safeText(why)}\nActieve warns: **${result.count}**\nID: \`${result.id}\``,
+          components: [warnAppealRow(config.guildId, result.id)],
+          allowedMentions: { parse: [] },
+        })
+        .catch(() => {});
+      return { message: `Gangwarn gegeven.${logged ? '' : ' De log staat lokaal opgeslagen.'}` };
+    }
+    if (value.action === 'warn.remove') {
+      await warnLogChannel(guild, config);
+      assertUser(/^[a-f0-9]{12}$/.test(value.id), 'Ongeldige gangwarn.');
+      const why = reason(),
+        removed = store.removeWarn(value.id, actor, why);
+      await syncWarningRoles(ctx, guild).catch((error) =>
+        console.error(
+          `Dashboard: waarschuwingsrol bijwerken mislukt (${error.code ?? error.message}).`,
+        ),
+      );
+      await writeWarnLog(
+        ctx,
+        guild,
+        'Gangwarn ingetrokken',
+        `ID: \`${value.id}\` • <@${removed.user_id}>\nDoor: <@${actor}>\nReden: ${safeText(why)}`,
+      );
+      return { message: 'Gangwarn ingetrokken. De historie blijft bewaard.' };
+    }
+    if (value.action === 'coins.adjust') {
+      const user = userId(),
+        why = reason();
+      await guild.members.fetch({ user, force: true });
+      return {
+        message: `Saldo bijgewerkt naar ${store.adjustCoins(user, value.amount, actor, why)} ${config.content.coinName}.`,
+      };
+    }
+    if (value.action === 'settings.save') {
+      const checked = validateDashboardSettings(value.settings);
+      const candidate = {
+        config: {
+          ...config,
+          gangpot: config.gangpot ? { ...config.gangpot } : null,
+          recruitment: config.recruitment ? { ...config.recruitment } : null,
+          admission: config.admission ? { ...config.admission } : null,
+        },
+      };
+      applyDashboardSettings(candidate, checked);
+      let currentUpdate;
+      if (config.gangpot && value.applyCurrent === true) {
+        assertUser(value.confirm === true, 'Bevestig wijzigen van de lopende gangpotweek.');
+        const period = store.db
+          .prepare(
+            'SELECT * FROM gangpot_periods WHERE starts_at<=? AND ends_at>? ORDER BY starts_at DESC LIMIT 1',
+          )
+          .get(Date.now(), Date.now());
+        if (period) {
+          const end =
+            planningTime(
+              period.id,
+              checked.operations?.gangpot?.deadlineTime || config.gangpot.deadlineTime || '23:59',
+            ) + 60000;
+          assertUser(end > Date.now(), 'De nieuwe deadline moet nog in de toekomst liggen.');
+          currentUpdate = { id: period.id, end };
+        }
+      }
+      if (checked.channels) {
+        assertUser(
+          member.permissions.has(P.Administrator),
+          'Alleen een administrator mag bestemmingskanalen veranderen.',
+        );
+        for (const [key, id] of Object.entries(checked.channels)) {
+          await communityChannel(guild, id);
+          if (['logChannelId', 'monthlyReportChannelId', 'weeklyReportChannelId'].includes(key))
+            await staffLogChannel(guild, { ...config, logChannelId: id });
+          if (
+            key.startsWith('gangpot') ||
+            [
+              'absencePanelChannelId',
+              'planningChannelId',
+              'monthlyReportChannelId',
+              'weeklyReportChannelId',
+            ].includes(key)
+          )
+            requireGangPot(ctx);
+        }
+      }
+      assertUser(!checked.gamesMembersOnly || config.memberRoleId, 'Stel eerst een ledenrol in.');
+      const desiredMax = checked.maxBet;
+      if (desiredMax !== undefined)
+        assertUser(
+          Number.isSafeInteger(desiredMax) && desiredMax >= 2 && desiredMax <= 100000,
+          'Kies een maximale inzet tussen 2 en 100000.',
+        );
+      if (desiredMax !== undefined && desiredMax !== config.maxBet)
+        await this.client.rest.put(Routes.applicationGuildCommands(config.clientId, guild.id), {
+          body: commands(desiredMax, config.ticketsEnabled),
+        });
+      saveDashboardSettings(ctx, checked, actor);
+      if (checked.operations?.security && config.security?.enabled)
+        ctx.securityReady = await initializeSecurity(ctx, guild);
+      if (config.recruitment) await refreshRecruitment(ctx, guild);
+      if (currentUpdate) {
+        store.db
+          .prepare('UPDATE gangpot_periods SET weekly_amount=?,ends_at=? WHERE id=?')
+          .run(config.gangpot.weeklyAmount, currentUpdate.end, currentUpdate.id);
+        store.audit('gangpot.period.settings', actor, {
+          period: currentUpdate.id,
+          amount: config.gangpot.weeklyAmount,
+        });
+      }
+      for (const item of store.db
+        .prepare("SELECT key FROM settings WHERE key LIKE 'panel:%'")
+        .all()) {
+        const [, type, id] = item.key.split(':');
+        await publishPanel(ctx, guild, id, type);
+      }
+      return { message: 'Instellingen opgeslagen en Discord-panelen bijgewerkt.' };
+    }
+    if (value.action === 'panel.refresh') {
+      for (const item of store.db
+        .prepare("SELECT key FROM settings WHERE key LIKE 'panel:%'")
+        .all()) {
+        const [, type, id] = item.key.split(':');
+        await publishPanel(ctx, guild, id, type);
+      }
+      return { message: 'Panelen in Discord bijgewerkt.' };
+    }
+    if (value.action === 'members.refresh') {
+      await refreshMembers(guild);
+      if (config.recruitment) await refreshRecruitment(ctx, guild);
+      if (config.roster) await publishRoster(ctx, guild);
+      return { message: 'Ledenlijst en sollicitatiestatus bijgewerkt.' };
+    }
+    if (value.action === 'admission.resend') {
+      assertUser(
+        /^[a-f0-9]{12}$/.test(value.id) && store.acceptance(value.id),
+        'Geen aannamebericht gevonden.',
+      );
+      const result = await resendAcceptance(ctx, this.client, value.id);
+      return {
+        message: ['sent', 'joined'].includes(result.status)
+          ? 'Het aannamebericht is verzonden.'
+          : result.status === 'dm_blocked'
+            ? 'De ontvanger heeft DM’s geblokkeerd. De uitnodiging is persoonlijk bewaard.'
+            : 'Het bericht staat in de verzendwachtrij.',
+      };
+    }
+    if (value.action === 'case.decision' || value.action === 'case.interview') {
+      assertUser(/^[a-f0-9]{12}$/.test(value.id), 'Ongeldig dossier.');
+      failure(value.confirm === true, 400, 'Bevestig deze actie eerst.');
+      const execute = async () => {
+        const interaction = await this.interaction(ctx, guild, member, value.id);
+        if (value.action === 'case.interview') await startInterview(ctx, interaction, value.id);
+        else {
+          assertUser(
+            ['accept', 'reject', 'close'].includes(value.decision),
+            'Kies aannemen, afwijzen of sluiten.',
+          );
+          await decideCase(ctx, interaction, value.id, value.decision);
+        }
+        return { message: interaction.result() || 'Dossier bijgewerkt.' };
+      };
+      const decisionKey = `${guild.id}:case-decision:${value.id}`;
+      return value.decision === 'accept'
+        ? this.locks.run(`${guild.id}:accept-member`, () => this.locks.run(decisionKey, execute))
+        : this.locks.run(decisionKey, execute);
+    }
+    throw new HTTPError(400, 'Onbekende dashboardactie.');
+  }
+  async handle(request, response) {
+    const path = new URL(request.url, 'http://localhost').pathname;
+    if (path !== '/' && !path.startsWith('/dashboard') && !path.startsWith('/api/dashboard'))
+      return false;
+    const send = (status, value, extra = {}) => {
+      response.writeHead(status, {
+        ...security,
+        'Content-Type': 'application/json; charset=utf-8',
+        ...extra,
+      });
+      response.end(request.method === 'HEAD' ? undefined : JSON.stringify(value));
+    };
+    try {
+      if (path === '/') {
+        response.writeHead(302, { ...security, Location: '/dashboard' });
+        response.end();
+        return true;
+      }
+      const asset = assets.get(path === '/dashboard/' ? '/dashboard' : path);
+      if (asset) {
+        failure(['GET', 'HEAD'].includes(request.method), 405, 'Alleen lezen toegestaan.');
+        response.writeHead(200, { ...security, 'Content-Type': asset.type });
+        response.end(request.method === 'HEAD' ? undefined : asset.body);
+        return true;
+      }
+      if (path === '/api/dashboard/auth') {
+        failure(request.method === 'GET', 405, 'Gebruik GET.');
+        const enabled = this.discordLogin.enabled();
+        send(200, {
+          discordLoginEnabled: enabled,
+          loginURL: enabled ? `${this.currentOrigin()}/api/dashboard/oauth/start` : null,
+        });
+        return true;
+      }
+      if (path === '/api/dashboard/oauth/start' || path === '/api/dashboard/oauth/callback') {
+        failure(request.method === 'GET', 405, 'Gebruik GET.');
+        try {
+          if (path.endsWith('/start')) {
+            const login = this.discordLogin.start(request);
+            response.writeHead(302, {
+              ...security,
+              Location: login.url,
+              'Set-Cookie': login.cookie,
+            });
+            response.end();
+            return true;
+          }
+          const userId = await this.discordLogin.complete(
+            request,
+            new URL(request.url, 'https://dashboard.invalid'),
+          );
+          const account = await this.createSession(userId);
+          response.writeHead(303, {
+            ...security,
+            Location: '/dashboard',
+            'Set-Cookie': [account.cookie, this.discordLogin.cookie('', 0)],
+          });
+          response.end();
+          return true;
+        } catch (error) {
+          const reason =
+            error instanceof DiscordLoginError
+              ? error.reason
+              : error.status === 403
+                ? 'denied'
+                : 'unavailable';
+          response.writeHead(303, {
+            ...security,
+            Location: `/dashboard#oauth=${reason}`,
+            'Set-Cookie': this.discordLogin.cookie('', 0),
+          });
+          response.end();
+          return true;
+        }
+      }
+      if (request.method === 'POST')
+        failure(
+          request.headers.origin === this.currentOrigin(),
+          403,
+          'Dit verzoek komt niet van het Bakarov-dashboard.',
+        );
+      if (path === '/api/dashboard/login') {
+        failure(request.method === 'POST', 405, 'Gebruik POST.');
+        const body = await bodyJSON(request);
+        failure(/^[A-Za-z0-9_-]{43}$/.test(body.code), 401, 'Ongeldige inloglink.');
+        this.prune();
+        const key = digest(body.code),
+          pending = this.logins.get(key);
+        failure(
+          pending,
+          401,
+          'Deze inloglink is verlopen of al gebruikt. Gebruik opnieuw /dashboard.',
+        );
+        this.logins.delete(key);
+        await this.authorized(pending, pending.guildId);
+        const account = await this.createSession(pending.userId, pending.guildId);
+        send(200, account.info, { 'Set-Cookie': account.cookie });
+        return true;
+      }
+      const session = this.session(request);
+      if (request.method === 'POST')
+        failure(
+          same(request.headers['x-csrf-token'], session.csrf),
+          403,
+          'De sessiebeveiliging is verlopen. Open het dashboard opnieuw.',
+        );
+      if (path === '/api/dashboard/logout') {
+        failure(request.method === 'POST', 405, 'Gebruik POST.');
+        for (const [key, item] of this.sessions) if (item === session) this.sessions.delete(key);
+        send(200, { ok: true }, { 'Set-Cookie': this.cookie('', 0) });
+        return true;
+      }
+      if (path === '/api/dashboard/session') {
+        failure(request.method === 'GET', 405, 'Gebruik GET.');
+        send(200, await this.sessionInfo(session));
+        return true;
+      }
+      const match =
+        /^\/api\/dashboard\/guilds\/(\d{17,20})\/(summary|actions|audit|monthly|weekly|cases\/([a-f0-9]{12})\/messages|members\/(\d{17,20}))$/.exec(
+          path,
+        );
+      failure(match, 404, 'Pagina niet gevonden.');
+      const { ctx, guild, member } = await this.authorized(session, match[1]);
+      if (match[2] === 'monthly') {
+        failure(request.method === 'GET', 405, 'Gebruik GET.');
+        const month =
+          new URL(request.url, 'http://localhost').searchParams.get('month') || undefined;
+        send(200, monthlyReport(ctx, month));
+        return true;
+      }
+      if (match[2] === 'weekly') {
+        failure(request.method === 'GET', 405, 'Gebruik GET.');
+        const value =
+          new URL(request.url, 'http://localhost').searchParams.get('date') || undefined;
+        send(200, weeklyReport(ctx, value));
+        return true;
+      }
+      if (match[4]) {
+        failure(request.method === 'GET', 405, 'Gebruik GET.');
+        send(200, memberOverview(ctx, guild, match[4]));
+        return true;
+      }
+      if (match[2] === 'audit') {
+        failure(request.method === 'GET', 405, 'Gebruik GET.');
+        const before = Number(
+          new URL(request.url, 'http://localhost').searchParams.get('before') ||
+            Number.MAX_SAFE_INTEGER,
+        );
+        failure(Number.isSafeInteger(before) && before > 0, 400, 'Ongeldige logpagina.');
+        const items = ctx.store.db
+          .prepare(
+            "SELECT * FROM audit WHERE id<? AND event NOT LIKE '%.started' ORDER BY id DESC LIMIT 100",
+          )
+          .all(before)
+          .map((item) => dashboardAuditItem(ctx, guild, item));
+        send(200, { items });
+        return true;
+      }
+      if (match[2] === 'summary') {
+        failure(request.method === 'GET', 405, 'Gebruik GET.');
+        send(200, this.summary(ctx, guild, member));
+        return true;
+      }
+      if (match[2] === 'actions') {
+        failure(request.method === 'POST', 405, 'Gebruik POST.');
+        const value = await bodyJSON(request);
+        const key = `${guild.id}:dashboard:${member.id}`;
+        const result = await this.locks.run(key, () => this.action(ctx, guild, member, value));
+        send(200, result);
+        return true;
+      }
+      failure(request.method === 'GET', 405, 'Gebruik GET.');
+      const dossier = ctx.store.caseById(match[3]);
+      failure(dossier, 404, 'Dossier niet gevonden.');
+      if (dossier.status !== 'open') {
+        send(200, { messages: [], closed: true });
+        return true;
+      }
+      const channel = await guild.channels.fetch(dossier.channel_id);
+      failure(
+        channel?.guildId === guild.id && channel.topic?.includes(`dossier:${dossier.id} |`),
+        404,
+        'Dossierkanaal niet gevonden.',
+      );
+      send(200, { messages: await fetchTranscriptMessages(channel, Infinity), closed: false });
+      return true;
+    } catch (error) {
+      send(error.status || (error instanceof UserError ? 400 : 503), {
+        error:
+          error.status || error instanceof UserError
+            ? error.message
+            : 'Deze actie kon nu niet worden uitgevoerd. Probeer opnieuw.',
+      });
+      return true;
+    }
+  }
+  close() {
+    this.sessions.clear();
+    this.logins.clear();
+    this.discordLogin.close();
+  }
+}

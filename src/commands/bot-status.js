@@ -1,0 +1,138 @@
+import { MessageFlags } from 'discord.js';
+import { requireStaff, quiet } from '../modules/tickets/service.js';
+import { embed } from '../ui/messages.js';
+import { operationSettings } from '../config/features.js';
+import { securityIsEnabled, securityTrustedRoleIds } from '../modules/moderation/security.js';
+export function botHealth(ctx, client) {
+  const db = ctx.store.db,
+    counts = {
+      transcripts: db
+        .prepare("SELECT COUNT(*) AS n FROM transcripts WHERE state NOT IN ('done','unavailable')")
+        .get().n,
+      invitations: db
+        .prepare(
+          "SELECT COUNT(*) AS n FROM acceptance_notifications WHERE status IN ('pending','dm_blocked')",
+        )
+        .get().n,
+      payments: db.prepare('SELECT COUNT(*) AS n FROM gangpot_claims WHERE dirty=1').get().n,
+      absences: db.prepare('SELECT COUNT(*) AS n FROM absence_requests WHERE dirty=1').get().n,
+      notifications: db
+        .prepare("SELECT COUNT(*) AS n FROM feature_notices WHERE status='pending'")
+        .get().n,
+      gangpotWarns: db
+        .prepare(
+          'SELECT COUNT(*) AS n FROM gangpot_notifications WHERE log_id IS NULL OR (dm_id IS NULL AND dm_blocked=0)',
+        )
+        .get().n,
+      activityWarns: db
+        .prepare('SELECT COUNT(*) AS n FROM activity_check_warnings WHERE log_id IS NULL')
+        .get().n,
+      activityChecks: db
+        .prepare(
+          "SELECT COUNT(*) AS n FROM activity_check_sessions WHERE dirty=1 OR (status='open' AND deadline_at<=?)",
+        )
+        .get(Date.now()).n,
+      blockedDMs: db
+        .prepare("SELECT COUNT(*) AS n FROM feature_notices WHERE status='blocked'")
+        .get().n,
+      changelog: db
+        .prepare('SELECT COUNT(*) AS n FROM release_announcements WHERE message_id IS NULL')
+        .get().n,
+      weeklyReports: db
+        .prepare('SELECT COUNT(*) AS n FROM weekly_reports WHERE message_id IS NULL')
+        .get().n,
+      warnCorrections: db
+        .prepare('SELECT COUNT(*) AS n FROM absence_warn_corrections WHERE log_id IS NULL')
+        .get().n,
+      warnAppeals: db
+        .prepare("SELECT COUNT(*) AS n FROM warn_appeals WHERE dirty=1 OR status='pending'")
+        .get().n,
+      logs: db
+        .prepare('SELECT COUNT(*) AS n FROM audit WHERE id>?')
+        .get(Number(ctx.store.setting('audit:cursor') || 0)).n,
+    };
+  const errors = [];
+  for (const table of [
+    'gangpot_claims',
+    'gangpot_notifications',
+    'activity_check_warnings',
+    'activity_check_sessions',
+    'absence_requests',
+    'feature_notices',
+    'audit_deliveries',
+    'release_announcements',
+    'promotions',
+    'activities',
+    'weekly_reports',
+    'absence_warn_corrections',
+    'warn_appeals',
+  ])
+    for (const item of db
+      .prepare(`SELECT last_error FROM ${table} WHERE last_error IS NOT NULL LIMIT 5`)
+      .all())
+      errors.push({ module: table, code: item.last_error });
+  if (ctx.store.setting('absence:panel:error'))
+    errors.push({ module: 'Afmeldpaneel', code: ctx.store.setting('absence:panel:error') });
+  for (const item of db
+    .prepare("SELECT key,value FROM settings WHERE key LIKE 'maintenance:error:%'")
+    .all())
+    try {
+      errors.unshift({ module: item.key.split(':').at(-1), code: JSON.parse(item.value).code });
+    } catch {}
+  const enabled = securityIsEnabled(ctx),
+    active = enabled && Boolean(ctx.securityReady),
+    raidEnabled = enabled && operationSettings(ctx).security.raidEnabled,
+    raidActive = active && raidEnabled,
+    raidMode = Boolean(raidActive && ctx.securityRaidUntil > Date.now());
+  return {
+    ready: ctx.ready && client.isReady(),
+    uptime: Math.round(process.uptime()),
+    latency: Math.max(0, client.ws?.ping || 0),
+    memoryMB: Math.round(process.memoryUsage().rss / 1048576),
+    security: {
+      enabled,
+      active,
+      trustedRoleId: ctx.config.security?.trustedRoleId || null,
+      trustedRoleIds: securityTrustedRoleIds(ctx.config),
+      incidents30d: db
+        .prepare('SELECT COUNT(*) AS n FROM security_incidents WHERE created_at>=?')
+        .get(Date.now() - 30 * 86400000).n,
+      raidEnabled,
+      raidActive,
+      raidMode,
+      raidUntil: raidMode ? ctx.securityRaidUntil : null,
+    },
+    counts,
+    errors: errors.slice(0, 20),
+  };
+}
+export async function handleBotStatus(ctx, interaction) {
+  requireStaff(interaction, ctx.config);
+  const health = botHealth(ctx, interaction.client),
+    roles = health.security.trustedRoleIds.map((id) => `<@&${id}>`).join(', ') || 'Niet ingesteld';
+  const description = [
+    `**Verbinding:** ${health.ready ? '🟢 Online' : '🟠 Starten / herstellen'}`,
+    `**Uptime:** ${Math.floor(health.uptime / 60)} minuten`,
+    `**Vertraging:** ${health.latency} ms`,
+    `**Geheugen:** ${health.memoryMB} MB`,
+    `**Beveiliging:** ${health.security.enabled ? (health.security.active ? '🟢 Actief' : '🔴 Niet actief — controleer botrechten en vertrouwensrol') : 'Uit'}`,
+    `**Vrijgestelde rollen:** ${roles}`,
+    `**Beveiligingsincidenten (30 dagen):** ${health.security.incidents30d}`,
+    `**Raidcontrole:** ${health.security.raidEnabled ? (health.security.raidActive ? '🟢 Aan — controleert nieuwe leden' : '🟠 Ingeschakeld — controleer botrechten en vertrouwensrol') : 'Uit via instellingen'}`,
+    `**Beschermmodus:** ${health.security.raidMode ? `🟠 Actief tot <t:${Math.floor(health.security.raidUntil / 1000)}:t>` : health.security.raidActive ? 'Geen raid gedetecteerd' : 'Niet actief'}`,
+    '',
+    '**Wachten op verwerking**',
+    Object.entries(health.counts)
+      .map(([name, n]) => `${name}: ${n}`)
+      .join('\n'),
+    '',
+    '**Laatste problemen:**',
+    health.errors.map((item) => `${item.module}: ${item.code}`).join('\n') ||
+      'Geen geregistreerde problemen.',
+  ].join('\n');
+  return interaction.reply({
+    flags: MessageFlags.Ephemeral,
+    embeds: [embed(ctx.config, 'Bakarov — Botstatus', description)],
+    allowedMentions: quiet,
+  });
+}

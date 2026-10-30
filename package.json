@@ -1,6 +1,6 @@
 {
   "name": "bakarov-future-rp-bot",
-  "version": "2.5.28",
+  "version": "2.5.29",
   "private": true,
   "description": "Nederlandstalige Discord-bot voor Bakarov in Future RP",
   "type": "module",
@@ -10,10 +10,10 @@
   },
   "scripts": {
     "start": "node --env-file-if-exists=.env index.js",
-    "deploy": "node --env-file-if-exists=.env scripts/deploy.mjs",
-    "check": "node --env-file-if-exists=.env scripts/check.mjs",
+    "deploy": "node --env-file-if-exists=.env scripts/deploy.js",
+    "check": "node --env-file-if-exists=.env scripts/check.js",
     "test": "node --test",
-    "backup": "node --env-file-if-exists=.env scripts/backup.mjs"
+    "backup": "node --env-file-if-exists=.env scripts/backup.js"
   },
   "dependencies": {
     "discord.js": "14.25.1"
