@@ -20,6 +20,7 @@ src/
     check-ins/           Activiteitenchecks en herstel van reacties
     games/               Blackjack, vissen, coins en missies
     gangpot/             Betalingen, voorraad, herinneringen en betaalregels
+    leveling/            Bericht-XP, actieve spraaktijd, levels en ranglijsten
     members/             Ledenlijst, promoties, ranggeschiedenis en ledenoverzicht
     moderation/          Beveiliging, warnrollen en bezwaren
     planning/            Activiteiten, aanmeldingen en reacties

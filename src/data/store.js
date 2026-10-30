@@ -63,6 +63,14 @@ export class Store {
         actor_id TEXT NOT NULL, details TEXT NOT NULL, created_at INTEGER NOT NULL
       );
       CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS member_levels (
+        user_id TEXT PRIMARY KEY, total_xp INTEGER NOT NULL DEFAULT 0 CHECK(total_xp>=0),
+        message_xp INTEGER NOT NULL DEFAULT 0, voice_xp INTEGER NOT NULL DEFAULT 0,
+        message_count INTEGER NOT NULL DEFAULT 0, voice_seconds INTEGER NOT NULL DEFAULT 0,
+        voice_remainder INTEGER NOT NULL DEFAULT 0, last_message_at INTEGER NOT NULL DEFAULT 0,
+        last_message_hash TEXT NOT NULL DEFAULT ''
+      );
+      CREATE INDEX IF NOT EXISTS member_levels_ranking ON member_levels(total_xp DESC,user_id);
       CREATE TABLE IF NOT EXISTS application_drafts (
         id TEXT PRIMARY KEY, owner_id TEXT NOT NULL UNIQUE, step INTEGER NOT NULL DEFAULT 0,
         revision INTEGER NOT NULL DEFAULT 0, answers TEXT NOT NULL,

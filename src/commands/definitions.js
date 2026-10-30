@@ -26,6 +26,10 @@ export function commands(maxBet, ticketsEnabled = true) {
     cmd('info', 'Informatie over Bakarov en Future RP'),
     cmd('regels', 'Lees de door Bakarov ingestelde regels'),
     cmd('rangen', 'Bekijk de rangvolgorde van Bakarov'),
+    cmd('level', 'Bekijk je level, XP en actieve spraaktijd').addUserOption((option) =>
+      option.setName('lid').setDescription('Bekijk het level van een ander lid'),
+    ),
+    cmd('levels', 'Bekijk de levelranglijst van deze server'),
     cmd('dashboard', 'Open het privé Bakarov-dashboard (alleen leiding)'),
     cmd('botstatus', 'Bekijk verbinding, uptime en acties die op herhaling wachten (leiding)'),
     cmd(

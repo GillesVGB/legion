@@ -1,5 +1,11 @@
 # Bakarov — Discord-bot voor Future RP
 
+## Levels voor berichten en spraaktijd — 2.6.0
+
+Met `/level [lid]` bekijk je level, XP, voortgang en actieve spraaktijd. `/levels` toont de publieke ranglijst. Standaard verdien je 15 XP per geldig bericht met een cooldown van 60 seconden, plus 5 XP per minuut in een gewoon spraakkanaal met minstens twee actieve mensen. Bots, privétickets, logkanalen, herhaalde tekst, AFK en gedempte/dove deelnemers tellen niet mee. Er wordt geen audio opgenomen of daadwerkelijke spraak gedetecteerd.
+
+De instellingen staan per server bij **Modules instellen → Levels & XP**. De dashboardpagina **Levels** toont de ranglijst en bericht-/spraakvoortgang. XP blijft bewaard bij herstarts, telt geen offline tijd en verandert geen gangrangen of coins. Details: [Levelsysteem](docs/LEVELS.md).
+
 ## Code-indeling — 2.5.29
 
 De broncode staat per onderdeel in duidelijke mappen:

@@ -94,6 +94,8 @@ import { runMaintenanceJobs } from './maintenance.js';
 import { recordMessageEvent, rememberMessage } from '../logging/messages.js';
 import { createRuntimeClientOptions, startRuntimeCacheMaintenance } from './runtime-limits.js';
 import { maintainStorage } from '../data/maintenance.js';
+import { awardMessageXp, handleLevelCommand } from '../modules/leveling/index.js';
+import { syncVoiceXp, clearVoiceXpTracking } from '../modules/leveling/voice.js';
 import { syncBotBranding } from '../ui/branding.js';
 import { handleMonthlyReport } from '../modules/reports/monthly.js';
 import { syncWeeklyReports, handleWeeklyReport } from '../modules/reports/weekly.js';
@@ -150,6 +152,7 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.GuildModeration,
+    GatewayIntentBits.GuildVoiceStates,
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User],
   allowedMentions: quiet,
@@ -502,6 +505,7 @@ async function handleCommand(ctx, interaction) {
             ...(config.ticketsEnabled ? ['**Tickets:** /ticket openen, /ticket sluiten'] : []),
             '**Games:** /blackjack, /coinflip, /dobbel, /8ball, /steenpapier, /fish, /vangstenboek',
             '**Coins:** /saldo, /daily, /leaderboard, /missies',
+            '**Levels:** /level, /levels — XP voor berichten en actieve spraaktijd',
             '**Leiding:** /dashboard, /botstatus, /lidinfo, /ranggeschiedenis, /gangwarn geven, /gangwarn bekijken, /gangwarn intrekken',
             '**Aangenomen:** /uitnodiging voor je persoonlijke ganginvite',
             '**Administrators:** /inrichten, /setup',
@@ -512,6 +516,7 @@ async function handleCommand(ctx, interaction) {
     });
   }
   if (['info', 'regels', 'rangen'].includes(name)) return info(ctx, interaction, name);
+  if (['level', 'levels'].includes(name)) return handleLevelCommand(ctx, interaction);
   if (name === 'sollicitatiestatus') return showApplicationStatus(ctx, interaction);
   if (name === 'activiteitencheck') return handleActivitiesCheck(ctx, interaction);
   if (name === 'lidinfo') return handleMemberOverview(ctx, interaction);
@@ -922,6 +927,11 @@ client.once(Events.ClientReady, async (ready) => {
         `Guild ${guildId}: controleer inrichting (${error instanceof UserError ? error.message : (error.code ?? error.name)}).`,
       );
     }
+    try {
+      syncVoiceXp(ctx, guild);
+    } catch (error) {
+      console.error(`Spraak-XP starten mislukt (${error.code || error.name}).`);
+    }
   }
   await drainTranscripts();
 });
@@ -1039,9 +1049,11 @@ client.on(Events.MessageCreate, (message) => {
       console.error(`Berichtsnapshot niet opgeslagen (${error.code || error.name}).`);
     }
   if (ctx && !shuttingDown)
-    handleSecurityMessage(ctx, message).catch((error) =>
-      securityFailure(ctx, 'Berichtencontrole', error),
-    );
+    handleSecurityMessage(ctx, message)
+      .then((allowed) => {
+        if (allowed !== false && ctx.ready && !shuttingDown) awardMessageXp(ctx, message);
+      })
+      .catch((error) => securityFailure(ctx, 'Berichtencontrole of bericht-XP', error));
   if (ctx && !shuttingDown && !message.author?.bot) {
     const dossier = ctx.store.caseByChannel(message.channelId);
     if (dossier?.payload.queueAt)
@@ -1269,9 +1281,45 @@ client.on(Events.MessageReactionRemoveEmoji, (reaction) => {
   if (ctx?.ready)
     clearPlanningReactions(ctx, reaction.message, reaction.emoji.name).catch(() => {});
 });
+client.on(Events.VoiceStateUpdate, (before, after) => {
+  const guild = after.guild || before.guild,
+    ctx = contexts.get(guild.id);
+  if (!ctx?.ready || shuttingDown || !client.isReady()) return;
+  try {
+    syncVoiceXp(ctx, guild);
+  } catch (error) {
+    console.error(`Spraak-XP opslaan mislukt (${error.code || error.name}).`);
+  }
+});
+client.on(Events.ShardDisconnect, () => clearVoiceXpTracking(contexts));
+const levelingTimer = setInterval(() => {
+  for (const ctx of contexts.values()) {
+    const guild = client.guilds.cache.get(ctx.config.guildId);
+    if (shuttingDown || !ctx.ready || !client.isReady() || !guild || guild.available === false) {
+      ctx.levelingVoice = null;
+      continue;
+    }
+    try {
+      syncVoiceXp(ctx, guild);
+    } catch (error) {
+      console.error(`Spraak-XP opslaan mislukt (${error.code || error.name}).`);
+    }
+  }
+}, 15_000);
+levelingTimer.unref();
+
 async function shutdown() {
   if (shuttingDown) return;
   shuttingDown = true;
+  clearInterval(levelingTimer);
+  for (const ctx of contexts.values()) {
+    const guild = client.guilds.cache.get(ctx.config.guildId);
+    if (guild && ctx.ready && client.isReady())
+      try {
+        syncVoiceXp(ctx, guild);
+      } catch {}
+  }
+  clearVoiceXpTracking(contexts);
   stopRuntimeCaches();
   clearInterval(timer);
   clearInterval(transcriptTimer);

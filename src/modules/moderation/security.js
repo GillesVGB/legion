@@ -297,7 +297,7 @@ export async function handleSecurityMessage(ctx, message, now = Date.now()) {
         `Je bericht bevat een niet-toegestane link en is verwijderd. Bij ${policy.linkBanCount} verboden linkberichten binnen ${policy.linkWindowMinutes} minuten volgt een ban.`,
       );
     }
-    return;
+    return false;
   }
   for (const [kind, event] of [
     ['guild', 'security.guild_links_allowed'],
@@ -326,7 +326,7 @@ export async function handleSecurityMessage(ctx, message, now = Date.now()) {
       everyone: message.mentions.everyone,
       channel: message.channelId,
     });
-    return;
+    return false;
   }
   if (PROFANITY.test(message.content || '')) {
     await timeoutMember(
@@ -339,7 +339,7 @@ export async function handleSecurityMessage(ctx, message, now = Date.now()) {
       now,
       policy,
     );
-    return;
+    return false;
   }
   const text = (message.content || '').trim().toLocaleLowerCase('nl-BE').replace(/\s+/g, ' ');
   if (!text) return;
@@ -364,8 +364,9 @@ export async function handleSecurityMessage(ctx, message, now = Date.now()) {
       now,
       policy,
     );
-    return;
+    return false;
   }
+  return true;
 }
 
 async function timeoutMember(ctx, guild, member, kind, text, messages, now, policy) {

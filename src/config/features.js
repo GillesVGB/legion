@@ -26,6 +26,18 @@ export const featureDefaults = {
     reward: 750,
     rareReward: 400,
   },
+  leveling: {
+    enabled: true,
+    messageEnabled: true,
+    messageXp: 15,
+    messageCooldownSeconds: 60,
+    minMessageLength: 5,
+    voiceEnabled: true,
+    voiceXpPerMinute: 5,
+    voiceMinMembers: 2,
+    voiceRequireUnmuted: true,
+    ignoredChannelIds: '',
+  },
   activityCheck: {
     remindersEnabled: true,
     reminderMinutes: 60,
@@ -63,6 +75,11 @@ export const featureDefaults = {
   },
 };
 const bounds = {
+  messageXp: [1, 100],
+  messageCooldownSeconds: [15, 3600],
+  minMessageLength: [1, 100],
+  voiceXpPerMinute: [1, 60],
+  voiceMinMembers: [1, 20],
   weeklyAmount: [1, 100000000],
   duration: [15, 720],
   target: [1, 10000],
@@ -154,6 +171,17 @@ export function validateOperations(value) {
         assertUser(
           Number.isSafeInteger(input) && input >= bounds[key][0] && input <= bounds[key][1],
           `${key}: kies ${bounds[key][0]} tot ${bounds[key][1]}.`,
+        );
+      else if (key === 'ignoredChannelIds')
+        assertUser(
+          typeof input === 'string' &&
+            input.length <= 500 &&
+            input.split(/[\s,]+/).filter(Boolean).length <= 20 &&
+            input
+              .split(/[\s,]+/)
+              .filter(Boolean)
+              .every((id) => /^\d{17,20}$/.test(id)),
+          'Vul maximaal twintig kanaal- of categorie-ID’s in, gescheiden door komma’s.',
         );
       else if (key === 'weeklyStartDate')
         assertUser(

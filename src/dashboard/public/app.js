@@ -26,6 +26,7 @@ const state = {
   busy: false,
 };
 const paths = {
+  leveling: 'M3 21h6v-6h6V9h6V3 M15 3h6v6',
   overview: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
   tickets: 'M3 5h18v4a3 3 0 0 0 0 6v4H3v-4a3 3 0 0 0 0-6z M14 5v14',
   applications: 'M6 3h12v18H6z M9 7h6 M9 11h6 M9 15h4',
@@ -50,6 +51,7 @@ const pages = {
   warnings: ['Gangwarns', 'Duidelijke afspraken. Een blijvende historie.'],
   members: ['Leden & rangen', 'Iedereen op de juiste plek binnen Bakarov.'],
   games: ['Games & coins', 'Fun-commands, saldi en de economie van je server.'],
+  leveling: ['Levels', 'XP, levels en actieve spraaktijd per server.'],
   information: ['Informatie', 'Jouw teksten, regels en Bakarov-identiteit.'],
   settings: ['Instellingen', 'De basis voor een goed georganiseerde gang.'],
   activity: ['Activiteit', 'Wat er gebeurde, wanneer en door wie.'],
@@ -967,6 +969,7 @@ function renderPage() {
     warnings: warningPage,
     members: memberPage,
     games: gamesPage,
+    leveling: levelingPage,
     planning: () => planningPage() + activityChecksPage() + planningAbsencesPage(),
     promotions: promotionsPage,
     gangpot: gangpotPage,
@@ -1434,7 +1437,37 @@ function collectionPage() {
     `<div class="notice">De standaard weekchallenges belonen goede en zeldzame vangsten. Beloningen en aantallen zijn aanpasbaar bij Modules instellen. De waarden voor een al begonnen challengeweek blijven bewaard.</div>`
   );
 }
+function levelingPage() {
+  const data = state.data.leveling || { enabled: false, ranking: [] };
+  return (
+    card(
+      'Levels & XP',
+      data.enabled
+        ? 'Actief — voortgang is per server gescheiden'
+        : 'XP verdienen staat uit; voortgang blijft bewaard',
+      '<div class="card-body"><p>Bekijk je eigen voortgang met <strong>/level</strong> en de Discordranglijst met <strong>/levels</strong>. Levels veranderen gangrangen en coins niet. XP en anti-spaminstellingen wijzig je bij Modules instellen → Levels &amp; XP.</p></div>',
+    ) +
+    card(
+      'Levelranglijst',
+      'De 25 hoogst geplaatste huidige leden',
+      table(
+        ['#', 'Lid', 'Level', 'XP', 'Bericht-XP', 'Spraak-XP', 'Actieve spraaktijd'],
+        data.ranking.map((item) => [
+          number(item.rank),
+          e(item.name),
+          number(item.level),
+          number(item.xp),
+          number(item.message_xp),
+          number(item.voice_xp),
+          `${number(Math.floor(item.voice_seconds / 3600))}u ${number(Math.floor((item.voice_seconds % 3600) / 60))}m`,
+        ]),
+      ),
+    )
+  );
+}
+
 const operationLabels = {
+  leveling: 'Levels & XP',
   weeklyReports: 'Weekoverzicht',
   monthlyReports: 'Maandoverzicht',
   activityCheck: 'Activiteitencheck & herinneringen',
@@ -1449,6 +1482,15 @@ const operationLabels = {
   security: 'Beveiliging & automatisch modereren',
 };
 const settingLabels = {
+  messageEnabled: 'XP voor berichten',
+  messageXp: 'XP per geldig bericht',
+  messageCooldownSeconds: 'Berichtcooldown (seconden)',
+  minMessageLength: 'Minimale berichtlengte',
+  voiceEnabled: 'XP voor actieve spraaktijd',
+  voiceXpPerMinute: 'XP per actieve spraakminuut',
+  voiceMinMembers: 'Minimaal actieve deelnemers in spraak',
+  voiceRequireUnmuted: 'Gedempte deelnemers niet meetellen',
+  ignoredChannelIds: 'Genegeerde kanaal-/categorie-ID’s (komma’s, maximaal 20)',
   sendTime: 'Verzenden op zondag (Belgische tijd)',
   weeklyStartDate: 'Eerste deadline (JJJJ-MM-DD)',
   weeklyIntervalWeeks: 'Interval activiteitencheck (weken)',
@@ -1531,15 +1573,17 @@ function modulesPage() {
         .map(([key, value]) => {
           const name = `${group}.${key}`,
             label =
-              group === 'security' && key === 'enabled'
-                ? 'Beveiligingssysteem'
-                : group === 'activityCheck' && key === 'weeklyEnabled'
-                  ? 'Wekelijkse activiteitencheck'
-                  : group === 'weeklyReports' && key === 'enabled'
-                    ? 'Automatisch weekoverzicht'
-                    : group === 'backups' && key === 'enabled'
-                      ? 'Automatische back-ups'
-                      : settingLabels[key] || key;
+              group === 'leveling' && key === 'enabled'
+                ? 'Levelsysteem'
+                : group === 'security' && key === 'enabled'
+                  ? 'Beveiligingssysteem'
+                  : group === 'activityCheck' && key === 'weeklyEnabled'
+                    ? 'Wekelijkse activiteitencheck'
+                    : group === 'weeklyReports' && key === 'enabled'
+                      ? 'Automatisch weekoverzicht'
+                      : group === 'backups' && key === 'enabled'
+                        ? 'Automatische back-ups'
+                        : settingLabels[key] || key;
           if (typeof value === 'boolean')
             return `<div class="field"><label>${e(label)}</label><select name="${e(name)}"><option value="true" ${value ? 'selected' : ''}>Aan</option><option value="false" ${value ? '' : 'selected'}>Uit</option></select></div>`;
           if (key === 'preparation')
@@ -1556,7 +1600,9 @@ function modulesPage() {
                   ? 'date'
                   : 'text',
           );
-          return key === 'weeklyChannelId' ? input.replace(' required', '') : input;
+          return ['weeklyChannelId', 'ignoredChannelIds'].includes(key)
+            ? input.replace(' required', '')
+            : input;
         })
         .join('')}</div>`,
     );

@@ -45,6 +45,7 @@ import {
   requireGangPot,
 } from '../modules/gangpot/index.js';
 import { operationSettings } from '../config/features.js';
+import { levelRanking } from '../modules/leveling/profiles.js';
 import {
   decideAbsence,
   setExemption,
@@ -423,6 +424,10 @@ export class Dashboard {
       gangpot: gangpotSummary(ctx, guild),
       health: botHealth(ctx, this.client),
       operations: operationSettings(ctx),
+      leveling: {
+        enabled: operationSettings(ctx).leveling.enabled,
+        ranking: levelRanking(ctx, guild, 25),
+      },
       backups: config.gangpot ? backupSummary(config.dataDir) : [],
       monthlyReports: config.gangpot ? monthlyReportIndex(ctx) : null,
       weeklyReports: config.gangpot ? weeklyReportIndex(ctx) : null,
