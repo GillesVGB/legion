@@ -1,9 +1,5 @@
 import { assertUser } from '../common/errors.js';
-import {
-  validateOperations,
-  applyOperations,
-  WEEKLY_CHECK_CHANNEL_ID,
-} from '../config/features.js';
+import { validateOperations, applyOperations } from '../config/features.js';
 import { migrateBrandSettings } from '../ui/branding.js';
 
 const limits = {
@@ -186,56 +182,23 @@ export function loadDashboardSettings(ctx) {
       ctx.store.setSetting('gangpot:friday-deadline-settings:1', '1');
     });
   }
-  if (
-    ctx.config.guildId === '1555685630640652338' &&
-    !ctx.store.setting('activitycheck:interval-config:2')
-  ) {
-    migrated.operations ??= {};
-    const settings = (migrated.operations.activityCheck ??= {});
-    settings.weeklyIntervalWeeks ??= 2;
-    if (settings.weeklyReason === 'Wekelijkse activiteitencheck')
-      settings.weeklyReason = 'Tweewekelijkse activiteitencheck';
-    ctx.store.transaction(() => {
-      ctx.store.setSetting('dashboard-config', JSON.stringify(migrated));
-      ctx.store.setSetting('activitycheck:interval-config:2', '1');
-    });
+  const activityCheckSettings = migrated.operations?.activityCheck;
+  let removedRecurringCheckSettings = false;
+  for (const key of [
+    'weeklyEnabled',
+    'weeklyStartDate',
+    'weeklyIntervalWeeks',
+    'weeklyTime',
+    'weeklyReason',
+    'weeklyChannelId',
+  ]) {
+    if (activityCheckSettings && Object.hasOwn(activityCheckSettings, key)) {
+      delete activityCheckSettings[key];
+      removedRecurringCheckSettings = true;
+    }
   }
-  if (
-    ctx.config.guildId === '1555685630640652338' &&
-    !ctx.store.setting('activitycheck:weekly-config:1')
-  ) {
-    migrated.operations ??= {};
-    migrated.operations.activityCheck = {
-      ...migrated.operations.activityCheck,
-      weeklyEnabled: true,
-      weeklyStartDate: '2026-10-23',
-      weeklyIntervalWeeks: 2,
-      weeklyTime: '07:30',
-      weeklyReason: 'Tweewekelijkse activiteitencheck',
-      weeklyChannelId: WEEKLY_CHECK_CHANNEL_ID,
-    };
-    // Persist once; later dashboard changes, including disabling, survive restarts.
-    ctx.store.transaction(() => {
-      ctx.store.setSetting('dashboard-config', JSON.stringify(migrated));
-      ctx.store.setSetting('activitycheck:weekly-config:1', '1');
-    });
-  }
-  if (
-    ctx.config.guildId === '1555685630640652338' &&
-    !ctx.store.setting('activitycheck:weekly-channel:2')
-  ) {
-    migrated.operations ??= {};
-    const settings = (migrated.operations.activityCheck ??= {});
-    if (
-      !settings.weeklyChannelId ||
-      [ctx.config.planningChannelId, '1555685633266163793'].includes(settings.weeklyChannelId)
-    )
-      settings.weeklyChannelId = WEEKLY_CHECK_CHANNEL_ID;
-    ctx.store.transaction(() => {
-      ctx.store.setSetting('dashboard-config', JSON.stringify(migrated));
-      ctx.store.setSetting('activitycheck:weekly-channel:2', '1');
-    });
-  }
+  if (removedRecurringCheckSettings)
+    ctx.store.setSetting('dashboard-config', JSON.stringify(migrated));
   let weeklyMigrated = false;
   if (migrated.operations?.monthlyReports && !migrated.operations.weeklyReports) {
     migrated.operations.weeklyReports = { ...migrated.operations.monthlyReports };

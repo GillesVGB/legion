@@ -1494,11 +1494,6 @@ const settingLabels = {
   voiceRequireUnmuted: 'Gedempte deelnemers niet meetellen',
   ignoredChannelIds: 'Genegeerde kanaal-/categorie-ID’s (komma’s, maximaal 20)',
   sendTime: 'Verzenden op zondag (Belgische tijd)',
-  weeklyStartDate: 'Eerste deadline (JJJJ-MM-DD)',
-  weeklyIntervalWeeks: 'Interval activiteitencheck (weken)',
-  weeklyTime: 'Tijdstip activiteitencheck (Belgische tijd)',
-  weeklyReason: 'Reden van de activiteitencheck',
-  weeklyChannelId: 'Weekcheck kanaal-ID (leeg = mededelingen)',
   reminderMinutes: 'Minuten vóór de check-in-deadline',
   keep: 'Aantal back-ups bewaren',
   maxTotalMB: 'Opslagbudget back-ups (MB)',
@@ -1516,7 +1511,6 @@ const settingLabels = {
   title: 'Standaard activiteitnaam',
   preparation: 'Voorbereiding',
   collectionEnabled: 'Verzameling bijhouden',
-  weeklyEnabled: 'Automatische activiteitencheck',
   target: 'Goede vangsten nodig',
   rareTarget: 'Zeldzame vangsten nodig',
   reward: 'Coins voor goede vangsten',
@@ -1567,7 +1561,9 @@ function modulesPage() {
     const cardDescription =
       group === 'security'
         ? `Instellingen voor ${d.guild.name}. Schakel beveiliging en raidcontrole afzonderlijk aan of uit. De beschermmodus start bij een gedetecteerde raid. Vrijgestelde rollen: ${d.guild.securityTrustedRoleName || 'rollen ingesteld in de serverconfiguratie'}. Lead is vrijgesteld van automatische beveiligingsstraffen. Beheeracties vereisen de juiste Discordrechten en rolvolgorde. Alle links zijn toegestaan in geregistreerde gewone tickets en sollicitatietickets.${d.guild.id === '1555685630640652338' ? ' Alle leden mogen in deze hoofdserver alle links in alle tekstkanalen plaatsen.' : d.channelSettings.mediaChannelId ? ' YouTube- en Medal-links mogen alleen in het ingestelde mediakanaal.' : ''}`
-        : 'Instellingen voor deze server';
+        : group === 'activityCheck'
+          ? 'Alleen herinneringen voor handmatig gestarte check-ins. Lead start een check via /activiteitencheck.'
+          : 'Instellingen voor deze server';
     html += card(
       operationLabels[group],
       cardDescription,
@@ -1579,13 +1575,11 @@ function modulesPage() {
                 ? 'Levelsysteem'
                 : group === 'security' && key === 'enabled'
                   ? 'Beveiligingssysteem'
-                  : group === 'activityCheck' && key === 'weeklyEnabled'
-                    ? 'Wekelijkse activiteitencheck'
-                    : group === 'weeklyReports' && key === 'enabled'
-                      ? 'Automatisch weekoverzicht'
-                      : group === 'backups' && key === 'enabled'
-                        ? 'Automatische back-ups'
-                        : settingLabels[key] || key;
+              : group === 'weeklyReports' && key === 'enabled'
+                ? 'Automatisch weekoverzicht'
+                : group === 'backups' && key === 'enabled'
+                  ? 'Automatische back-ups'
+                  : settingLabels[key] || key;
           if (typeof value === 'boolean')
             return `<div class="field"><label>${e(label)}</label><select name="${e(name)}"><option value="true" ${value ? 'selected' : ''}>Aan</option><option value="false" ${value ? '' : 'selected'}>Uit</option></select></div>`;
           if (key === 'preparation')
@@ -1598,11 +1592,9 @@ function modulesPage() {
               ? 'number'
               : key.endsWith('Time')
                 ? 'time'
-                : key === 'weeklyStartDate'
-                  ? 'date'
-                  : 'text',
+              : 'text',
           );
-          return ['weeklyChannelId', 'ignoredChannelIds', 'levelUpChannelId'].includes(key)
+          return ['ignoredChannelIds', 'levelUpChannelId'].includes(key)
             ? input.replace(' required', '')
             : input;
         })

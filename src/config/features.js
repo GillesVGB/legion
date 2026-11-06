@@ -43,12 +43,6 @@ export const featureDefaults = {
   activityCheck: {
     remindersEnabled: true,
     reminderMinutes: 60,
-    weeklyEnabled: false,
-    weeklyStartDate: '2026-10-23',
-    weeklyIntervalWeeks: 2,
-    weeklyTime: '07:30',
-    weeklyReason: 'Tweewekelijkse activiteitencheck',
-    weeklyChannelId: WEEKLY_CHECK_CHANNEL_ID,
   },
   backups: { enabled: true, keep: 2, maxTotalMB: 96 },
   monthlyReports: { enabled: true, sendTime: '09:00' },
@@ -95,7 +89,6 @@ const bounds = {
   minimumAge: [1, 100],
   inviteMaxAgeSeconds: [300, 604800],
   reminderMinutes: [1, 10080],
-  weeklyIntervalWeeks: [1, 12],
   keep: [1, 30],
   maxTotalMB: [16, 256],
   localRetentionDays: [7, 365],
@@ -116,6 +109,18 @@ export function operationSettings(ctx) {
   return Object.fromEntries(
     Object.entries(featureDefaults).map(([group, defaults]) => {
       const saved = ctx.config.operations?.[group] || {};
+      if (group === 'activityCheck') {
+        const {
+          weeklyEnabled,
+          weeklyStartDate,
+          weeklyIntervalWeeks,
+          weeklyTime,
+          weeklyReason,
+          weeklyChannelId,
+          ...manualSettings
+        } = saved;
+        return [group, { ...defaults, ...manualSettings }];
+      }
       if (group === 'security')
         return [
           group,
@@ -185,15 +190,7 @@ export function validateOperations(value) {
               .every((id) => /^\d{17,20}$/.test(id)),
           'Vul maximaal twintig kanaal- of categorie-ID’s in, gescheiden door komma’s.',
         );
-      else if (key === 'weeklyStartDate')
-        assertUser(
-          typeof input === 'string' &&
-            /^\d{4}-\d{2}-\d{2}$/.test(input) &&
-            Number.isFinite(Date.parse(input + 'T12:00:00Z')) &&
-            new Date(input + 'T12:00:00Z').toISOString().slice(0, 10) === input,
-          'Gebruik een geldige startdatum: JJJJ-MM-DD.',
-        );
-      else if (['weeklyChannelId', 'levelUpChannelId'].includes(key))
+      else if (key === 'levelUpChannelId')
         assertUser(
           typeof input === 'string' && (!input || /^\d{17,20}$/.test(input)),
           'Gebruik een geldig kanaal-ID of laat leeg voor het standaardkanaal.',

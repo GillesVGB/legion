@@ -1,4 +1,9 @@
 {
+  "2.6.3": [
+    "⏸️ **Automatische tweewekelijkse activiteitencheck verwijderd**\nDe bot plant of publiceert geen volgende terugkerende activiteitencheck meer. Ook de velden voor interval, datum, tijd, reden, kanaal en automatisch aan/uit zijn uit Modules instellen verwijderd. De normale herinneringen voor handmatig gestarte checks blijven instelbaar.",
+    "🛑 **Openstaande automatisch ingeplande checks veilig geannuleerd**\nEen nog open check die door de terugkerende planning was ingepland, wordt één keer afgesloten als geannuleerd. Het bestaande Discordbericht wordt bijgewerkt. Voor deze geannuleerde check deelt de bot geen gangwarns meer uit. Afgeronde checks en hun waarschuwinghistorie blijven behouden.",
+    "✅ **Handmatige check blijft beschikbaar**\nLead kan nog steeds zelf /activiteitencheck datum tijd en eventueel een kanaal gebruiken. Reacties met ✅, reminders, beoordeling na de deadline en de bestaande regels voor goedgekeurde afwezigheid blijven voor handmatige checks werken. De persoonlijke activiteitencheck-planning is niet veranderd."
+  ],
   "2.6.2": [
     "🖼️ **Alleen de PNG bij levels**\n/level en automatische levelmeldingen sturen voortaan uitsluitend de rankkaart als PNG-bijlage. De extra embed, tekstvelden en tag verdwijnen. Naam, avatar, level en XP-voortgang staan op de afbeelding. De groene kaart bij een level omhoog blijft bestaan. /levels behoudt zijn ranglijst.",
     "💬 **Bericht-XP in alle kanalen**\nGewone ledenberichten kunnen nu ook XP verdienen in changelog, logs, transcriptkanalen, tickets en privéthreads. De vaste kanaaluitsluitingen zijn verwijderd. De bot moet het kanaal kunnen lezen; kanalen of categorieën die Lead zelf bij Modules instellen uitsluit blijven genegeerd. De bestaande XP-standen blijven behouden.",

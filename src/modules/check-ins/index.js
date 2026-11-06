@@ -15,7 +15,7 @@ import { refreshMembers } from '../../common/members.js';
 import { planningTime, requirePlanningGuild } from '../planning/index.js';
 import { missionDay } from '../games/mission-definitions.js';
 import { queueFeatureNotice, deliverFeatureNotices } from '../../common/notices.js';
-import { operationSettings, WEEKLY_CHECK_CHANNEL_ID } from '../../config/features.js';
+import { operationSettings } from '../../config/features.js';
 
 const checkById = (ctx, id) =>
   ctx.store.db.prepare('SELECT * FROM activity_check_sessions WHERE id=?').get(id);
@@ -542,6 +542,7 @@ export async function syncActivityChecks(ctx, guild, now = Date.now()) {
   if (ctx.config.guildId !== '1555685630640652338') return;
   await recoverPublishedActivityChecks(ctx, guild, now);
   await cleanupMovedActivityChecks(ctx, guild, now);
+  await cancelOpenScheduledActivityChecks(ctx, guild, now);
   if (ctx.store.setting('activitycheck:layout') !== '2') {
     ctx.store.transaction(() => {
       ctx.store.db
@@ -593,8 +594,27 @@ export async function syncActivityChecks(ctx, guild, now = Date.now()) {
   }
   await syncCheckReminders(ctx, guild, now);
   await syncActivityWarnings(ctx, guild, now);
-  // A broken destination for the next week must not block logs/DMs of completed checks.
-  await syncWeeklyActivityCheck(ctx, guild, now);
+}
+async function cancelOpenScheduledActivityChecks(ctx, guild, now) {
+  const scheduled = ctx.store.db
+    .prepare(`SELECT c.id,c.message_id FROM activity_check_sessions c
+      JOIN activity_check_occurrences o ON o.check_id=c.id WHERE c.status='open'`)
+    .all();
+  for (const item of scheduled) {
+    ctx.store.transaction(() => {
+      ctx.store.db
+        .prepare(`UPDATE activity_check_sessions SET status='cancelled',dirty=?,next_attempt=0
+          WHERE id=? AND status='open'`)
+        .run(item.message_id ? 1 : 0, item.id);
+      ctx.store.audit('activitycheck.recurring_removed', guild.members.me.id, { id: item.id });
+    });
+    if (item.message_id)
+      await publishActivityCheck(ctx, guild, item.id).catch((error) =>
+        ctx.store.db
+          .prepare('UPDATE activity_check_sessions SET last_error=?,next_attempt=? WHERE id=?')
+          .run(String(error.code || error.name), now + 60000, item.id),
+      );
+  }
 }
 export async function cleanupMovedActivityChecks(ctx, guild, now = Date.now()) {
   for (const item of ctx.store.db
@@ -740,78 +760,6 @@ export async function moveActivityCheck(ctx, guild, id, channelId, now = Date.no
     });
     await cleanupMovedActivityChecks(ctx, guild, now);
     return checkById(ctx, id);
-  });
-}
-export function weeklyCheckDeadline(ctx, now = Date.now()) {
-  const settings = operationSettings(ctx).activityCheck;
-  if (!settings.weeklyEnabled) return null;
-  const intervalDays = settings.weeklyIntervalWeeks * 7;
-  let date = settings.weeklyStartDate,
-    deadline = planningTime(date, settings.weeklyTime, now);
-  // Calendar weeks preserve the configured local time through Belgian summer/winter time changes.
-  while (deadline < now + 60000) {
-    date = new Date(Date.parse(date + 'T12:00:00Z') + intervalDays * 86400000)
-      .toISOString()
-      .slice(0, 10);
-    deadline = planningTime(date, settings.weeklyTime, now);
-  }
-  return { date, deadline };
-}
-export async function syncWeeklyActivityCheck(ctx, guild, now = Date.now()) {
-  if (ctx.config.guildId !== '1555685630640652338') return;
-  return serializeCommunity(`${guild.id}:weekly-checkin`, async () => {
-    const next = weeklyCheckDeadline(ctx, now);
-    if (
-      !next ||
-      next.deadline - now >
-        operationSettings(ctx).activityCheck.weeklyIntervalWeeks * 7 * 86400000 + 3600000
-    )
-      return;
-    const settings = operationSettings(ctx).activityCheck,
-      target = settings.weeklyChannelId || WEEKLY_CHECK_CHANNEL_ID;
-    const scheduled = ctx.store.db
-      .prepare(
-        'SELECT c.* FROM activity_check_sessions c JOIN activity_check_occurrences o ON o.check_id=c.id WHERE o.deadline_date=?',
-      )
-      .get(next.date);
-    if (scheduled) {
-      if (scheduled.status === 'open' && scheduled.channel_id !== target)
-        await moveActivityCheck(ctx, guild, scheduled.id, target, now);
-      return;
-    }
-    const open = ctx.store.db
-      .prepare("SELECT * FROM activity_check_sessions WHERE status='open'")
-      .get();
-    if (open) {
-      // Reuse a manually started check with this exact deadline instead of duplicating it.
-      if (open.deadline_at === next.deadline) {
-        ctx.store.transaction(() => {
-          ctx.store.db
-            .prepare('INSERT INTO activity_check_occurrences(deadline_date,check_id) VALUES(?,?)')
-            .run(next.date, open.id);
-          ctx.store.db
-            .prepare(
-              'UPDATE activity_check_sessions SET reason=?,dirty=1,next_attempt=0 WHERE id=?',
-            )
-            .run(operationSettings(ctx).activityCheck.weeklyReason, open.id);
-        });
-        if (open.channel_id !== target) await moveActivityCheck(ctx, guild, open.id, target, now);
-      }
-      return;
-    }
-    await createCheck(
-      ctx,
-      guild,
-      guild.members.me,
-      {
-        date: next.date,
-        time: settings.weeklyTime,
-        reason: settings.weeklyReason,
-        channelId: target,
-        scheduleDate: next.date,
-      },
-      now,
-    );
   });
 }
 export async function syncCheckReminders(ctx, guild, now = Date.now()) {

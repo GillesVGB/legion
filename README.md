@@ -1,5 +1,9 @@
 # Bakarov — Discord-bot voor Future RP
 
+## Automatische tweewekelijkse activiteitencheck verwijderd — 2.6.3
+
+De bot plant geen terugkerende activiteitencheck meer. Openstaande, automatisch ingeplande checks worden bij de update geannuleerd en krijgen geen gangwarns meer. Afgeronde checks en checkgeschiedenis blijven staan. Lead kan nog steeds zelf een check starten met `/activiteitencheck datum tijd [kanaal]`.
+
 ## Alleen PNG en XP in alle kanalen — 2.6.2
 
 `/level` en levelmeldingen sturen uitsluitend de PNG-rankkaart. Gewone ledenberichten kunnen in alle kanalen XP verdienen, ook changelog, logs, tickets en threads. Alleen eigen uitsluitingen in het dashboard blijven gelden. De cooldown van standaard zestig seconden, minimale berichtlengte en spamcontrole blijven actief. Een eerder gestuurde afbeelding is een momentopname; opnieuw `/level` toont de nieuwste stand.
