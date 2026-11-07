@@ -1104,6 +1104,12 @@ export class Store {
         queueNoticeSent: false,
         queueTicketNoticeSent: false,
       };
+      for (const key of [
+        'queueSyncRetryAt',
+        'queueSyncRetryAttempts',
+        'queueSyncLastError',
+      ])
+        delete payload[key];
       delete payload.queueReplyFor;
       delete payload.queueReplyOpenedAt;
       delete payload.queueReplyOpenedBy;
@@ -1236,13 +1242,54 @@ export class Store {
         (item.payload.queueNoticeRetryAt || 0) <= now,
     );
   }
-  queuedApplications() {
+  queuedApplications(now = Date.now()) {
     return this.activeCases().filter(
       (item) =>
         item.kind === 'application' &&
         item.payload.queueAt &&
-        item.payload.queueStatus !== 'released',
+        item.payload.queueStatus !== 'released' &&
+        (item.payload.queueSyncRetryAt || 0) <= now,
     );
+  }
+  retryApplicationQueueSync(id, error, now = Date.now()) {
+    const dossier = this.caseById(id);
+    if (
+      dossier?.kind !== 'application' ||
+      dossier.status !== 'open' ||
+      !dossier.payload.queueAt ||
+      dossier.payload.queueStatus === 'released'
+    )
+      return null;
+    const message = String(error || 'Onbekende fout').slice(0, 180),
+      attempts = (dossier.payload.queueSyncRetryAttempts || 0) + 1,
+      delay = Math.min(60 * 60 * 1000, 60 * 1000 * 2 ** Math.min(attempts - 1, 6)),
+      payload = {
+        ...dossier.payload,
+        queueSyncRetryAt: now + delay,
+        queueSyncRetryAttempts: attempts,
+        queueSyncLastError: message,
+      };
+    this.db.prepare('UPDATE cases SET payload=? WHERE id=?').run(JSON.stringify(payload), id);
+    if (dossier.payload.queueSyncLastError !== message)
+      this.audit('application.queue_retry_failed', this.config.clientId, {
+        id,
+        error: message,
+        attempts,
+      });
+    return this.caseById(id);
+  }
+  clearApplicationQueueSyncRetry(id) {
+    const dossier = this.caseById(id);
+    if (!dossier?.payload.queueSyncRetryAt && !dossier?.payload.queueSyncLastError) return dossier;
+    const payload = { ...dossier.payload };
+    for (const key of [
+      'queueSyncRetryAt',
+      'queueSyncRetryAttempts',
+      'queueSyncLastError',
+    ])
+      delete payload[key];
+    this.db.prepare('UPDATE cases SET payload=? WHERE id=?').run(JSON.stringify(payload), id);
+    return this.caseById(id);
   }
   applicationQueuePost(id) {
     return this.db.prepare('SELECT * FROM application_queue_posts WHERE case_id=?').get(id) || null;

@@ -829,17 +829,41 @@ export async function handleApplicationQueueLeadMessage(ctx, message) {
   return true;
 }
 
-async function synchronizeQueuedApplication(ctx, guild, dossier) {
-  const channel = await guild.channels.fetch(dossier.channel_id).catch((error) => {
-    if (error.code === 10003) return null;
-    throw error;
-  });
-  assertUser(
+async function findQueuedApplicationChannel(ctx, guild, dossier) {
+  const matches = (channel) =>
     channel?.guildId === guild.id &&
-      channel.type === ChannelType.GuildText &&
-      channel.topic?.includes(`dossier:${dossier.id} | application`),
-    'Het sollicitatiekanaal hoort niet bij dit dossier.',
-  );
+    channel.type === ChannelType.GuildText &&
+    channel.topic?.includes(`dossier:${dossier.id} | application`);
+  let channel = dossier.channel_id
+    ? await guild.channels.fetch(dossier.channel_id).catch((error) => {
+        if (error.code === 10003) return null;
+        throw error;
+      })
+    : null;
+  if (!matches(channel)) {
+    const channels = await guild.channels.fetch();
+    channel = channels.find(matches) || null;
+  }
+  if (!channel) {
+    if (dossier.channel_id) {
+      const knownChannel = guild.channels.cache.get(dossier.channel_id);
+      if (knownChannel)
+        assertUser(false, 'Het opgeslagen sollicitatiekanaal heeft niet meer het dossieronderwerp.');
+    }
+    ctx.store.closeCase(dossier.id, 'failed', guild.members.me.id);
+    ctx.store.audit('application.queue_channel_missing', guild.members.me.id, {
+      id: dossier.id,
+      owner: dossier.owner_id,
+    });
+    return null;
+  }
+  if (channel.id !== dossier.channel_id) ctx.store.bindCase(dossier.id, channel.id);
+  return channel;
+}
+
+async function synchronizeQueuedApplication(ctx, guild, dossier) {
+  const channel = await findQueuedApplicationChannel(ctx, guild, dossier);
+  if (!channel) return false;
   const category = await applicationQueueCategory(ctx, guild);
   if (channel.parentId !== category.id)
     await channel.setParent(category.id, {
@@ -904,12 +928,13 @@ export async function syncApplicationQueue(ctx, guild) {
   await applicationQueueBoardChannel(ctx, guild, category);
   for (const dossier of ctx.store.queuedApplications()) {
     try {
-      await synchronizeQueuedApplication(ctx, guild, dossier);
+      const recovered = await synchronizeQueuedApplication(ctx, guild, dossier);
+      if (recovered !== false) ctx.store.clearApplicationQueueSyncRetry(dossier.id);
     } catch (error) {
-      ctx.store.audit('application.queue_retry_failed', guild.members.me.id, {
-        id: dossier.id,
-        error: String(error.code || error.name),
-      });
+      ctx.store.retryApplicationQueueSync(
+        dossier.id,
+        error.code || error.message || error.name || 'Onbekende fout',
+      );
     }
   }
   for (const post of ctx.store.applicationQueuePosts().filter((item) => item.status === 'queued')) {

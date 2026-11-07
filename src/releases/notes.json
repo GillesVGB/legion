@@ -1,4 +1,8 @@
 {
+  "2.6.4": [
+    "🔁 **Wachtrijherstel zonder logspam**\nTijdelijke fouten bij het herstellen van sollicitaties worden nu met oplopende wachttijd opnieuw geprobeerd, tot maximaal één poging per uur. De bot logt de echte foutmelding één keer en opnieuw als de fout verandert. Na geslaagd herstel wordt de retry-status gewist.",
+    "🧭 **Verdwaalde sollicitatiekanalen teruggevonden**\nAls het opgeslagen kanaal niet meer klopt, zoekt de bot in de server naar het kanaal met het dossier-ID en koppelt het dossier opnieuw. Bestaat het kanaal echt niet meer, dan sluit de bot het onherstelbare dossier af en werkt de wachtrijkaart bij; hetzelfde dossier blijft dan niet elke minuut falen."
+  ],
   "2.6.3": [
     "⏸️ **Automatische tweewekelijkse activiteitencheck verwijderd**\nDe bot plant of publiceert geen volgende terugkerende activiteitencheck meer. Ook de velden voor interval, datum, tijd, reden, kanaal en automatisch aan/uit zijn uit Modules instellen verwijderd. De normale herinneringen voor handmatig gestarte checks blijven instelbaar.",
     "🛑 **Openstaande automatisch ingeplande checks veilig geannuleerd**\nEen nog open check die door de terugkerende planning was ingepland, wordt één keer afgesloten als geannuleerd. Het bestaande Discordbericht wordt bijgewerkt. Voor deze geannuleerde check deelt de bot geen gangwarns meer uit. Afgeronde checks en hun waarschuwinghistorie blijven behouden.",

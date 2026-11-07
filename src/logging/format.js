@@ -104,6 +104,7 @@ const names = {
   'application.queue_dm_sent': '📨 Wachtrijbericht verstuurd',
   'application.queue_dm_failed': '⚠️ Wachtrijbericht niet bezorgd',
   'application.queue_retry_failed': '⚠️ Wachtrijherstel mislukt',
+  'application.queue_channel_missing': '⚠️ Wachtrijdossier afgesloten: ticketkanaal ontbreekt',
   'application.queue_ticket_notice': '📨 Wachtrijbericht in ticket geplaatst',
 };
 const labels = {
@@ -116,7 +117,8 @@ const labels = {
   interaction: 'Interactie',
   action: 'Uitgevoerde actie',
   route: 'Uitgevoerd',
-  error: 'Foutcode',
+  error: 'Foutmelding',
+  attempts: 'Pogingen',
   amount: 'Bedrag',
   period: 'Termijn',
   version: 'Versie',
