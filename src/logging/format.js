@@ -2,6 +2,7 @@ import { embed, safeText } from '../ui/messages.js';
 import { cleanAudit } from './sanitize.js';
 const names = {
   'gangpot.exemptions.removed': '💰 Losse gangpotvrijstellingen afgeschaft',
+  'gangpot.exemption.granted': '✅ Eenmalige gangpotvrijstelling toegekend',
   'application.queue_replies_opened': '💬 Antwoorden toegestaan na bericht van Lead',
   'application.queue_reply_notice': '📨 Sollicitant kan weer antwoorden: ticketmelding geplaatst',
   'message.delete': '🗑️ Bericht verwijderd',

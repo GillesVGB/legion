@@ -9,8 +9,18 @@ export function removeGangpotExemptions(store, now = Date.now()) {
     }
     store.db
       .prepare(
-        "UPDATE gangpot_exemptions SET revoked_at=?,revoked_by=?,revoke_reason='Losse gangpotvrijstellingen zijn afgeschaft.' WHERE revoked_at IS NULL",
+        "UPDATE gangpot_exemptions SET revoked_at=?,revoked_by=?,revoke_reason='Losse gangpotvrijstellingen zijn afgeschaft.' WHERE revoked_at IS NULL AND source!='manual'",
       )
       .run(now, store.config.clientId || 'system');
   });
+}
+
+export function manualGangpotExemptionFor(ctx, user, periodId) {
+  return (
+    ctx.store.db
+      .prepare(
+        "SELECT * FROM gangpot_exemptions WHERE user_id=? AND period_id=? AND source='manual' AND revoked_at IS NULL LIMIT 1",
+      )
+      .get(user, periodId) || null
+  );
 }

@@ -1,11 +1,14 @@
-import { planningTime } from '../planning/index.js';
 import { missionDay } from '../games/mission-definitions.js';
+import { operationSettings } from '../../config/features.js';
 const eligible = (ctx, member) =>
   Boolean(member && !member.user.bot && member.roles.cache.has(ctx.config.gangpot.memberRoleId));
 export function gangpotIntroduction(ctx, user, period) {
-  return null;
+  if (!period) return null;
+  const membership = ctx.store.db
+    .prepare('SELECT * FROM gangpot_memberships WHERE user_id=? AND started_at IS NOT NULL')
+    .get(user);
+  return membership?.required_from === period.ends_at ? membership : null;
 }
-const dayShift = (date, days) => missionDay(Date.parse(date + 'T12:00:00Z') + days * 86400000);
 function firstRequired(ctx, started, windowAt) {
   const period =
     ctx.store.db
@@ -14,9 +17,10 @@ function firstRequired(ctx, started, windowAt) {
       )
       .get(started, started) || windowAt(started);
   if (!period) return started;
-  if (started <= period.starts_at) return period.starts_at;
-  const firstPayableTuesday = planningTime(dayShift(period.id, -4), '00:00', started);
-  return started >= firstPayableTuesday ? period.ends_at : period.starts_at;
+  const graceStartsOn = operationSettings(ctx).gangpot.memberGraceStartDate;
+  return missionDay(started) >= graceStartsOn && started >= period.starts_at
+    ? period.ends_at
+    : period.starts_at;
 }
 function remember(ctx, user, started, source, windowAt) {
   const required = started === null ? 0 : firstRequired(ctx, started, windowAt);

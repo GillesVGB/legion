@@ -222,7 +222,7 @@ export class Store {
       CREATE TABLE IF NOT EXISTS gangpot_exemptions (
         id TEXT PRIMARY KEY, user_id TEXT NOT NULL,period_id TEXT NOT NULL,request_id TEXT,
         actor_id TEXT NOT NULL,reason TEXT NOT NULL,created_at INTEGER NOT NULL,
-        revoked_at INTEGER,revoked_by TEXT,revoke_reason TEXT
+        revoked_at INTEGER,revoked_by TEXT,revoke_reason TEXT,source TEXT NOT NULL DEFAULT 'legacy'
       );
       CREATE UNIQUE INDEX IF NOT EXISTS exemption_active ON gangpot_exemptions(period_id,user_id) WHERE revoked_at IS NULL;
       CREATE TABLE IF NOT EXISTS feature_notices (
@@ -305,6 +305,14 @@ export class Store {
     ])
       if (!gangpotColumns.has(name))
         this.db.exec(`ALTER TABLE gangpot_claims ADD COLUMN ${name} ${type};`);
+    const exemptionColumns = new Set(
+      this.db
+        .prepare('PRAGMA table_info(gangpot_exemptions)')
+        .all()
+        .map((column) => column.name),
+    );
+    if (!exemptionColumns.has('source'))
+      this.db.exec("ALTER TABLE gangpot_exemptions ADD COLUMN source TEXT NOT NULL DEFAULT 'legacy';");
     if (previousSchema < 10)
       this.db.exec(`UPDATE gangpot_claims SET
       withdrawn_at=(SELECT voided_at FROM gangpot_entries WHERE id=payment_id),
@@ -349,7 +357,7 @@ export class Store {
       CREATE INDEX IF NOT EXISTS check_member_history ON activity_check_members(user_id,check_id);
       CREATE INDEX IF NOT EXISTS notice_due_kind ON feature_notices(status,kind,next_attempt);
       CREATE INDEX IF NOT EXISTS check_deadline_due ON activity_check_sessions(status,deadline_at,next_attempt);
-      PRAGMA user_version = 21;
+      PRAGMA user_version = 22;
     `);
     removeGangpotExemptions(this);
   }

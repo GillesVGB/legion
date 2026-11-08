@@ -4,6 +4,7 @@ export const featureDefaults = {
   gangpot: {
     weeklyAmount: 25000,
     deadlineTime: '23:59',
+    memberGraceStartDate: '2026-11-08',
     remindersEnabled: true,
     thursdayTime: '18:00',
     fridayTime: '18:00',
@@ -194,6 +195,14 @@ export function validateOperations(value) {
         assertUser(
           typeof input === 'string' && (!input || /^\d{17,20}$/.test(input)),
           'Gebruik een geldig kanaal-ID of laat leeg voor het standaardkanaal.',
+        );
+      else if (key === 'memberGraceStartDate')
+        assertUser(
+          typeof input === 'string' &&
+            /^\d{4}-\d{2}-\d{2}$/.test(input) &&
+            Number.isFinite(Date.parse(`${input}T00:00:00.000Z`)) &&
+            new Date(`${input}T00:00:00.000Z`).toISOString().slice(0, 10) === input,
+          'Kies een geldige datum voor de instapvrijstelling.',
         );
       else if (key.endsWith('Time'))
         assertUser(

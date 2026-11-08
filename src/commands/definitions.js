@@ -275,6 +275,30 @@ export function commands(maxBet, ticketsEnabled = true) {
       )
       .addSubcommand((s) =>
         s
+          .setName('vrijstellen')
+          .setDescription('Stel een lid voor één gangpottermijn vrij (leiding)')
+          .addUserOption((o) =>
+            o
+              .setName('gebruiker')
+              .setDescription('Het Bakarov-lid dat deze week wordt vrijgesteld')
+              .setRequired(true),
+          )
+          .addStringOption((o) =>
+            o
+              .setName('reden')
+              .setDescription('Waarom krijgt dit lid deze eenmalige vrijstelling?')
+              .setRequired(true)
+              .setMaxLength(500),
+          )
+          .addStringOption((o) =>
+            o
+              .setName('termijn')
+              .setDescription('Zaterdag: DD-MM-JJJJ; standaard huidige week')
+              .setMaxLength(10),
+          ),
+      )
+      .addSubcommand((s) =>
+        s
           .setName('betaling')
           .setDescription('Meld je eigen in-game betaling; Lead zet het vinkje')
           .addIntegerOption((o) =>

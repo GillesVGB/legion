@@ -62,7 +62,7 @@ export function syncAbsenceExemptions(ctx, actor, now = Date.now(), inside = fal
   const run = () => {
     ctx.store.db
       .prepare(
-        "UPDATE gangpot_exemptions SET revoked_at=?,revoked_by=?,revoke_reason='Losse gangpotvrijstellingen zijn afgeschaft.' WHERE revoked_at IS NULL",
+        "UPDATE gangpot_exemptions SET revoked_at=?,revoked_by=?,revoke_reason='Losse gangpotvrijstellingen zijn afgeschaft.' WHERE revoked_at IS NULL AND source!='manual'",
       )
       .run(now, actor || ctx.config.clientId);
     const approved = ctx.store.db

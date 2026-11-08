@@ -812,7 +812,7 @@ function gangpotPage() {
     exempt: '✅ Vrijgesteld',
   };
   return (
-    `<div class="notice">Leden gebruiken <strong>/gangpot betaling</strong>. Alleen Lead kan ✅ goedkeuren of ❌ afkeuren. Iedere zaterdag om <strong>23:59 Belgische tijd</strong> volgt automatisch één gangwarn voor leden zonder volledige goedkeuring. Ook wachten op controle geeft geen uitstel. Leden die vanaf dinsdag toetreden zijn alleen die week vrijgesteld; vanaf de volgende week betalen ze mee.</div>` +
+    `<div class="notice">Leden gebruiken <strong>/gangpot betaling</strong>. Alleen Lead kan ✅ goedkeuren of ❌ afkeuren. Iedere zaterdag om <strong>23:59 Belgische tijd</strong> volgt automatisch één gangwarn voor leden zonder volledige goedkeuring. Ook wachten op controle geeft geen uitstel. Leden die vanaf ${e(state.data.operations.gangpot.memberGraceStartDate)} na de start van hun eerste termijn toetreden, zijn alleen voor die termijn vrijgesteld; vanaf de volgende termijn betalen ze mee. Stel de ingangsdatum in via Modules instellen → Gangpot & herinneringen.</div>` +
     gangpotAssetsPage(d) +
     card(
       'Bevestigde gangpot',
@@ -1500,6 +1500,7 @@ const settingLabels = {
   localRetentionDays: 'Verzonden berichtlogs lokaal bewaren (dagen)',
   weeklyAmount: 'Weekbijdrage in-game',
   deadlineTime: 'Deadline op zaterdag',
+  memberGraceStartDate: 'Instapvrijstelling vanaf datum',
   remindersEnabled: 'Herinneringen voor leden',
   thursdayTime: 'Vrijdag: DM-tijd',
   fridayTime: 'Zaterdag: DM-tijd',
@@ -1590,9 +1591,14 @@ function modulesPage() {
             value,
             typeof value === 'number'
               ? 'number'
+              : key === 'memberGraceStartDate'
+                ? 'date'
               : key.endsWith('Time')
                 ? 'time'
               : 'text',
+            key === 'memberGraceStartDate'
+              ? 'Nieuwe leden die vanaf deze datum na de start van hun eerste termijn toetreden, slaan alleen die eerste termijn over.'
+              : '',
           );
           return ['ignoredChannelIds', 'levelUpChannelId'].includes(key)
             ? input.replace(' required', '')
